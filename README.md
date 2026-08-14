@@ -21,6 +21,7 @@
 - [与 dsh 文档的对应关系](#与-dsh-文档的对应关系)
 - [工作原理](#工作原理)
 - [项目结构](#项目结构)
+- [项目状态](#项目状态)
 - [常见问题](#常见问题-faq)
 - [许可证](#许可证)
 
@@ -201,6 +202,12 @@ dsh-harness-controller/
 ├── LICENSE               # MIT 许可证
 └── .gitignore            # 排除运行时产物与本机配置
 ```
+
+## 项目状态
+
+- **当前版本**：v0.1.0（已发布，[下载 Release](https://github.com/DreamRift/dsh-harness-controller/releases)）
+- **状态**：功能完整，项目暂告一段落（维护模式）
+- **后续**：如发现缺陷或有新需求，欢迎提交 [Issue](https://github.com/DreamRift/dsh-harness-controller/issues) 或 [Pull Request](https://github.com/DreamRift/dsh-harness-controller/pulls)
 
 ## 常见问题 (FAQ)
 
