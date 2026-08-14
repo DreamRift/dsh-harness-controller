@@ -1,0 +1,14 @@
+# 运行时生成的文件（含本机路径，不提交）
+launcher.json
+cli.log
+crash.log
+
+# 构建产物（请用 build.ps1 自行编译）
+*.exe
+*.pdb
+
+# 编辑器/系统
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
