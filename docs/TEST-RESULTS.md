@@ -18,7 +18,7 @@
 | `--selftest-core --port 3189`（Release publish） | 通过，23 passed / 0 failed |
 | GUI 启动与状态显示 | 通过，UI Automation 可见文本完整，外部实例识别正常 |
 | 明暗主题切换 | 通过，浅色平均亮度约 241，深色约 85，最终恢复 `system` |
-| 任务栏/exe 图标 | 通过，`app.ico` 改为品牌蓝底白色鲸鱼，exe 提取图标约 77% 品牌蓝、17% 白色 |
+| 任务栏/exe 图标 | 通过，`app.ico` 改为官方风格白底黑色鲸鱼；exe 提取图标约 21% 黑、72% 白（40px），16px 黑色占比约 25% |
 
 ## 核心自检覆盖
 

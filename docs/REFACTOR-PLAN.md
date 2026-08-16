@@ -246,8 +246,8 @@ Stopped ──Start──► Starting ──probe OK──► Running
 
 ### 5.4 应用图标（R7）✅ 已完成
 
-`Assets/app.ico`（9 尺寸 PNG-in-ICO）+ `whale.svg` 源件，构图使用品牌蓝 `#3964FE`
-圆角瓷砖 + 白色鲸鱼；任务栏小尺寸不再显示为白色色块。构建后从 exe 提取图标复核像素。
+`Assets/app.ico`（9 尺寸 PNG-in-ICO）+ `whale.svg` 源件，构图还原 Harness 官方白底
+黑色鲸鱼；鲸鱼放大到约 82%，任务栏小尺寸仍保留明显黑色对比。构建后从 exe 提取图标复核像素。
 
 ---
 

@@ -68,8 +68,8 @@ WASDK 1.5.240607001，不在本次重构中追新（稳定性优先）。
   浅色模式 `#000` 填充、深色模式 `#fff`，`manifest.webmanifest` 名称 "DeepSeek Harness"）。
 - 已生成（`Assets/`）：
   - `whale.svg`：官方源文件副本（去除 media query）
-  - `app.ico`：9 尺寸 PNG-in-ICO 容器（已验证容器结构），构图 = `#3964FE` 品牌蓝圆角瓷砖 +
-    白色鲸鱼居中 76%，保证任务栏/小尺寸图标不是白色色块
+  - `app.ico`：9 尺寸 PNG-in-ICO 容器（已验证容器结构），构图 = `#FFFFFF` 白底圆角瓷砖 +
+    黑色鲸鱼居中约 82%，保持 Harness 官方黑鲸观感并改善小尺寸对比
 - 工具链：Node 生成逐尺寸 HTML → headless Chrome `--screenshot` + `--default-background-color=00000000` →
   PowerShell BinaryWriter 组装 ICO。图标通过 exe 提取与像素比例复核。
 
