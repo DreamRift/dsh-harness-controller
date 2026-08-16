@@ -85,7 +85,7 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
 │ ┌──────────────────────────────────────────────────┐ │
 │ │ 21:30:01  已启动 dsh web（PID 18672）   Consolas  │ │
 │ └──────────────────────────────────────────────────┘ │
-│  dsh: %APPDATA%\npm\dsh.cmd · v0.2.0                 │
+│  dsh: %APPDATA%\npm\dsh.cmd · v0.3.0                 │
 └──────────────────────────────────────────────────────┘
 ```
 
@@ -94,7 +94,7 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
 ### 方式一：直接使用发布包
 
 1. 下载 [Releases](https://github.com/DreamRift/dsh-harness-controller/releases)
-   中的 `DshController-0.2.0-win-x64.zip`，解压到任意目录；
+   中的 `DshController-0.3.0-win-x64.zip`，解压到任意目录；
 2. 运行 `DshController.exe`（前置条件：Win10 17763+ 与 [.NET 6 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/6.0)；
    `-Portable` 全自包含包则无任何前置）；
 3. 点 **▶ 启动后端**，浏览器会自动打开 Harness 界面；
@@ -305,7 +305,7 @@ dsh-harness-controller/
 不会。会话与数据保存在 `$DSH_HOME`（默认 `%USERPROFILE%\.dsh`），
 再次启动后端即可恢复。
 
-**Q：为什么 v0.2.0 变成了一个大文件夹而不是单个 exe？**
+**Q：为什么变成了一个大文件夹而不是单个 exe？**
 WinUI 3 + 自包含 Windows App SDK 的固有代价（约 120 MB）。用
 `build.ps1 -Portable` 构建可连 .NET 运行时一并自包含，拷贝即用。
 
