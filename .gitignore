@@ -8,6 +8,7 @@ reports/
 bin/
 obj/
 publish/
+publish-fixed/
 *.exe
 *.pdb
 *.user

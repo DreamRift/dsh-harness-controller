@@ -6,7 +6,7 @@
 ## [0.2.0] - 开发中（未发布）
 
 > **当前状态**：代码实现完成，构建通过；`--check`、`--spawn-test-node`、
-> `--spawn-test`、`--selftest-core`（Debug 与 Release 各 23 项）已全部验证通过；
+> `--spawn-test`、`--selftest-core`（Debug 与 Release 各 30 项）已全部验证通过；
 > GUI 已启动并确认外部实例状态、按钮、日志与明暗主题切换；Release 发布目录已生成，
 > GitHub Release 发布待执行。
 
@@ -58,6 +58,9 @@
 
 - `--check` 等自检命令在 Windows App SDK 清单合并（mt.exe）下的启动问题
   （requestedExecutionLevel 的 UIAccess 属性导致 SxS 激活失败）
+- 外部后端直接点击“重启”并确认后无动作：UI 通过端口探测显示 Running，但
+  `BackendManager` 内部状态仍为 Stopped，旧逻辑会提前返回；现在允许停止外部实例
+  并由本程序重新启动后端（重启仍不打开浏览器）
 
 ## [0.1.0] - 2026-08-14
 

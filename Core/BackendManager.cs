@@ -130,8 +130,16 @@ namespace DshController.Core
             {
                 bool mine;
                 int pid;
-                lock (_gate) { mine = _mine; pid = _childPid; }
-                if (State == BackendState.Stopped) return false;
+                lock (_gate)
+                {
+                    mine = _mine;
+                    pid = _childPid;
+                    // UI 可能已通过端口探测显示外部实例 Running，但管理器内部仍是 Stopped；
+                    // 此时仍应允许“停止外部实例 → 由本程序重启”。
+                    if (_state == BackendState.Starting || _state == BackendState.Stopping ||
+                        _state == BackendState.Restarting)
+                        return false;
+                }
 
                 LogUi("⟳ 重启：正在停止后端（浏览器不会自动打开）…");
                 SetState(BackendState.Restarting, mine, pid);

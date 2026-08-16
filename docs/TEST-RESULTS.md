@@ -14,11 +14,12 @@
 | `--check`（默认 3080 只读） | 通过，dsh 已解析，3080 为 UP |
 | `--spawn-test-node --port 3187` | 通过，启动/停止与端口释放全绿 |
 | `--spawn-test --port 3188` | 通过，真实 dsh 启动/停止与端口释放全绿 |
-| `--selftest-core --port 3185`（Debug） | 通过，23 passed / 0 failed |
-| `--selftest-core --port 3189`（Release publish） | 通过，23 passed / 0 failed |
+| `--selftest-core --port 3185`（Debug） | 通过，30 passed / 0 failed |
+| `--selftest-core --port 3191`（Release publish-fixed） | 通过，30 passed / 0 failed |
 | GUI 启动与状态显示 | 通过，UI Automation 可见文本完整，外部实例识别正常 |
 | 明暗主题切换 | 通过，浅色平均亮度约 241，深色约 85，最终恢复 `system` |
 | 任务栏/exe 图标 | 通过，`app.ico` 改为官方风格白底黑色鲸鱼；exe 提取图标约 21% 黑、72% 白（40px），16px 黑色占比约 25% |
+| 外部实例直接重启 | 通过，确认后停止外部测试实例并重新启动，Ready 抑制浏览器 |
 
 ## 核心自检覆盖
 
@@ -28,6 +29,8 @@
 3. 真实 dsh 启动：端口监听，状态进入 Running（本程序），Ready 不抑制浏览器。
 4. 重启：后端 PID 更换，Ready 事件 `SuppressAutoOpen=true`，无失败报告。
 5. 停止：端口释放，状态回到 Stopped。
+6. 外部实例直接重启：管理器初始状态为 Stopped 时，仍能停止外部测试实例并启动本程序后端，
+   且 Ready 事件 `SuppressAutoOpen=true`。
 
 ## GUI 验证
 
@@ -39,8 +42,8 @@
 
 ## 发布产物
 
-- `publish\DshController.exe`（119 MB，框架依赖 .NET 6 Desktop Runtime，WASDK 自包含）
-- `publish\DshController-0.2.0-win-x64.zip`
+- `publish\DshController.exe`（旧版，正在运行；后续手动关闭后可替换为修复版）
+- `publish-fixed\DshController.exe`（修复版，119 MB，框架依赖 .NET 6 Desktop Runtime，WASDK 自包含）
 
 ## 尚未执行
 

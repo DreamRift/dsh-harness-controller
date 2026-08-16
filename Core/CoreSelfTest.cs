@@ -10,12 +10,14 @@
 //                           === true（需求 R4：重启绝不拉浏览器）
 //    4. 停止              → 断言端口释放、状态回 Stopped
 //    5. launcher.json 旧格式（含反斜杠污染）迁移净化
+//    6. 外部实例直接重启   → 断言管理器初始 Stopped 时仍可停止外部并启动本程序后端
 //
 //  端口使用 3185+（避开 3080 用户实例与常用测试端口）；退出码 0=全部通过。
 // ============================================================================
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -136,6 +138,8 @@ namespace DshController.Core
                 if (!up) Thread.Sleep(1000);
             }
             Check(up, "后端就绪（端口监听）");
+            for (int i = 0; i < 20 && !(mgr.State == BackendState.Running && mgr.IsMine); i++)
+                Thread.Sleep(250);
             Check(mgr.State == BackendState.Running && mgr.IsMine, "状态 Running(本程序)");
             int pid1 = mgr.ChildPid;
             Check(pid1 > 0, "记录子进程 PID", pid1.ToString());
@@ -153,6 +157,8 @@ namespace DshController.Core
                 if (!up2) Thread.Sleep(1000);
             }
             Check(rst && up2, "重启后端口重新监听");
+            for (int i = 0; i < 20 && !(mgr.State == BackendState.Running && mgr.IsMine); i++)
+                Thread.Sleep(250);
             Check(mgr.State == BackendState.Running && mgr.IsMine, "重启后 Running(本程序)");
             Check(mgr.ChildPid != pid1 && mgr.ChildPid > 0, "子进程 PID 已更换",
                 pid1 + " -> " + mgr.ChildPid);
@@ -168,6 +174,68 @@ namespace DshController.Core
             bool down = !PortTools.ProbeAsync(cfg.Host, cfg.Port).GetAwaiter().GetResult();
             Check(down, "端口已释放");
             Check(mgr.State == BackendState.Stopped, "状态回 Stopped");
+
+            // ---------- 6) 外部实例直接重启 ----------
+            Console.WriteLine("[6] 外部实例直接重启");
+            string extNode = DshResolver.FindNode();
+            if (string.IsNullOrEmpty(extNode))
+            {
+                Check(false, "node 可用于外部实例");
+            }
+            else
+            {
+                int extPort = basePort + 2;
+                string extJs = Path.Combine(binDir, "test-server.js");
+                var extCfg = new Config
+                {
+                    Host = "127.0.0.1",
+                    Port = extPort,
+                    Workspace = Path.GetTempPath(),
+                    ErrorReportDir = rptDir
+                };
+                var extPsi = new ProcessStartInfo(extNode, "\"" + extJs + "\" " + extPort)
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (Process ext = Process.Start(extPsi))
+                {
+                    bool extUp = false;
+                    for (int i = 0; i < 20 && !extUp; i++)
+                    {
+                        extUp = PortTools.ProbeAsync(extCfg.Host, extCfg.Port).GetAwaiter().GetResult();
+                        if (!extUp) Thread.Sleep(250);
+                    }
+                    Check(extUp, "外部实例已监听");
+
+                    var extMgr = new BackendManager(null);
+                    var extReady = new List<ReadyEventArgs>();
+                    var extFail = new List<StartFailureContext>();
+                    extMgr.Ready += (s, e) => { lock (extReady) extReady.Add(e); };
+                    extMgr.StartFailed += (s, e) => { lock (extFail) extFail.Add(e); };
+                    Check(extMgr.State == BackendState.Stopped, "外部实例下管理器状态为 Stopped");
+
+                    bool extRst = extMgr.RestartAsync(extCfg).GetAwaiter().GetResult();
+                    bool extUp2 = false;
+                    for (int i = 0; i < 120 && !extUp2; i++)
+                    {
+                        extUp2 = PortTools.ProbeAsync(extCfg.Host, extCfg.Port).GetAwaiter().GetResult();
+                        if (!extUp2) Thread.Sleep(1000);
+                    }
+                    Check(extRst && extUp2, "外部实例直接重启成功");
+                    for (int i = 0; i < 20 && !(extMgr.State == BackendState.Running && extMgr.IsMine); i++)
+                        Thread.Sleep(250);
+                    Check(extMgr.State == BackendState.Running && extMgr.IsMine, "重启后为本程序启动");
+                    Check(extReady.Count > 0 && extReady[0].SuppressAutoOpen,
+                        "外部重启 Ready.SuppressAutoOpen = true");
+                    Check(extFail.Count == 0, "外部重启无失败报告",
+                        extFail.Count > 0 ? extFail[0].FailureKind : "");
+
+                    bool extStopped = extMgr.StopAsync(extCfg, killExternal: false).GetAwaiter().GetResult();
+                    Check(extStopped, "外部重启后停止成功");
+                    extMgr.Dispose();
+                }
+            }
 
             mgr.Dispose();
             try { File.Delete(failCmd); } catch { }
