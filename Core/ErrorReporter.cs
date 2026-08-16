@@ -26,11 +26,13 @@ namespace DshController.Core
         public IReadOnlyList<string> CapturedOutput; // 子进程输出（最近 N 行）
         public int? ExitCode;                   // 早退时的退出码
         public string Extra = "";               // 额外信息（端口详情等）
+        public string InstanceId;               // 实例 ID（多实例 v0.3.0，可空）
+        public string InstanceHome;             // 实例 DSH_HOME（多实例 v0.3.0，可空）
     }
 
     public static class ErrorReporter
     {
-        public const string AppVersion = "0.2.0";
+        public const string AppVersion = "0.3.0";
 
         /// <summary>启动失败报告。返回写入的文件路径；彻底失败返回 null。</summary>
         public static string WriteStartFailure(StartFailureContext ctx)
@@ -60,6 +62,13 @@ namespace DshController.Core
             return WriteReport(name, sb.ToString(), cfg);
         }
 
+        /// <summary>全局崩溃报告（多实例 v0.3.0）：从注册表快照取全局报告目录。</summary>
+        public static string WriteCrash(Exception ex, string phase, InstanceRegistry registry)
+        {
+            var cfg = new Config { ErrorReportDir = registry?.Settings?.ErrorReportDir ?? "" };
+            return WriteCrash(ex, phase, cfg);
+        }
+
         // ------------------------------------------------------------------
 
         private static string BuildMarkdown(StartFailureContext ctx)
@@ -79,7 +88,16 @@ namespace DshController.Core
             if (ctx.ExitCode.HasValue) sb.AppendLine("子进程退出码: `" + ctx.ExitCode.Value + "`");
             if (!string.IsNullOrEmpty(ctx.Extra)) sb.AppendLine(ctx.Extra);
 
-            // 1 环境
+            // 1 实例信息
+            sb.AppendLine();
+            sb.AppendLine("## 实例信息");
+            sb.AppendLine();
+            if (!string.IsNullOrEmpty(ctx.InstanceId)) sb.AppendLine("实例 ID: `" + ctx.InstanceId + "`");
+            if (!string.IsNullOrEmpty(ctx.InstanceHome)) sb.AppendLine("DSH_HOME: `" + ctx.InstanceHome + "`");
+            if (string.IsNullOrEmpty(ctx.InstanceId) && string.IsNullOrEmpty(ctx.InstanceHome))
+                sb.AppendLine("（默认实例，未注入 DSH_HOME）");
+
+            // 2 环境
             AppendEnvironment(sb);
 
             // 2 dsh 解析
@@ -98,7 +116,7 @@ namespace DshController.Core
 
             // 3 配置
             sb.AppendLine();
-            sb.AppendLine("## 本次配置（launcher.json）");
+            sb.AppendLine("## 本次配置（instances.json）");
             sb.AppendLine();
             sb.AppendLine("```json");
             sb.AppendLine("{");
@@ -106,6 +124,8 @@ namespace DshController.Core
             sb.AppendLine("  \"port\": " + cfg.Port + ",");
             sb.AppendLine("  \"workspace\": \"" + cfg.Workspace + "\",");
             sb.AppendLine("  \"dshCommand\": \"" + cfg.DshCommand + "\",");
+            sb.AppendLine("  \"home\": \"" + (string.IsNullOrEmpty(cfg.Home) ? "（默认 ~/.dsh）" : cfg.Home) + "\",");
+            sb.AppendLine("  \"trustedHosts\": " + FormatTrustedHosts(cfg.TrustedHosts) + ",");
             sb.AppendLine("  \"autoOpenBrowser\": " + (cfg.AutoOpenBrowser ? "true" : "false") + ",");
             sb.AppendLine("  \"stopOnExit\": " + (cfg.StopOnExit ? "true" : "false") + ",");
             sb.AppendLine("  \"errorReportDir\": \"" + cfg.EffectiveErrorReportDir + "\"");
@@ -154,6 +174,12 @@ namespace DshController.Core
             sb.AppendLine();
             sb.AppendLine(SuggestionsFor(ctx));
             return sb.ToString();
+        }
+
+        private static string FormatTrustedHosts(string[] trustedHosts)
+        {
+            if (trustedHosts == null || trustedHosts.Length == 0) return "（无）";
+            return "\"" + string.Join("、", trustedHosts) + "\"";
         }
 
         private static void AppendEnvironment(StringBuilder sb)

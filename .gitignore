@@ -1,5 +1,8 @@
 # 运行时生成的文件（含本机路径，不提交）
 launcher.json
+launcher.json.*
+instances.json
+instances.json.tmp
 cli.log
 crash.log
 reports/

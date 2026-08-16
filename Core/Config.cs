@@ -48,6 +48,14 @@ namespace DshController.Core
         [JsonConverter(typeof(JsonStringEnumConverterEx))]
         public AppTheme Theme { get; set; } = AppTheme.System;
 
+        /// <summary>DSH_HOME 目录（v0.3.0 多实例隔离）；空 = 不注入（使用默认 ~/.dsh，兼容旧行为）。</summary>
+        [JsonPropertyName("home")]
+        public string Home { get; set; } = "";
+
+        /// <summary>额外浏览器信任来源（--trusted-host，可重复）。</summary>
+        [JsonPropertyName("trustedHosts")]
+        public string[] TrustedHosts { get; set; } = Array.Empty<string>();
+
         [JsonIgnore]
         public static string FilePath
         {

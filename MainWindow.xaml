@@ -27,6 +27,15 @@
                     </Image.Source>
                 </Image>
                 <TextBlock Text="DSH HARNESS 控制器" Style="{StaticResource Wordmark}" VerticalAlignment="Center" />
+                <ComboBox x:Name="CmbInstance" Width="160"
+                          VerticalAlignment="Center" MinHeight="32"
+                          SelectionChanged="CmbInstance_SelectionChanged">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
             </StackPanel>
             <!-- 主题切换：留出右侧系统标题按钮空间 -->
             <Button x:Name="BtnTheme" Style="{StaticResource BtnIcon}" HorizontalAlignment="Right"
@@ -55,6 +64,8 @@
                                            FontSize="15" Foreground="{ThemeResource LabelPrimaryBrush}"
                                            VerticalAlignment="Center" />
                             </StackPanel>
+                            <TextBlock x:Name="HomeText" Text="DSH_HOME: ~/.dsh(默认,不注入)"
+                                       Style="{StaticResource FooterText}" TextWrapping="Wrap" />
                             <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                                 <HyperlinkButton x:Name="UrlLink" Padding="0" Margin="0"
                                                  FontSize="13" Content="http://127.0.0.1:3080/">
@@ -86,14 +97,14 @@
                     <Button Grid.Column="0" x:Name="BtnStart" Style="{StaticResource BtnPrimary}" Click="BtnStart_Click">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" FontSize="15" />
-                            <TextBlock Text="启动后端" />
+                            <TextBlock Text="启动" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="1" x:Name="BtnRestart" Style="{StaticResource BtnSecondary}" Click="BtnRestart_Click"
                             ToolTipService.ToolTip="仅重启 harness 后端，不会打开新的浏览器界面">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="15" />
-                            <TextBlock Text="重启后端" />
+                            <TextBlock Text="重启" />
                         </StackPanel>
                     </Button>
                     <Button Grid.Column="2" x:Name="BtnStop" Style="{StaticResource BtnDangerGhost}" Click="BtnStop_Click"
@@ -111,14 +122,48 @@
                     </Button>
                 </Grid>
 
-                <!-- 设置 -->
-                <Expander Header="设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                <!-- 实例管理行 -->
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" x:Name="BtnNew" Style="{StaticResource BtnCompact}" Click="BtnNew_Click"
+                            ToolTipService.ToolTip="新建空白实例">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE710;" FontSize="13" />
+                            <TextBlock Text="新建实例" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" x:Name="BtnClone" Style="{StaticResource BtnCompact}" Click="BtnClone_Click"
+                            ToolTipService.ToolTip="克隆现有实例或默认 ~/.dsh">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8C8;" FontSize="13" />
+                            <TextBlock Text="克隆实例" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" x:Name="BtnDelete" Style="{StaticResource BtnCompact}" Click="BtnDelete_Click"
+                            ToolTipService.ToolTip="停止实例并删除注册项与 HOME 目录">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE74D;" FontSize="13" />
+                            <TextBlock Text="删除实例" />
+                        </StackPanel>
+                    </Button>
+                    <TextBlock Grid.Column="4" Text="编辑：在下方“实例设置”中直接修改当前实例"
+                               Style="{StaticResource FooterText}" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                </Grid>
+
+                <!-- 实例设置（选中实例） -->
+                <Expander Header="实例设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                           IsExpanded="False">
                     <Expander.HeaderTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="14" />
-                                <TextBlock Text="设置" FontWeight="SemiBold" />
+                                <TextBlock Text="实例设置" FontWeight="SemiBold" />
                             </StackPanel>
                         </DataTemplate>
                     </Expander.HeaderTemplate>
@@ -154,10 +199,22 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="报告目录" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
-                                       ToolTipService.ToolTip="启动失败/崩溃时详细错误报告（Markdown）的保存位置" />
-                            <TextBox Grid.Column="1" x:Name="TxtReportDir" Style="{StaticResource InputBox}" />
-                            <Button Grid.Column="2" x:Name="BtnBrowseRd" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseRd_Click" />
+                            <TextBlock Grid.Column="0" Text="DSH_HOME" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="留空表示不注入，使用默认 ~/.dsh" />
+                            <TextBox Grid.Column="1" x:Name="TxtHome" Style="{StaticResource InputBox}"
+                                     PlaceholderText="留空 = 默认 ~/.dsh（不注入）" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseHome" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseHome_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="trusted-hosts" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="逗号分隔，对应 dsh web --trusted-host 参数" />
+                            <TextBox Grid.Column="1" x:Name="TxtTrustedHosts" Style="{StaticResource InputBox}"
+                                     PlaceholderText="例：192.168.1.10, localhost" />
                         </Grid>
 
                         <Grid ColumnSpacing="10">
@@ -170,6 +227,55 @@
                                 <ToggleSwitch x:Name="SwAutoOpen" Header="启动就绪后自动打开浏览器界面" OnContent="" OffContent="" />
                                 <ToggleSwitch x:Name="SwStopOnExit" Header="退出时停止由本程序启动的后端" OnContent="" OffContent="" />
                             </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 全局设置 -->
+                <Expander Header="全局设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          IsExpanded="False">
+                    <Expander.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="14" />
+                                <TextBlock Text="全局设置" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </Expander.HeaderTemplate>
+                    <StackPanel Spacing="12" Margin="4,10,4,4" HorizontalAlignment="Stretch">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="报告目录" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="启动失败/崩溃时详细错误报告（Markdown）的保存位置" />
+                            <TextBox Grid.Column="1" x:Name="TxtReportDir" Style="{StaticResource InputBox}" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseRd" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseRd_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="实例目录根" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="新建/克隆实例时 DSH_HOME 的父目录" />
+                            <TextBox Grid.Column="1" x:Name="TxtHomeRoot" Style="{StaticResource InputBox}" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseRoot" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseRoot_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="dshCommand" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="留空自动查找（npm shim / PATH / node 入口）" />
+                            <TextBox Grid.Column="1" x:Name="TxtDshCommand" Style="{StaticResource InputBox}"
+                                     PlaceholderText="留空自动查找" />
                         </Grid>
                     </StackPanel>
                 </Expander>

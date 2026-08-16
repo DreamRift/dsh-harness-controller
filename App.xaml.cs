@@ -3,6 +3,7 @@
 // ============================================================================
 
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using DshController.Core;
 using Microsoft.UI.Xaml;
@@ -25,7 +26,7 @@ namespace DshController
             {
                 try
                 {
-                    string path = ErrorReporter.WriteCrash(e.Exception, "xaml", _configSnapshot);
+                    string path = ErrorReporter.WriteCrash(e.Exception, "xaml", _registrySnapshot);
                     e.Handled = true;
                     if (MainWindow != null) MainWindow.NotifyCrash(path);
                 }
@@ -33,7 +34,7 @@ namespace DshController
             };
             TaskScheduler.UnobservedTaskException += (s, e) =>
             {
-                try { ErrorReporter.WriteCrash(e.Exception, "task", _configSnapshot); } catch { }
+                try { ErrorReporter.WriteCrash(e.Exception, "task", _registrySnapshot); } catch { }
                 e.SetObserved();
             };
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
@@ -42,17 +43,18 @@ namespace DshController
                 {
                     var ex = e.ExceptionObject as Exception ??
                              new Exception(e.ExceptionObject == null ? "(null)" : e.ExceptionObject.ToString());
-                    ErrorReporter.WriteCrash(ex, "domain", _configSnapshot);
+                    ErrorReporter.WriteCrash(ex, "domain", _registrySnapshot);
                 }
                 catch { }
             };
 
-            _configSnapshot = Config.Load();
-            MainWindow = new MainWindow(_configSnapshot);
+            InstanceRegistry registry = InstanceRegistry.Load();
+            _registrySnapshot = registry.Instances.FirstOrDefault()?.ToConfig(registry.Settings) ?? new Config();
+            MainWindow = new MainWindow(registry);
             MainWindow.Activate();
         }
 
         // 供崩溃报告标注用户自定义的报告目录（尽力而为的快照）
-        private static Config _configSnapshot;
+        private static Config _registrySnapshot;
     }
 }

@@ -2,8 +2,11 @@
 //  Cli — 无界面自检模式（v0.1.0 语义原样移植到 v0.2.0 架构）
 //
 //    DshController.exe --check                        打印 dsh 解析结果与端口状态
-//    DshController.exe --spawn-test [--port N]        真实启动/停止 dsh web 实例
+//    DshController.exe --spawn-test [--port N] [--home <dir>]
+//                                                     真实启动/停止 dsh web 实例（可选 DSH_HOME 注入验证）
 //    DshController.exe --spawn-test-node [--port N]   仅验证进程管线（微型 node 服务）
+//    DshController.exe --instance <id> start|stop|restart|status
+//                                                     定向操作指定实例（无 GUI）
 //    DshController.exe --version                      打印版本
 //  退出码语义与 v0.1.0 一致；输出同时转录到 exe 旁 cli.log。
 //  附加 --noredirect 可在禁止管道重定向的受限环境运行。
@@ -29,6 +32,12 @@ namespace DshController.Core
             if (a == "--check") { exitCode = Check(args); return true; }
             if (a == "--spawn-test") { exitCode = SpawnTest(args, useRealDsh: true); return true; }
             if (a == "--spawn-test-node") { exitCode = SpawnTest(args, useRealDsh: false); return true; }
+            if (a == "--instance" && args.Length >= 3)
+            {
+                AttachConsoleOutput();
+                exitCode = Instance(args);
+                return true;
+            }
             if (a == "--version" || a == "-v")
             {
                 AttachConsoleOutput();
@@ -77,7 +86,10 @@ namespace DshController.Core
             var transcript = new StringBuilder();
             Action<string> Out = line => { transcript.AppendLine(line); try { Console.WriteLine(line); } catch { } };
 
-            Config cfg = Config.Load();
+            // v0.3.0：主配置取实例清单的第一个实例（launcher.json 迁移后已退役）
+            var registry = InstanceRegistry.Load();
+            InstanceDef main = registry.Instances.Count > 0 ? registry.Instances[0] : new InstanceDef();
+            Config cfg = main.ToConfig(registry.Settings);
             int port = cfg.Port;
             for (int i = 1; i < args.Length; i++)
                 if (args[i] == "--port" && i + 1 < args.Length)
@@ -95,7 +107,21 @@ namespace DshController.Core
             Out("backend      : " + (up ? "UP" : "DOWN"));
             if (up) Out("listener pid : " + PortTools.FindListenerPidAsync(port).GetAwaiter().GetResult());
             Out("report dir   : " + cfg.EffectiveErrorReportDir);
-            Out("launcher.json: " + Config.FilePath);
+            Out("launcher.json: " + InstanceRegistry.LegacyFilePath);
+            Out("instances.json: " + InstanceRegistry.FilePath);
+            Out("");
+            Out("instances:");
+            foreach (InstanceDef def in registry.Instances)
+            {
+                string home = string.IsNullOrEmpty(def.Home) ? "(默认 ~/.dsh)" : def.Home;
+                bool instanceUp = PortTools.ProbeAsync(def.Host, def.Port).GetAwaiter().GetResult();
+                string listenerPid = instanceUp
+                    ? PortTools.FindListenerPidAsync(def.Port).GetAwaiter().GetResult().ToString()
+                    : "-";
+                Out("  [" + def.Id + "] " + def.Name + "  port=" + def.Port +
+                    "  home=" + home + "  backend=" + (instanceUp ? "UP" : "DOWN") +
+                    "  pid=" + listenerPid);
+            }
             WriteCliLog(transcript);
             return dsh == null ? 2 : 0;
         }
@@ -115,6 +141,7 @@ namespace DshController.Core
             Config cfg = Config.Load();
             int port = cfg.Port + 1;
             bool noRedirect = false;
+            string homeDir = null;
             for (int i = 1; i < args.Length; i++)
             {
                 if (args[i] == "--port" && i + 1 < args.Length)
@@ -122,6 +149,7 @@ namespace DshController.Core
                     int p; if (int.TryParse(args[i + 1], out p)) port = p;
                 }
                 if (args[i] == "--noredirect") noRedirect = true;
+                if (args[i] == "--home" && i + 1 < args.Length) homeDir = args[i + 1];
             }
 
             string desc;
@@ -175,6 +203,7 @@ namespace DshController.Core
 
             psi.UseShellExecute = false;
             psi.CreateNoWindow = true;
+            if (!string.IsNullOrEmpty(homeDir)) psi.EnvironmentVariables["DSH_HOME"] = homeDir;
             if (!noRedirect)
             {
                 psi.RedirectStandardOutput = true;
@@ -220,6 +249,22 @@ namespace DshController.Core
                     Trace("READY: " + PortTools.Url(cfg.Host, port) + " after ~" +
                           (int)(DateTime.UtcNow - started).TotalSeconds + "s");
 
+                    if (!string.IsNullOrEmpty(homeDir))
+                    {
+                        string expected = Path.Combine(homeDir, "profiles", "web");
+                        if (Directory.Exists(expected))
+                            Trace("step: DSH_HOME 自动初始化 OK (profiles/web 已生成)");
+                        else
+                        {
+                            var rfail = PortTools.EnsurePortFreeAsync(cfg.Host, port, child.Id).GetAwaiter().GetResult();
+                            Trace("step: stop backend -> " + (rfail.Item1 ? "OK" : "FAIL"));
+                            Trace(rfail.Item2);
+                            Out("FAIL: DSH_HOME 未自动初始化: " + expected);
+                            WriteCliLog(transcript);
+                            return 1;
+                        }
+                    }
+
                     var r = PortTools.EnsurePortFreeAsync(cfg.Host, port, child.Id).GetAwaiter().GetResult();
                     Trace("step: stop backend -> " + (r.Item1 ? "OK" : "FAIL"));
                     Trace(r.Item2);
@@ -233,6 +278,91 @@ namespace DshController.Core
                 WriteCliLog(transcript);
                 return 1;
             }
+        }
+
+        /// <summary>--instance &lt;id&gt; start|stop|restart|status [--noredirect]：对指定实例执行无 GUI 操作。</summary>
+        private static int Instance(string[] args)
+        {
+            var transcript = new StringBuilder();
+            Action<string> Out = line =>
+            {
+                transcript.AppendLine(line);
+                try { Console.WriteLine(line); } catch { }
+            };
+            Action<string> Trace = line => { Out(line); WriteCliLog(transcript); };
+
+            string id = args[1];
+            string op = args[2].ToLowerInvariant();
+
+            var registry = InstanceRegistry.Load();
+            if (!registry.TryGet(id, out InstanceDef def))
+            {
+                Out("instance not found: " + id);
+                WriteCliLog(transcript);
+                return 1;
+            }
+
+            var im = new InstanceManager(null, registry);
+            im.For(id).Log += (s, line) => Trace(line);
+
+            try
+            {
+                if (op == "status") return InstanceStatus(id, def, im, Out, WriteCliLog, transcript);
+                if (op == "start") return InstanceStart(id, im, Out, WriteCliLog, transcript);
+                if (op == "stop") return InstanceStop(id, im, Out, WriteCliLog, transcript);
+                if (op == "restart") return InstanceRestart(id, im, Out, WriteCliLog, transcript);
+                Out("FAIL: unknown instance operation '" + args[2] + "', expected start|stop|restart|status");
+                WriteCliLog(transcript);
+                return 1;
+            }
+            finally
+            {
+                im.DisposeAll();
+            }
+        }
+
+        private static int InstanceStatus(string id, InstanceDef def, InstanceManager im,
+            Action<string> Out, Action<StringBuilder> writeClilog, StringBuilder transcript)
+        {
+            bool up = PortTools.ProbeAsync(def.Host, def.Port).GetAwaiter().GetResult();
+            int listenerPid = up ? PortTools.FindListenerPidAsync(def.Port).GetAwaiter().GetResult() : 0;
+            Out("id: " + def.Id);
+            Out("state: " + (up ? "Running" : "Stopped"));
+            Out("port: " + def.Port);
+            Out("pid: " + (listenerPid > 0 ? listenerPid.ToString() : "0"));
+            Out("url: " + PortTools.Url(def.Host, def.Port));
+            Out("home: " + (string.IsNullOrEmpty(def.Home) ? "(默认 ~/.dsh)" : def.Home));
+            writeClilog(transcript);
+            return 0;
+        }
+
+        private static int InstanceStart(string id, InstanceManager im,
+            Action<string> Out, Action<StringBuilder> writeClilog, StringBuilder transcript)
+        {
+            Out("starting instance " + id + " ...");
+            bool ok = im.StartAsync(id).GetAwaiter().GetResult();
+            if (ok) Out("started");
+            else Out("FAIL: 启动失败，请查看上方日志");
+            writeClilog(transcript);
+            return ok ? 0 : 1;
+        }
+
+        private static int InstanceStop(string id, InstanceManager im,
+            Action<string> Out, Action<StringBuilder> writeClilog, StringBuilder transcript)
+        {
+            bool ok = im.StopAsync(id, killExternal: true).GetAwaiter().GetResult();
+            Out(ok ? "stopped" : "FAIL: 停止失败，请查看上方日志");
+            writeClilog(transcript);
+            return ok ? 0 : 1;
+        }
+
+        private static int InstanceRestart(string id, InstanceManager im,
+            Action<string> Out, Action<StringBuilder> writeClilog, StringBuilder transcript)
+        {
+            bool ok = im.RestartAsync(id).GetAwaiter().GetResult();
+            Out(ok ? "restarted" : "FAIL: 重启失败，请查看上方日志");
+            writeClilog(transcript);
+            return ok ? 0 : 1;
         }
     }
 }

@@ -95,6 +95,12 @@ namespace DshController.Core
             return d == null ? "(未找到)" : d.Describe();
         }
 
+        /// <summary>写入管理器自身日志（经 Log 事件投递到 UI；供 InstanceManager/CLI 等外部调用）。</summary>
+        public void LogLine(string line)
+        {
+            LogUi(line);
+        }
+
         public List<string> RecentOutput(int maxLines)
         {
             lock (_ringLock)
@@ -219,16 +225,29 @@ namespace DshController.Core
                 StandardErrorEncoding = Encoding.UTF8,
                 WorkingDirectory = ws
             };
+            // v0.3.0 多实例：trusted-host 可重复传参；空数组时保持旧命令字符串不变。
+            // 注意：cmd /s /c 只剥除首尾引号，参数必须插在最外层引号闭合之前；
+            // cmd 中反斜杠不是转义符，内层引号原样保留（与现有 ""prog" args" 形态一致）。
+            string trusted = "";
+            if (cfg.TrustedHosts != null && cfg.TrustedHosts.Length > 0)
+                trusted = " --trusted-host " + string.Join(
+                    " --trusted-host ",
+                    cfg.TrustedHosts.Select(h => "\"" + h + "\""));
+
             if (dsh.Kind == "cmd")
             {
                 psi.FileName = "cmd.exe";
-                psi.Arguments = "/d /s /c \"\"" + dsh.Path1 + "\" web --host " + cfg.Host + " --port " + cfg.Port + "\"";
+                psi.Arguments = "/d /s /c \"\"" + dsh.Path1 + "\" web --host " + cfg.Host + " --port " + cfg.Port + trusted + "\"";
             }
             else
             {
                 psi.FileName = dsh.Path1;
-                psi.Arguments = "\"" + dsh.Path2 + "\" web --host " + cfg.Host + " --port " + cfg.Port;
+                psi.Arguments = "\"" + dsh.Path2 + "\" web --host " + cfg.Host + " --port " + cfg.Port + trusted;
             }
+
+            // v0.3.0 多实例：非空 DSH_HOME 注入到子进程环境，避免实例间共享 ~/.dsh。
+            if (!string.IsNullOrEmpty(cfg.Home))
+                psi.EnvironmentVariables["DSH_HOME"] = cfg.Home;
 
             SetState(BackendState.Starting, false, 0);
             ClearRing();

@@ -3,6 +3,41 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.3.0] - 开发中（未发布）
+
+> **多实例功能**：一个控制器管理 N 个互相隔离的 DeepSeek Harness 实例。
+> 每个实例 = 独立 `$DSH_HOME`（数据/会话/凭据/插件全隔离）+ 独立端口 + 独立 workspace。
+
+### 新增
+
+- **多实例数据模型**：`launcher.json` → `instances.json`（`version 2`，`settings` 全局 +
+  `instances[]` 实例清单）；旧配置首次启动自动迁移为 `default` 实例（原文件备份为
+  `launcher.json.v1.bak`），全新环境兜底预置 default 实例——v0.2.0 单实例行为零突变
+- **实例隔离**：启动时注入 `DSH_HOME` 环境变量（每个实例独立数据目录），支持
+  `--trusted-host` 追加参数；`web` profile 首次启动自动初始化，模块依赖 junction 自动共享
+- **对指定实例操作（UI）**：标题栏实例选择器；状态卡 / 启动 / 重启（不拉浏览器）/
+  停止 / 打开界面 / 日志 全部按选中实例路由；DSH_HOME 显示；按钮使能状态机矩阵
+- **实例管理**：新建实例（向导：名称/端口/工作目录）、克隆实例（空白 / 克隆 ~/.dsh /
+  克隆现有实例 × Blank/Standard/Full 三档，含 file:/link: 依赖路径重写与 node_modules 排除）、
+  删除实例（确认后停止 + 移除注册与 HOME 目录）
+- **对指定实例操作（CLI）**：`--instance <id> start|stop|restart|status`；
+  `--check` 输出实例清单；`--spawn-test --home <dir>` 验证 DSH_HOME 注入与自动初始化
+- **实例 HOME 文件锁**：`<home>\.dsh-instance.lock` 记录 PID，防止同一 HOME 被重复拉起
+- **端口分配器**：3080-3099 用户段内自动推荐空闲端口，冲突检测
+- **错误报告**：新增"实例信息"节（实例 ID / DSH_HOME），配置节改为 instances.json 视角
+- **自检扩展**：`--selftest-core` 新增 [7]-[13] 组（迁移 / DSH_HOME 注入 / 双实例并行 /
+  数据隔离 / 实例锁 / 端口分配 / 克隆），既有真实启动用例改用临时 HOME（不污染 ~/.dsh）
+
+### 变更
+
+- 配置文件名：`launcher.json` → `instances.json`（自动迁移，无手工操作）
+- `AppVersion` → `0.3.0`
+
+### 修复
+
+- 多实例下事件串台风险：UI 事件按"选中实例的 manager"过滤
+- CLI `--check` 迁移后主配置读取（改为实例清单首个实例）
+
 ## [0.2.0] - 开发中（未发布）
 
 > **当前状态**：代码实现完成，构建通过；`--check`、`--spawn-test-node`、

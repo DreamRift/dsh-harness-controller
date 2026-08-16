@@ -59,6 +59,11 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
   自动捕获 dsh 打印的 `dsh web: http://...` 公告 URL
 - **外部实例检测**：若后端由其他方式启动（例如你手动在终端运行过 `dsh web`），
   应用会识别为"外部进程"，停止/重启前弹窗确认，绝不误杀
+- **多实例管理（v0.3.0）**：一个控制器管理多个互相隔离的 DeepSeek Harness 实例——
+  每实例独立 `DSH_HOME`（数据/会话/凭据/插件全隔离）+ 独立端口 + 独立 workspace；
+  标题栏实例选择器切换，启动/重启/停止/打开界面/日志均按选中实例操作；
+  支持新建/克隆（空白/标准/完整三档，含插件依赖路径重写）/删除实例；
+  CLI 支持 `--instance <id> start|stop|restart|status` 定向操作
 - **WinUI 3 原生体验**：Mica 材质、圆角卡片、明暗主题跟随系统（可手动三态切换）、
   深度还原 DeepSeek Harness web 的简约设计（品牌蓝 `#3964FE`）
 - **同款图标**：应用图标取自 dsh-web-frontend 官方 favicon 鲸鱼；任务栏/exe 使用白底黑色鲸鱼，小尺寸也清晰可见
@@ -110,33 +115,60 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 
 ## 配置说明
 
-首次运行后，程序目录下会生成 `launcher.json`（关闭窗口时自动保存）：
+v0.3.0 起配置为 `instances.json`（v0.2.0 及以前的 `launcher.json` 首次启动自动迁移为
+默认实例 `default`，原文件备份为 `launcher.json.v1.bak`；全新环境自动预置 default 实例，
+行为与旧版一致）。关闭窗口时自动保存：
 
-```json
+```jsonc
 {
-  "host": "127.0.0.1",
-  "port": 3080,
-  "workspace": "C:\\Users\\<你>\\Documents",
-  "dshCommand": "",
-  "autoOpenBrowser": true,
-  "stopOnExit": true,
-  "errorReportDir": "",
-  "theme": "system"
+  "version": 2,
+  "settings": {                          // 全局设置
+    "dshCommand": "",                    // 手动指定 dsh 命令完整路径（一般无需设置）
+    "errorReportDir": "",                // 错误报告目录；空 = 我的文档\DshController\error-reports
+    "theme": "system",                   // 界面主题：system / light / dark
+    "homeRoot": ""                       // 新实例 DSH_HOME 根；空 = %LOCALAPPDATA%\DshController\instances
+  },
+  "instances": [
+    {
+      "id": "default",                   // 实例 ID（字母/数字/_/-）
+      "name": "主实例",
+      "home": "",                        // DSH_HOME；空 = 不注入（使用默认 ~/.dsh）
+      "host": "127.0.0.1",
+      "port": 3080,
+      "trustedHosts": [],                // 额外 --trusted-host（可重复）
+      "workspace": "C:\\Users\\<你>\\Documents",
+      "autoOpenBrowser": true,
+      "stopOnExit": true
+    }
+  ]
 }
 ```
 
-| 字段 | 默认值 | 说明 |
+| 实例字段 | 默认值 | 说明 |
 |---|---|---|
-| `host` | `127.0.0.1` | 后端监听主机（对应 dsh 的 `--host`） |
-| `port` | `3080` | 后端监听端口（对应 dsh 的 `--port`） |
-| `workspace` | `我的文档` | 后端的工作目录；**运行目录即默认 workspace 根目录**（dsh 文档约定） |
-| `dshCommand` | 空 | 手动指定 dsh 启动命令的完整路径（一般无需设置） |
-| `autoOpenBrowser` | `true` | 启动就绪后是否自动打开浏览器（**重启路径永不自动打开**） |
-| `stopOnExit` | `true` | 关闭程序时是否停止由本程序启动的后端 |
-| `errorReportDir` | 空 | 启动失败/崩溃报告目录；空 = `我的文档\DshController\error-reports` |
-| `theme` | `system` | 界面主题：`system`（跟随系统）/ `light` / `dark` |
+| `home` | 空 | 实例数据目录（DSH_HOME）；**空 = 不注入**，使用默认 `~/.dsh`（兼容旧行为）；非空 = 完全隔离的独立实例 |
+| `host` / `port` | `127.0.0.1` / `3080` | 后端监听地址（对应 dsh 的 `--host` / `--port`） |
+| `trustedHosts` | 空 | 额外浏览器信任来源（对应 dsh 的 `--trusted-host`） |
+| `workspace` | 我的文档 | 实例工作目录（运行目录即默认 workspace 根目录） |
+| `autoOpenBrowser` | `true` | 启动就绪后自动打开浏览器（**重启路径永不自动打开**） |
+| `stopOnExit` | `true` | 退出程序时是否停止由本程序启动的该实例后端 |
 
-> `launcher.json` 含本机路径，已被 `.gitignore` 排除，不会提交到仓库。
+> `instances.json` 含本机路径，已被 `.gitignore` 排除，不会提交到仓库。
+
+## 多实例与隔离
+
+每个实例 = **独立的 `$DSH_HOME` + 独立端口 + 独立 workspace**，数据（会话/存储/技能/
+凭据/设置）、插件装配与补丁、浏览器状态（不同端口 = 不同 origin）天然互不可见；
+模块依赖（`profiles/node_modules`）为自动维护的 junction，只读共享、磁盘成本≈0。
+
+- **新建实例**：向导填写名称/端口/工作目录 → 空目录首次启动时由 dsh 自动初始化
+  （`initProfile`），无需手工步骤；
+- **克隆实例**：三档复制（Blank 空目录 / Standard 配置与技能 / Full 完整复制），
+  自动排除 node_modules 与运行时文件，`file:`/`link:` 插件依赖自动重写指向新 HOME；
+- **删除实例**：确认后停止进程、移除注册与 HOME 目录；
+- **实例锁**：`<home>\.dsh-instance.lock` 记录 PID，防止同一 HOME 被重复拉起；
+- **CLI 定向操作**：`DshController.exe --instance <id> start|stop|restart|status`、
+  `--check`（含实例清单）、`--spawn-test --home <dir>`（验证 DSH_HOME 注入与自动初始化）。
 
 ## 错误报告
 
