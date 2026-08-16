@@ -105,7 +105,7 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
 git clone https://github.com/DreamRift/dsh-harness-controller.git
 cd dsh-harness-controller
 powershell -ExecutionPolicy Bypass -File build.ps1
-.\publish\DshController.exe
+.\publish-fixed\DshController.exe
 ```
 
 ## 配置说明
@@ -159,7 +159,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1
 需要 .NET SDK 6.0+（无需 Visual Studio）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File build.ps1             # Release 发布 -> publish\（含 zip）
+powershell -ExecutionPolicy Bypass -File build.ps1             # Release 发布 -> publish-fixed\（含 zip）
 powershell -ExecutionPolicy Bypass -File build.ps1 -Debug      # 快速开发构建
 powershell -ExecutionPolicy Bypass -File build.ps1 -Portable   # 连 .NET 一并自包含
 powershell -ExecutionPolicy Bypass -File build.ps1 -Clean      # 清理构建产物

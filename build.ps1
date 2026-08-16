@@ -4,9 +4,9 @@
 #  Microsoft.WindowsAppSDK). No Visual Studio needed.
 #
 #  Usage:
-#    powershell -ExecutionPolicy Bypass -File build.ps1             # Release -> publish\
+#    powershell -ExecutionPolicy Bypass -File build.ps1             # Release -> publish-fixed\
 #    powershell -ExecutionPolicy Bypass -File build.ps1 -Debug      # fast dev build (bin\)
-#    powershell -ExecutionPolicy Bypass -File build.ps1 -Clean      # wipe bin/obj/publish
+#    powershell -ExecutionPolicy Bypass -File build.ps1 -Clean      # wipe bin/obj/publish*
 #    powershell -ExecutionPolicy Bypass -File build.ps1 -Portable   # also self-contain .NET
 # ============================================================================
 
@@ -20,11 +20,11 @@ $dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # ---------- preflight ----------
 if ($Clean) {
-    foreach ($p in 'bin', 'obj', 'publish') {
+    foreach ($p in 'bin', 'obj', 'publish', 'publish-fixed') {
         $t = Join-Path $dir $p
         if (Test-Path $t) { Remove-Item $t -Recurse -Force }
     }
-    Write-Host "cleaned bin/ obj/ publish/" -ForegroundColor Yellow
+    Write-Host "cleaned bin/ obj/ publish/ publish-fixed/" -ForegroundColor Yellow
     return
 }
 
@@ -59,25 +59,29 @@ if ($Portable) {
 } else {
     $commonArgs += '--no-self-contained'
 }
+$outDir = Join-Path $dir 'publish-fixed'
 & dotnet publish (Join-Path $dir 'DshController.csproj') `
-    -c Release -r win-x64 -p:Platform=x64 -o (Join-Path $dir 'publish') `
+    -c Release -r win-x64 -p:Platform=x64 -o $outDir `
     @commonArgs -nologo
 if ($LASTEXITCODE -ne 0) {
     Write-Host "PUBLISH FAILED (exit $LASTEXITCODE)" -ForegroundColor Red
     exit $LASTEXITCODE
 }
 
-$exe = Join-Path $dir 'publish\DshController.exe'
+$exe = Join-Path $outDir 'DshController.exe'
 if (-not (Test-Path $exe)) { throw 'publish finished but DshController.exe not found' }
 
-# zip for distribution
-$zip = Join-Path $dir 'publish\DshController-0.2.0-win-x64.zip'
+# zip for distribution（排除本机 launcher.json、日志与报告）
+$zip = Join-Path $outDir 'DshController-0.2.0-win-x64.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $dir 'publish\*') -DestinationPath $zip -Force
+$zipItems = Get-ChildItem $outDir -Force | Where-Object {
+    $_.Name -notin @('launcher.json', 'cli.log', 'crash.log', 'reports')
+}
+Compress-Archive -Path $zipItems.FullName -DestinationPath $zip -Force
 
-$size = '{0:N0} MB' -f ((Get-ChildItem (Join-Path $dir 'publish') -Recurse | Measure-Object Length -Sum).Sum / 1MB)
-Write-Host "DONE -> publish\DshController.exe ($size)" -ForegroundColor Green
+$size = '{0:N0} MB' -f ((Get-ChildItem $outDir -Recurse | Measure-Object Length -Sum).Sum / 1MB)
+Write-Host "DONE -> publish-fixed\DshController.exe ($size)" -ForegroundColor Green
 Write-Host "zip   -> $zip" -ForegroundColor Green
 Write-Host "self checks:" -ForegroundColor Yellow
-Write-Host "  .\publish\DshController.exe --check" -ForegroundColor Yellow
-Write-Host "  .\publish\DshController.exe --spawn-test --port 3137" -ForegroundColor Yellow
+Write-Host "  .\publish-fixed\DshController.exe --check" -ForegroundColor Yellow
+Write-Host "  .\publish-fixed\DshController.exe --spawn-test --port 3137" -ForegroundColor Yellow

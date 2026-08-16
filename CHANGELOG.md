@@ -50,7 +50,7 @@
 ### 变更
 
 - 就绪超时（180s）行为变更：清理无响应子进程（v0.1.0 会留下僵尸进程）
-- 产物形态变更：单 exe（36 KB）→ `publish/` 目录（约 120 MB，自包含 WASDK；
+- 产物形态变更：单 exe（36 KB）→ `publish-fixed/` 目录（约 120 MB，自包含 WASDK；
   `build.ps1 -Portable` 可连 .NET 一并自包含）
 - 构建依赖变更：.NET Framework csc → dotnet SDK 6.0+（`build.ps1` 已适配）
 

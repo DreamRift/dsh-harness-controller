@@ -257,7 +257,7 @@ Stopped ──Start──► Starting ──probe OK──► Running
 |---|---|
 | launcher.json | 字段只增不改（+`errorReportDir`/`theme`）；读取容忍未知字段；首次加载检测到多重反斜杠污染即净化重存（修 D1 根因收尾） |
 | CLI | `--check/--spawn-test/--spawn-test-node/--noredirect/--version` 行为与退出码语义不变，仍写 `cli.log` |
-| test-server.js / LICENSE / .gitignore 语义 | 保留；.gitignore 追加 `bin/ obj/ publish/ *.user` |
+| test-server.js / LICENSE / .gitignore 语义 | 保留；.gitignore 追加 `bin/ obj/ publish/ publish-fixed/ *.user` |
 | 旧 DshController.cs | 移入 `legacy/` 留档（不删除，便于 diff 审阅）；根目录旧 exe 清理 |
 | 版本 | 0.1.0 → **0.2.0**（破坏性变化：产物从单 exe 变为目录） |
 
@@ -268,9 +268,9 @@ Stopped ──Start──► Starting ──probe OK──► Running
 `build.ps1` 重写（PowerShell 5 兼容、ASCII 注释风格延续）：
 
 ```
-powershell -ExecutionPolicy Bypass -File build.ps1            # Release publish → publish\
+powershell -ExecutionPolicy Bypass -File build.ps1            # Release publish → publish-fixed\
 powershell ... -File build.ps1 -Debug                         # Debug 构建（快速迭代）
-powershell ... -File build.ps1 -Clean                         # 清 bin/obj/publish
+powershell ... -File build.ps1 -Clean                         # 清 bin/obj/publish*
 powershell ... -File build.ps1 -Portable                      # .NET 亦自包含（免运行时，~250MB）
 ```
 
@@ -321,6 +321,6 @@ powershell ... -File build.ps1 -Portable                      # .NET 亦自包�
 
 1. §1.1 七条需求全部落地且经 §8 对应测试验证；
 2. 旧缺陷 D1–D10、E1–E5 在新代码中不复存在（逐条可指出对应修复位置）；
-3. `build.ps1` 一键产出可双击运行的 `publish\DshController.exe`（含新图标）；
+3. `build.ps1` 一键产出可双击运行的 `publish-fixed\DshController.exe`（含新图标）；
 4. launcher.json 旧格式无缝读取，无破坏；
 5. 全程未影响用户 3080 端口的运行中后端。

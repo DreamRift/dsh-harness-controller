@@ -80,4 +80,4 @@ WASDK 1.5.240607001，不在本次重构中追新（稳定性优先）。
 ## 7. 测试约束
 
 - **禁止动 3080**（用户后端在跑）：CLI spawn 测试默认 `cfg.Port+1=3081`，显式 `--port` 时也用 ≥3081。
-- 旧 exe `DshController.exe` 在仓库根目录，被 `.gitignore` 的 `*.exe` 排除；新产物进 `publish/`。
+- 旧根目录 exe 已清理；新 Release 产物进 `publish-fixed/`，构建产物均被 `.gitignore` 排除。

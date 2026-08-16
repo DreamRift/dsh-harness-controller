@@ -42,8 +42,8 @@
 
 ## 发布产物
 
-- `publish\DshController.exe`（旧版，正在运行；后续手动关闭后可替换为修复版）
-- `publish-fixed\DshController.exe`（修复版，119 MB，框架依赖 .NET 6 Desktop Runtime，WASDK 自包含）
+- `publish-fixed\DshController.exe`（当前修复版，119 MB，框架依赖 .NET 6 Desktop Runtime，WASDK 自包含）
+- 旧版 `publish\` 目录已清理；`build.ps1` 后续统一输出到 `publish-fixed\`
 
 ## 尚未执行
 
