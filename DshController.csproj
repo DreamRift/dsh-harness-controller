@@ -1,0 +1,60 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net6.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>DshController</RootNamespace>
+    <AssemblyName>DshController</AssemblyName>
+    <Version>0.2.0</Version>
+    <Description>DeepSeek Harness 后端控制器（WinUI 3）</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+
+    <!-- 平台：仅 x64；SDK 会在 csproj 之前把空 Platform 预置为 AnyCPU，需一并覆盖 -->
+    <Platform Condition=" '$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' ">x64</Platform>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- WinUI 3 / Windows App SDK：免打包 + 运行时自包含（目标机零前置） -->
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- build.ps1 -Portable 时连同 .NET 一并自包含，免装 .NET 6 Desktop Runtime -->
+    <SelfContained Condition=" '$(Portable)' == 'true' ">true</SelfContained>
+    <SelfContained Condition=" '$(Portable)' != 'true' ">false</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- 自定义 Program.Main（CLI 自检入口在 WinUI 引导之前执行） -->
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+
+    <LangVersion>10</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <SatelliteResourceLanguages>zh-CN;en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.5.240607001" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.22621.756" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- v0.1.0 源码留档，不参与编译 -->
+    <Compile Remove="legacy\**" />
+    <None Remove="legacy\**" />
+    <Content Remove="legacy\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 运行时需要的资源：AppWindow.SetIcon 使用 ico；whale.svg 供窗口内展示；
+         test-server.js 为 spawn-test-node 自检辅助 -->
+    <Content Include="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\whale.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\whale-white.svg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="test-server.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

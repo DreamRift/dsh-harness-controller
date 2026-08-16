@@ -113,6 +113,11 @@ namespace DshController
                         if (i <= 0) continue;
                         string key = t.Substring(0, i).Trim().Trim('"');
                         string val = t.Substring(i + 1).Trim().Trim('"');
+                        // Save() 写入时会把 \ 和 " 转义为 \\ 与 \"，读取时必须反转义，
+                        // 否则每保存一次反斜杠数量翻倍（历史 launcher.json 已被污染成
+                        // 数百个连续反斜杠，这里用正则把它们一次性收敛回单个）
+                        val = Regex.Replace(val, @"\\+", @"\");
+                        val = val.Replace("\\\"", "\"");
                         switch (key)
                         {
                             case "host": c.Host = string.IsNullOrEmpty(val) ? c.Host : val; break;
@@ -655,7 +660,8 @@ namespace DshController
     internal sealed class MainForm : Form
     {
         private readonly Config _cfg;
-        private Process _child;                 // 由本程序启动的 dsh 进程
+        private Process _child;                 // 由本程序启动的 dsh 进程（仅在 Start 成功后赋值）
+        private int _childPid;                  // 启动成功时记录的 PID（避免事后访问 _child.Id 抛异常）
         private readonly object _lock = new object();
         private volatile bool _starting;
         private bool _probing;
@@ -884,6 +890,17 @@ namespace DshController
         }
 
         // ---------------- 状态刷新 ----------------
+
+        /// <summary>安全判断子进程是否存活。对"从未启动/句柄已释放"的 Process 对象
+        /// 调用 HasExited 会抛 InvalidOperationException（"没有与此对象关联的进程"），
+        /// 这里统一吞掉并视为不在运行，避免状态刷新定时器崩溃。</summary>
+        private static bool IsChildAlive(Process p)
+        {
+            if (p == null) return false;
+            try { return !p.HasExited; }
+            catch { return false; }
+        }
+
         private async Task RefreshStateAsync()
         {
             if (_probing || _closing) return;
@@ -898,7 +915,11 @@ namespace DshController
 
         private void ApplyState(bool up)
         {
-            bool mine = _child != null && !_child.HasExited;
+            // 快照 + 安全判断：_child 可能被 Exited 回调线程置空，
+            // 且 HasExited 对未成功启动的进程会抛异常
+            Process child;
+            lock (_lock) { child = _child; }
+            bool mine = IsChildAlive(child);
             string state;
             Color color;
             if (_starting) { state = "● 启动中…"; color = Color.FromArgb(230, 126, 34); }
@@ -910,7 +931,9 @@ namespace DshController
                 _lblStatus.Text = state;
                 _lblStatus.ForeColor = color;
             }
-            _lblPid.Text = mine ? _child.Id.ToString() : (up ? ("外部 " + Backend.FindListenerPid(_cfg.Port)) : "—");
+            int myPid;
+            lock (_lock) { myPid = _childPid; }
+            _lblPid.Text = mine ? myPid.ToString() : (up ? ("外部 " + Backend.FindListenerPid(_cfg.Port)) : "—");
             _lblUrl.Text = Backend.Url(_cfg.Host, _cfg.Port);
             _btnStart.Enabled = !_starting && !up;
             _btnStop.Enabled = !_starting && (mine || up);
@@ -985,13 +1008,25 @@ namespace DshController
                 p.ErrorDataReceived += (s, e) => { if (!string.IsNullOrEmpty(e.Data)) OnChildOutput(e.Data, isError: true); };
                 p.Exited += (s, e) => OnChildExited();
 
-                lock (_lock) { _child = p; }
-                if (!p.Start())
+                // 注意：_child 只在 Start 成功之后才赋值。
+                // 若提前赋值，Start() 抛异常时会留下一个"从未启动"的 Process 对象，
+                // 之后定时器对它调用 HasExited 会抛"没有与此对象关联的进程"。
+                try
                 {
-                    AppendLog("启动 dsh 失败：进程未能创建。");
-                    lock (_lock) { _child = null; }
+                    if (!p.Start())
+                    {
+                        AppendLog("启动 dsh 失败：进程未能创建。");
+                        return;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog("启动 dsh 失败：" + ex.Message);
+                    if (ex is System.ComponentModel.Win32Exception)
+                        AppendLog("（提示：从服务/非交互环境启动时，请检查工作目录是否可访问、cmd.exe 是否在 PATH 中。）");
                     return;
                 }
+                lock (_lock) { _child = p; _childPid = p.Id; }
                 AppendLog("已启动 dsh web（PID " + p.Id + "，工作目录: " + ws + "）");
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
@@ -1012,7 +1047,7 @@ namespace DshController
             while (DateTime.UtcNow < deadline)
             {
                 if (_closing) return;
-                if (p.HasExited) { OnChildExited(); return; }
+                if (!IsChildAlive(p)) { OnChildExited(); return; }
                 if (Backend.Probe(_cfg.Host, _cfg.Port))
                 {
                     string url = Backend.Url(_cfg.Host, _cfg.Port);
@@ -1036,18 +1071,19 @@ namespace DshController
             if (_starting) return;
 
             Process mine = null;
-            lock (_lock) { mine = _child; }
+            int minePid = 0;
+            lock (_lock) { mine = _child; minePid = _childPid; }
 
-            if (mine != null && !mine.HasExited)
+            if (mine != null && IsChildAlive(mine))
             {
-                AppendLog("正在停止本程序启动的后端（PID " + mine.Id + "）…");
+                AppendLog("正在停止本程序启动的后端（PID " + minePid + "）…");
                 string log;
-                bool ok = Backend.EnsurePortFree(_cfg.Host, _cfg.Port, mine.Id, out log);
+                bool ok = Backend.EnsurePortFree(_cfg.Host, _cfg.Port, minePid, out log);
                 AppendLog("停止后端: " + (ok ? "成功，端口已释放。" : "端口未能释放！"));
                 foreach (string l in log.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                     AppendLog("  " + l);
                 try { mine.WaitForExit(8000); } catch { }
-                lock (_lock) { _child = null; }
+                lock (_lock) { _child = null; _childPid = 0; }
             }
             else if (Backend.Probe(_cfg.Host, _cfg.Port))
             {
@@ -1119,7 +1155,7 @@ namespace DshController
             int code = -1;
             try { if (p.HasExited) code = p.ExitCode; } catch { }
             AppendLog("dsh 进程已退出，退出码 " + code + "。");
-            lock (_lock) { _child = null; }
+            lock (_lock) { _child = null; _childPid = 0; }
             Ui(() =>
             {
                 if (!_starting) ApplyState(Backend.Probe(_cfg.Host, _cfg.Port));
@@ -1163,12 +1199,14 @@ namespace DshController
             _cfg.Save();
 
             Process mine = null;
-            lock (_lock) { mine = _child; }
-            if (mine != null && !mine.HasExited && _cfg.StopOnExit)
+            int minePid = 0;
+            lock (_lock) { mine = _child; minePid = _childPid; }
+            if (mine != null && IsChildAlive(mine) && _cfg.StopOnExit)
             {
                 string log;
-                Backend.EnsurePortFree(_cfg.Host, _cfg.Port, mine.Id, out log);
+                Backend.EnsurePortFree(_cfg.Host, _cfg.Port, minePid, out log);
                 try { mine.WaitForExit(8000); } catch { }
+                lock (_lock) { _child = null; _childPid = 0; }
             }
         }
 

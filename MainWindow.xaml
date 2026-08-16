@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="DshController.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Title="DSH Harness 控制器">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="Root" Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="44" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== 标题栏（拖拽区） ==================== -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="44">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="10">
+                <Image x:Name="TitleBarLogo" Width="20" Height="20">
+                    <Image.Source>
+                        <SvgImageSource x:Name="TitleBarLogoSource" UriSource="ms-appx:///Assets/whale.svg" RasterizePixelWidth="40" RasterizePixelHeight="40" />
+                    </Image.Source>
+                </Image>
+                <TextBlock Text="DSH HARNESS 控制器" Style="{StaticResource Wordmark}" VerticalAlignment="Center" />
+            </StackPanel>
+            <!-- 主题切换：留出右侧系统标题按钮空间 -->
+            <Button x:Name="BtnTheme" Style="{StaticResource BtnIcon}" HorizontalAlignment="Right"
+                    VerticalAlignment="Center" Margin="0,0,150,0" Click="BtnTheme_Click"
+                    ToolTipService.ToolTip="切换主题：跟随系统 / 浅色 / 深色">
+                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE790;" FontSize="14" />
+            </Button>
+        </Grid>
+
+        <!-- ==================== 内容区 ==================== -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20,4,20,16" Spacing="12">
+
+                <!-- 状态卡片 -->
+                <Border Style="{StaticResource DshCard}" Padding="18,14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Spacing="8">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border x:Name="StatusDot" Width="10" Height="10" CornerRadius="5"
+                                        VerticalAlignment="Center" Background="{ThemeResource StateStopBrush}" />
+                                <TextBlock x:Name="StatusText" Text="● 已停止" FontWeight="SemiBold"
+                                           FontSize="15" Foreground="{ThemeResource LabelPrimaryBrush}"
+                                           VerticalAlignment="Center" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <HyperlinkButton x:Name="UrlLink" Padding="0" Margin="0"
+                                                 FontSize="13" Content="http://127.0.0.1:3080/">
+                                    <HyperlinkButton.Resources>
+                                        <SolidColorBrush x:Key="HyperlinkButtonForeground" Color="{ThemeResource BrandPrimaryColor}" />
+                                        <SolidColorBrush x:Key="HyperlinkButtonForegroundPointerOver" Color="{ThemeResource BrandPrimaryHoverColor}" />
+                                    </HyperlinkButton.Resources>
+                                </HyperlinkButton>
+                                <Button x:Name="BtnCopyUrl" Style="{StaticResource BtnCompact}"
+                                        Content="复制" Click="BtnCopyUrl_Click" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
+                            <TextBlock Text="进程 PID" Style="{StaticResource FooterText}" HorizontalAlignment="Right" />
+                            <TextBlock x:Name="PidText" Text="—" FontWeight="SemiBold" FontSize="16"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" HorizontalAlignment="Right" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- 主操作行 -->
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" x:Name="BtnStart" Style="{StaticResource BtnPrimary}" Click="BtnStart_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE768;" FontSize="15" />
+                            <TextBlock Text="启动后端" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" x:Name="BtnRestart" Style="{StaticResource BtnSecondary}" Click="BtnRestart_Click"
+                            ToolTipService.ToolTip="仅重启 harness 后端，不会打开新的浏览器界面">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="15" />
+                            <TextBlock Text="重启后端" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="2" x:Name="BtnStop" Style="{StaticResource BtnDangerGhost}" Click="BtnStop_Click"
+                            ToolTipService.ToolTip="结束 dsh web 进程树（会话数据保留在 $DSH_HOME，重启可继续）">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71A;" FontSize="15" />
+                            <TextBlock Text="停止" />
+                        </StackPanel>
+                    </Button>
+                    <Button Grid.Column="3" x:Name="BtnOpen" Style="{StaticResource BtnSecondary}" Click="BtnOpen_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE774;" FontSize="15" />
+                            <TextBlock Text="打开界面" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- 设置 -->
+                <Expander Header="设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                          IsExpanded="False">
+                    <Expander.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="14" />
+                                <TextBlock Text="设置" FontWeight="SemiBold" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </Expander.HeaderTemplate>
+                    <StackPanel Spacing="12" Margin="4,10,4,4" HorizontalAlignment="Stretch">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="150" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="主机" Style="{StaticResource FieldLabel}" />
+                            <TextBox Grid.Column="1" x:Name="TxtHost" Style="{StaticResource InputBox}" />
+                            <TextBlock Grid.Column="2" Text="端口" Style="{StaticResource FieldLabel}" Margin="4,0,0,0" />
+                            <TextBox Grid.Column="3" x:Name="TxtPort" Style="{StaticResource InputBox}" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="工作目录" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}" />
+                            <TextBox Grid.Column="1" x:Name="TxtWorkspace" Style="{StaticResource InputBox}" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseWs" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseWs_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="报告目录" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="启动失败/崩溃时详细错误报告（Markdown）的保存位置" />
+                            <TextBox Grid.Column="1" x:Name="TxtReportDir" Style="{StaticResource InputBox}" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseRd" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseRd_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="行为" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Center">
+                                <ToggleSwitch x:Name="SwAutoOpen" Header="启动就绪后自动打开浏览器界面" OnContent="" OffContent="" />
+                                <ToggleSwitch x:Name="SwStopOnExit" Header="退出时停止由本程序启动的后端" OnContent="" OffContent="" />
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 日志 -->
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="2,0,2,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="后端日志" FontWeight="SemiBold" FontSize="13"
+                                   Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" Content="滚动：开" Click="BtnAutoScroll_Click" />
+                            <Button x:Name="BtnClearLog" Style="{StaticResource BtnCompact}" Content="清空" Click="BtnClearLog_Click" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBox Grid.Row="1" x:Name="TxtLog" Style="{StaticResource LogBox}" Height="230" Text="" />
+                </Grid>
+
+                <!-- 页脚 -->
+                <TextBlock x:Name="FooterText" Style="{StaticResource FooterText}" Margin="2,0,2,0" TextWrapping="NoWrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

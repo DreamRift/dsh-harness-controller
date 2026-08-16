@@ -2,13 +2,22 @@
 launcher.json
 cli.log
 crash.log
+reports/
 
-# 构建产物（请用 build.ps1 自行编译）
+# 构建产物（请用 build.ps1）
+bin/
+obj/
+publish/
 *.exe
 *.pdb
+*.user
+
+# 图标中间产物（保留 app.ico / whale.svg / whale-white.svg）
+Assets/icon-*.png
 
 # 编辑器/系统
 .vscode/
 .idea/
+.vs/
 Thumbs.db
 .DS_Store
