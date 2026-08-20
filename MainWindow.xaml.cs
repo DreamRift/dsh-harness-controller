@@ -43,6 +43,7 @@ namespace DshController
         private bool _closeCleanupDone;
         private AppTheme _theme;
         private int _externalPidCache;     // 外部实例 PID 展示缓存
+        private string _cachedSelectedId = "";  // 上次切换的实例 ID，用于临时竞态检测
         private BackendState _uiState = BackendState.Stopped;
         private bool _uiMine;
 
@@ -149,10 +150,21 @@ namespace DshController
 
         private void RefreshInstanceList()
         {
+            string instancesCount = _registry.Instances.Count.ToString();
+            AppendLog($"刷新实例列表：共{instancesCount}个实例");
             _loadingRegistryUI = true;
             try
             {
                 CmbInstance.ItemsSource = _registry.Instances.ToList();
+                
+                // 打印每个实例的 ID/名称，方便调试
+                var sb = new System.Text.StringBuilder("实例详情: ");
+                foreach (var inst in _registry.Instances)
+                {
+                    if (sb.Length > 20) sb.Append(", ");
+                    sb.Append(inst.Name).Append("(").Append(inst.Id).Append(")");
+                }
+                AppendLog(sb.ToString());
             }
             finally { _loadingRegistryUI = false; }
         }
@@ -160,14 +172,32 @@ namespace DshController
         private void CmbInstance_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_loadingRegistryUI) return;
-            if (CmbInstance.SelectedItem is InstanceDef def && def.Id != _selectedId)
+            InstanceDef def = CmbInstance.SelectedItem as InstanceDef;
+            string selectedIdBefore = _selectedId;
+            
+            if (def != null && def.Id != _selectedId)
             {
+                AppendLog($"用户选择实例：当前 '{_selectedId}' → 目标 '{def.Id}'（名称：{def.Name}）");
                 SelectInstance(def.Id, refreshLog: true);
+                
+                // 记录切换后结果，用于验证切换是否成功
+                string selectedIdAfter = _selectedId;
+                InstanceDef uiDef = CmbInstance.SelectedItem as InstanceDef;
+                AppendLog($"切换结果：代码选中='{selectedIdAfter}', UI 选中={uiDef?.Name ?? "(null)"}");
+                
+                // 如果代码与 UI 不一致，记录警告
+                if (string.Equals(selectedIdAfter, uiDef?.Id, StringComparison.OrdinalIgnoreCase) == false)
+                {
+                    AppendLog("⚠️警告：代码选中与 UI 选中不一致！");
+                }
             }
         }
 
         private void SelectInstance(string id, bool refreshLog)
         {
+            // 切换前记录旧 ID（用于诊断）
+            string prevSelectedId = _selectedId;
+
             if (string.IsNullOrEmpty(id) || !_registry.TryGet(id, out _))
             {
                 _selectedId = "";
@@ -180,9 +210,36 @@ namespace DshController
             InstanceDef def = SelectedDef();
             if (def != null)
             {
-                _loadingRegistryUI = true;
-                CmbInstance.SelectedItem = def;
-                _loadingRegistryUI = false;
+                try
+                {
+                    _loadingRegistryUI = true;
+
+                    // 1. 尝试用引用匹配设置 SelectedItem（正常情况）
+                    CmbInstance.SelectedItem = def;
+
+                    // 2. 回退：如果 SelectedItem 没更新到目标实例，改用 SelectedIndex（保底方案）。
+                    //    WinUI ComboBox 的 SelectedItem 通过 Equals 匹配；InstanceDef 默认引用比较。
+                    //    若 ItemsSource 引用问题或竞态导致匹配失败，用索引定位更可靠。
+                    int matchedIdx = -1;
+                    if (CmbInstance.ItemsSource is System.Collections.IList items)
+                    {
+                        for (int i = 0; i < items.Count; i++)
+                        {
+                            if (items[i] is InstanceDef itemDef &&
+                                string.Equals(itemDef.Id, _selectedId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                matchedIdx = i;
+                                break;
+                            }
+                        }
+                    }
+                    var curSel = CmbInstance.SelectedItem as InstanceDef;
+                    if (matchedIdx >= 0 && (curSel == null || curSel.Id != def.Id))
+                    {
+                        CmbInstance.SelectedIndex = matchedIdx;
+                    }
+                }
+                finally { _loadingRegistryUI = false; }
             }
 
             if (refreshLog)
@@ -191,11 +248,19 @@ namespace DshController
                 BackendManager mgr = string.IsNullOrEmpty(_selectedId) ? null : _instanceMgr.For(_selectedId);
                 if (mgr != null)
                 {
-                    AppendLog("已切换到实例: " + def?.Name + "（" + _selectedId + "）");
+                    AppendLog("实例切换: '" + prevSelectedId + "' → '" + _selectedId + "' (" + def?.Name + ")");
                     foreach (string line in mgr.RecentOutput(RecentLogLines))
                         AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + line + Environment.NewLine);
                 }
+                else
+                {
+                    AppendLog("实例切换: '" + prevSelectedId + "' → '" + _selectedId + "'（无实例）");
+                }
             }
+
+            // 切换时清空 PID 缓存与选中标识，避免跨实例状态串台
+            _externalPidCache = 0;
+            _cachedSelectedId = _selectedId;
 
             RefreshSelectedControls();
             ProbeAsyncAfterSwitch();
@@ -210,6 +275,10 @@ namespace DshController
         private void RefreshSelectedControls()
         {
             InstanceDef def = SelectedDef();
+            
+            // 增加详细日志记录（仅首次或少量关键调用），避免过多日志噪声
+            // static bool s_refreshCount = 0; ++refreshCount < 10 && AppendLog($"刷新选中控件：{def?.Id ?? "(null)"}");
+            
             if (def == null)
             {
                 TxtHost.Text = "";
@@ -217,11 +286,15 @@ namespace DshController
                 TxtWorkspace.Text = "";
                 TxtHome.Text = "";
                 TxtTrustedHosts.Text = "";
+                TxtWslDistro.Text = "";
+                TxtWslHome.Text = "";
                 SwAutoOpen.IsOn = false;
                 SwStopOnExit.IsOn = false;
                 UrlLink.Content = "—";
                 UrlLink.NavigateUri = null;
                 HomeText.Text = "DSH_HOME: —";
+                StatusText.Text = "无实例，请新建";
+                PidText.Text = "—";
                 return;
             }
 
@@ -234,14 +307,52 @@ namespace DshController
             SwStopOnExit.IsOn = def.StopOnExit;
             TxtReportDir.Text = _registry.Settings.ErrorReportDir;
             TxtHomeRoot.Text = _registry.Settings.HomeRoot;
+            TxtNewWs.Text = _registry.Settings.NewInstanceWorkspace;
             TxtDshCommand.Text = _registry.Settings.DshCommand;
+            // v0.4.0 WSL 运行环境
+            TxtWslDistro.Text = def.WslDistro ?? "";
+            TxtWslHome.Text = def.WslHome ?? "";
+            SelectRuntimeOption(def.IsWsl);
             UpdateHomeLabel(def.Home);
             UpdateUrlAndFooter(def);
             UpdateUiState(CurrentStateFor(def), CurrentMineFor(def), CurrentPidFor(def));
         }
 
+        /// <summary>按实例运行环境选中 CmbRuntime 并切换 WSL 专属行的可见性。</summary>
+        private void SelectRuntimeOption(bool isWsl)
+        {
+            int idx = isWsl ? 1 : 0;
+            if (CmbRuntime.SelectedIndex != idx) CmbRuntime.SelectedIndex = idx;
+            ApplyRuntimeVisibility(isWsl);
+        }
+
+        private void ApplyRuntimeVisibility(bool isWsl)
+        {
+            RowWslHome.Visibility = isWsl ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void CmbRuntime_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ApplyRuntimeVisibility(IsRuntimeWslSelected());
+        }
+
+        private bool IsRuntimeWslSelected()
+        {
+            if (CmbRuntime.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+                return tag.Equals("wsl", StringComparison.OrdinalIgnoreCase);
+            return false;
+        }
+
         private void UpdateHomeLabel(string home)
         {
+            InstanceDef def = SelectedDef();
+            if (def != null && def.IsWsl)
+            {
+                string linuxHome = string.IsNullOrWhiteSpace(def.WslHome) ? "~/.dsh" : def.WslHome.Trim();
+                string distro = string.IsNullOrWhiteSpace(def.WslDistro) ? "(发行版未配置)" : def.WslDistro;
+                HomeText.Text = "WSL 实例 · 发行版 " + distro + " · DSH_HOME(Linux): " + linuxHome;
+                return;
+            }
             if (string.IsNullOrWhiteSpace(home))
                 HomeText.Text = "DSH_HOME: ~/.dsh(默认,不注入)";
             else
@@ -326,25 +437,33 @@ namespace DshController
                 if (def == null) return;
 
                 // 忙态（Starting/Stopping/Restarting）由状态机事件驱动，跳过探测
-                BackendState s = _instanceMgr.For(def.Id).State;
+                string probeId = def.Id;
+                BackendState s = _instanceMgr.For(probeId).State;
                 if (s == BackendState.Starting || s == BackendState.Stopping || s == BackendState.Restarting)
                     return;
 
                 bool up = await PortTools.ProbeAsync(def.Host, def.Port);
                 int pid = 0;
-                BackendManager mgr = _instanceMgr.For(def.Id);
+                BackendManager mgr = _instanceMgr.For(probeId);
                 bool mine = mgr.IsMine && up;
                 if (up)
                 {
                     pid = mine ? mgr.ChildPid : await PortTools.FindListenerPidAsync(def.Port);
-                    _externalPidCache = pid;
+                    // 仅当当前选中实例仍是探测开始时那个实例，才更新 PID 缓存
+                    if (_cachedSelectedId == probeId)
+                        _externalPidCache = pid;
                 }
-                else _externalPidCache = 0;
+                else if (_cachedSelectedId == probeId)
+                {
+                    _externalPidCache = 0;
+                }
 
                 var newState = up ? BackendState.Running : BackendState.Stopped;
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (ReferenceEquals(mgr, _instanceMgr.For(_selectedId)))
+                    // 双重验证：探测期间实例未切换
+                    if (_cachedSelectedId == probeId &&
+                        ReferenceEquals(mgr, _instanceMgr.For(_selectedId)))
                         UpdateUiState(newState, mine, pid);
                 });
             }
@@ -519,14 +638,29 @@ namespace DshController
 
         private void OnBackendReady(object sender, ReadyEventArgs e)
         {
-            if (_closing || !IsSelectedManager(sender)) return;
+            if (_closing) return;
+            // 就绪动作按"触发该事件的实例自身配置"执行，而不是当前选中实例——
+            // 用户启动 A 后切到 B，A 就绪仍应按 A 的 autoOpenBrowser 打开浏览器。
+            bool autoOpen = SwAutoOpen.IsOn;
+            foreach (InstanceDef d in _registry.Instances)
+            {
+                if (ReferenceEquals(_instanceMgr.For(d.Id), sender))
+                {
+                    autoOpen = d.AutoOpenBrowser;
+                    break;
+                }
+            }
             if (e.SuppressAutoOpen)
             {
                 AppendLog("后端已就绪（重启路径：未打开浏览器）。浏览器中的旧页面刷新即可重连。");
             }
-            else if (SwAutoOpen.IsOn)
+            else if (autoOpen)
             {
                 OpenBrowser(e.Url);
+            }
+            else
+            {
+                AppendLog("后端已就绪: " + e.Url + "（按实例设置未自动打开浏览器）");
             }
         }
 
@@ -547,8 +681,18 @@ namespace DshController
 
         private async void OnStartFailed(object sender, StartFailureContext ctx)
         {
-            if (_closing || !IsSelectedManager(sender)) return;
-            InstanceDef def = SelectedDef();
+            if (_closing) return;
+            // 失败提示按触发失败的实例显示，不受"当前选中实例"过滤——
+            // 用户启动 A 后切到 B，A 的启动失败也必须弹窗提示。
+            InstanceDef def = null;
+            foreach (InstanceDef d in _registry.Instances)
+            {
+                if (ReferenceEquals(_instanceMgr.For(d.Id), sender))
+                {
+                    def = d;
+                    break;
+                }
+            }
             if (def != null)
             {
                 ctx.InstanceId = def.Id;
@@ -638,9 +782,15 @@ namespace DshController
                 int suggested = await PortAllocatorSuggestAsync(3081);
                 var txtName = new TextBox { PlaceholderText = "实例名称，如 项目A" };
                 var txtPort = new TextBox { Text = suggested > 0 ? suggested.ToString() : "自动分配", PlaceholderText = "0 或空 = 由 dsh 分配" };
+                // v0.3.1：默认工作目录优先级：全局"新建实例默认工作区" > 当前选中实例工作目录 > "我的文档"兜底
+                string inheritedWs = _registry.Settings.NewInstanceWorkspace?.Trim();
+                if (string.IsNullOrWhiteSpace(inheritedWs))
+                    inheritedWs = SelectedDef()?.Workspace;
+                if (string.IsNullOrWhiteSpace(inheritedWs))
+                    inheritedWs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 var txtWorkspace = new TextBox
                 {
-                    Text = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                    Text = inheritedWs
                 };
                 var btnBrowseWs = new Button
                 {
@@ -675,6 +825,25 @@ namespace DshController
 
                 var cmbSource = new ComboBox { Width = 320 };
                 ComboBox cmbLevel = null;
+
+                // v0.4.0 运行环境选择（Windows / WSL2）
+                var cmbRuntime = new ComboBox { Width = 320 };
+                cmbRuntime.Items.Add(new ComboBoxItem { Content = "Windows（本机）", Tag = "windows" });
+                cmbRuntime.Items.Add(new ComboBoxItem { Content = "WSL2（在发行版内运行）", Tag = "wsl" });
+                cmbRuntime.SelectedIndex = 0;
+                layout.Children.Add(LabelledField("运行环境", cmbRuntime));
+
+                var txtWslDistro = new TextBox { PlaceholderText = "如 Ubuntu-26.04" };
+                var txtWslHome = new TextBox { PlaceholderText = "留空 = ~/.dsh" };
+                var wslPanel = new StackPanel { Spacing = 12, Visibility = Visibility.Collapsed };
+                wslPanel.Children.Add(LabelledField("WSL 发行版", txtWslDistro));
+                wslPanel.Children.Add(LabelledField("WSL DSH_HOME", txtWslHome));
+                layout.Children.Add(wslPanel);
+                cmbRuntime.SelectionChanged += (_, __) =>
+                {
+                    bool w = (cmbRuntime.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "wsl";
+                    wslPanel.Visibility = w ? Visibility.Visible : Visibility.Collapsed;
+                };
                 if (cloneMode)
                 {
                     cmbSource.Items.Add(new CreateSourceItem("blank", "空白沙箱"));
@@ -727,14 +896,24 @@ namespace DshController
                     ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                     : txtWorkspace.Text.Trim();
 
-                string home = _homeMgr.NewHomePath(_registry.Settings.EffectiveHomeRoot, id);
+                bool wantWsl = (cmbRuntime.SelectedItem as ComboBoxItem)?.Tag?.ToString() == "wsl";
+                string home = "";
+                if (!wantWsl)
+                {
+                    home = _homeMgr.NewHomePath(_registry.Settings.EffectiveHomeRoot, id);
+                }
                 string srcHome = "";
                 CreateSourceItem source = null;
                 List<object> items = cmbSource?.Items.ToList() ?? new List<object>();
                 if (items.Count > 0 && cmbSource.SelectedItem is CreateSourceItem si)
                     source = si;
 
-                if (source is { Kind: "blank" })
+                if (wantWsl)
+                {
+                    // WSL 实例不需要 Windows 侧 HOME（DSH_HOME 在 Linux 内，运行环境隔离）
+                    home = "";
+                }
+                else if (source is { Kind: "blank" })
                 {
                     _homeMgr.CreateBlank(home);
                 }
@@ -774,7 +953,11 @@ namespace DshController
                     Workspace = workspace,
                     AutoOpenBrowser = true,
                     StopOnExit = true,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
+                    // v0.4.0 WSL 运行环境
+                    Runtime = wantWsl ? "wsl" : "windows",
+                    WslDistro = wantWsl ? txtWslDistro.Text.Trim() : "",
+                    WslHome = wantWsl ? txtWslHome.Text.Trim() : ""
                 };
                 _registry.Add(def);
                 _registry.Save();
@@ -915,6 +1098,54 @@ namespace DshController
 
         // ==================== 设置读写 ====================
 
+        // v0.3.1：Expander Save/Cancel 按钮处理
+        private void BtnSaveInstance_Click(object sender, RoutedEventArgs e)
+        {
+            // TryReadSettings 返回 false → 用户输入无效（端口、主机等）
+            if (!TryReadSettings(showErrors: true)) return;
+            SaveAllSettings();
+            
+            // 保存成功并收起 Expander
+            ExpInstanceSettings.IsExpanded = false;
+            AppendLog("实例设置已保存");
+        }
+
+        private void BtnCancelInstance_Click(object sender, RoutedEventArgs e)
+        {
+            // 从注册表恢复字段值到 UI，放弃用户未保存的修改
+            RefreshSelectedControls();
+            
+            // 收起 Expander
+            ExpInstanceSettings.IsExpanded = false;
+            AppendLog("实例设置已取消");
+        }
+
+        private void BtnSaveGlobal_Click(object sender, RoutedEventArgs e)
+        {
+            // 读取全局设置字段
+            _registry.Settings.ErrorReportDir = TxtReportDir.Text.Trim();
+            _registry.Settings.HomeRoot = TxtHomeRoot.Text.Trim();
+            _registry.Settings.NewInstanceWorkspace = TxtNewWs.Text.Trim();
+            _registry.Settings.DshCommand = TxtDshCommand.Text.Trim();
+            _registry.Settings.Theme = _theme;
+            
+            SaveAllSettings();
+            ExpGlobalSettings.IsExpanded = false;
+            AppendLog("全局设置已保存");
+        }
+
+        private void BtnCancelGlobal_Click(object sender, RoutedEventArgs e)
+        {
+            // 从注册表恢复全局字段到 UI
+            TxtReportDir.Text = _registry.Settings.ErrorReportDir;
+            TxtHomeRoot.Text = _registry.Settings.HomeRoot;
+            TxtNewWs.Text = _registry.Settings.NewInstanceWorkspace;
+            TxtDshCommand.Text = _registry.Settings.DshCommand;
+            
+            ExpGlobalSettings.IsExpanded = false;
+            AppendLog("全局设置已取消");
+        }
+
         private bool TryReadSettings(bool showErrors)
         {
             int port;
@@ -946,9 +1177,15 @@ namespace DshController
             def.TrustedHosts = SplitTrustedHosts(TxtTrustedHosts.Text);
             def.AutoOpenBrowser = SwAutoOpen.IsOn;
             def.StopOnExit = SwStopOnExit.IsOn;
+            // v0.4.0 WSL 运行环境
+            bool wsl = IsRuntimeWslSelected();
+            def.Runtime = wsl ? "wsl" : "windows";
+            def.WslDistro = TxtWslDistro.Text.Trim();
+            def.WslHome = TxtWslHome.Text.Trim();
 
             _registry.Settings.ErrorReportDir = TxtReportDir.Text.Trim();
             _registry.Settings.HomeRoot = TxtHomeRoot.Text.Trim();
+            _registry.Settings.NewInstanceWorkspace = TxtNewWs.Text.Trim();
             _registry.Settings.DshCommand = TxtDshCommand.Text.Trim();
             _registry.Settings.Theme = _theme;
 
@@ -992,6 +1229,13 @@ namespace DshController
         {
             string dir = await PickFolderAsync("选择错误报告保存目录");
             if (dir != null) TxtReportDir.Text = dir;
+        }
+
+        // v0.3.1：新建实例默认工作区浏览按钮
+        private async void BtnBrowseNewWs_Click(object sender, RoutedEventArgs e)
+        {
+            string dir = await PickFolderAsync("选择新建实例默认工作区目录");
+            if (dir != null) TxtNewWs.Text = dir;
         }
 
         private async void BtnBrowseRoot_Click(object sender, RoutedEventArgs e)

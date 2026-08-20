@@ -19,6 +19,10 @@
         </Grid.RowDefinitions>
 
         <!-- ==================== 标题栏（拖拽区） ==================== -->
+        <!-- 注意：实例选择器 ComboBox 已移出标题栏（v0.3.1 修复）——
+             WinUI 3 中 ExtendsContentIntoTitleBar + SetTitleBar 区域内的
+             ComboBox 下拉箭头点击会被标题栏拖拽命中测试拦截，导致下拉列表
+             打不开、无法在实例间切换。选择器移入内容区顶部保证可用性。 -->
         <Grid x:Name="AppTitleBar" Grid.Row="0" Height="44">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0" Spacing="10">
                 <Image x:Name="TitleBarLogo" Width="20" Height="20">
@@ -27,15 +31,6 @@
                     </Image.Source>
                 </Image>
                 <TextBlock Text="DSH HARNESS 控制器" Style="{StaticResource Wordmark}" VerticalAlignment="Center" />
-                <ComboBox x:Name="CmbInstance" Width="160"
-                          VerticalAlignment="Center" MinHeight="32"
-                          SelectionChanged="CmbInstance_SelectionChanged">
-                    <ComboBox.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Name}" />
-                        </DataTemplate>
-                    </ComboBox.ItemTemplate>
-                </ComboBox>
             </StackPanel>
             <!-- 主题切换：留出右侧系统标题按钮空间 -->
             <Button x:Name="BtnTheme" Style="{StaticResource BtnIcon}" HorizontalAlignment="Right"
@@ -48,6 +43,27 @@
         <!-- ==================== 内容区 ==================== -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="20,4,20,16" Spacing="12">
+
+                <!-- 实例选择器（自 v0.3.1 从标题栏移入内容区：修复下拉打不开） -->
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="260" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="当前实例" Style="{StaticResource FieldLabel}"
+                               VerticalAlignment="Center" ToolTipService.ToolTip="选择要管理的 dsh 实例" />
+                    <ComboBox Grid.Column="1" x:Name="CmbInstance" MinHeight="32"
+                              SelectionChanged="CmbInstance_SelectionChanged">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Grid.Column="2" Text="选择要管理的实例，其状态 / 日志 / 设置均独立" 
+                               Style="{StaticResource FooterText}" VerticalAlignment="Center" TextWrapping="NoWrap" />
+                </Grid>
 
                 <!-- 状态卡片 -->
                 <Border Style="{StaticResource DshCard}" Padding="18,14">
@@ -152,12 +168,10 @@
                             <TextBlock Text="删除实例" />
                         </StackPanel>
                     </Button>
-                    <TextBlock Grid.Column="4" Text="编辑：在下方“实例设置”中直接修改当前实例"
-                               Style="{StaticResource FooterText}" VerticalAlignment="Center" TextWrapping="NoWrap" />
                 </Grid>
 
-                <!-- 实例设置（选中实例） -->
-                <Expander Header="实例设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                <!-- 实例设置（选中实例） 含保存/取消按钮 -->
+                <Expander x:Name="ExpInstanceSettings" Header="实例设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                           IsExpanded="False">
                     <Expander.HeaderTemplate>
                         <DataTemplate>
@@ -228,11 +242,60 @@
                                 <ToggleSwitch x:Name="SwStopOnExit" Header="退出时停止由本程序启动的后端" OnContent="" OffContent="" />
                             </StackPanel>
                         </Grid>
+
+                        <!-- v0.4.0 WSL 运行环境 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="运行环境" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                                       ToolTipService.ToolTip="windows=本机直接拉起 dsh；wsl=在 WSL2 发行版内运行（v0.4.0）" />
+                            <ComboBox Grid.Column="1" x:Name="CmbRuntime" MinHeight="32" SelectionChanged="CmbRuntime_SelectionChanged">
+                                <ComboBoxItem Content="Windows（本机）" Tag="windows" />
+                                <ComboBoxItem Content="WSL2（在发行版内运行）" Tag="wsl" />
+                            </ComboBox>
+                            <TextBlock Grid.Column="2" Text="发行版" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            <TextBox Grid.Column="3" x:Name="TxtWslDistro" Style="{StaticResource InputBox}" PlaceholderText="如 Ubuntu-26.04" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10" x:Name="RowWslHome">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="WSL DSH_HOME" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="Linux 侧数据目录（~ 前缀展开）；留空 = 发行版内默认 ~/.dsh" />
+                            <TextBox Grid.Column="1" x:Name="TxtWslHome" Style="{StaticResource InputBox}"
+                                     PlaceholderText="留空 = ~/.dsh（如 ~/dsh-instances/main）" />
+                        </Grid>
+                        <Grid ColumnSpacing="10" HorizontalAlignment="Right">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" x:Name="BtnCancelInstance" Style="{StaticResource BtnSecondary}" Click="BtnCancelInstance_Click"
+                                    ToolTipService.ToolTip="放弃更改并收起">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8bb;" FontSize="12" />
+                                    <TextBlock Text="取消" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" x:Name="BtnSaveInstance" Style="{StaticResource BtnPrimary}" Click="BtnSaveInstance_Click"
+                                    ToolTipService.ToolTip="保存当前实例设置并收起">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73e;" FontSize="12" />
+                                    <TextBlock Text="保存" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
                     </StackPanel>
                 </Expander>
 
                 <!-- 全局设置 -->
-                <Expander Header="全局设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                <Expander x:Name="ExpGlobalSettings" Header="全局设置" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
                           IsExpanded="False">
                     <Expander.HeaderTemplate>
                         <DataTemplate>
@@ -271,11 +334,46 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="新建实例默认工作区" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
+                                       ToolTipService.ToolTip="新建/克隆实例对话框中工作目录的默认值；留空则回退为当前选中实例的工作目录" />
+                            <TextBox Grid.Column="1" x:Name="TxtNewWs" Style="{StaticResource InputBox}"
+                                     PlaceholderText="留空 = 继承当前选中实例的工作目录" />
+                            <Button Grid.Column="2" x:Name="BtnBrowseNewWs" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseNewWs_Click" />
+                        </Grid>
+
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Grid.Column="0" Text="dshCommand" Style="{StaticResource FieldLabel}" Width="{StaticResource SettingsLabelWidth}"
                                        ToolTipService.ToolTip="留空自动查找（npm shim / PATH / node 入口）" />
                             <TextBox Grid.Column="1" x:Name="TxtDshCommand" Style="{StaticResource InputBox}"
                                      PlaceholderText="留空自动查找" />
+                        </Grid>
+
+                        <!-- 全局设置操作按钮 -->
+                        <Grid ColumnSpacing="10" HorizontalAlignment="Right">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" x:Name="BtnCancelGlobal" Style="{StaticResource BtnSecondary}" Click="BtnCancelGlobal_Click"
+                                    ToolTipService.ToolTip="放弃更改并收起">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8bb;" FontSize="12" />
+                                    <TextBlock Text="取消" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button Grid.Column="1" x:Name="BtnSaveGlobal" Style="{StaticResource BtnPrimary}" Click="BtnSaveGlobal_Click"
+                                    ToolTipService.ToolTip="保存全局设置并收起">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE73e;" FontSize="12" />
+                                    <TextBlock Text="保存" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                         </Grid>
                     </StackPanel>
                 </Expander>

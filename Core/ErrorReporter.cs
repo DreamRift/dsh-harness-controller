@@ -32,7 +32,7 @@ namespace DshController.Core
 
     public static class ErrorReporter
     {
-        public const string AppVersion = "0.3.0";
+        public const string AppVersion = "0.4.0";
 
         /// <summary>启动失败报告。返回写入的文件路径；彻底失败返回 null。</summary>
         public static string WriteStartFailure(StartFailureContext ctx)

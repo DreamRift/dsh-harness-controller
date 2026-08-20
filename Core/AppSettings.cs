@@ -30,6 +30,10 @@ namespace DshController.Core
         [JsonPropertyName("homeRoot")]
         public string HomeRoot { get; set; } = "";
 
+        /// <summary>新建实例默认工作区目录（v0.3.1）。</summary>
+        [JsonPropertyName("newInstanceWorkspace")]
+        public string NewInstanceWorkspace { get; set; } = "";
+
         /// <summary>解析后的实例目录根（配置值优先，否则默认目录）。</summary>
         [JsonIgnore]
         public string EffectiveHomeRoot

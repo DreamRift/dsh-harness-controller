@@ -56,6 +56,25 @@ namespace DshController.Core
         [JsonPropertyName("trustedHosts")]
         public string[] TrustedHosts { get; set; } = Array.Empty<string>();
 
+        /// <summary>运行环境：windows（默认，cmd 直接拉起）| wsl（wsl.exe 拉起，P:WSL 支持）。</summary>
+        [JsonPropertyName("runtime")]
+        public string Runtime { get; set; } = "windows";
+
+        /// <summary>WSL 发行版名称（Runtime=wsl 时有效，如 Ubuntu-26.04）。</summary>
+        [JsonPropertyName("wslDistro")]
+        public string WslDistro { get; set; } = "";
+
+        /// <summary>Linux 侧 DSH_HOME（Runtime=wsl 时有效；~ 前缀展开，空 = ~/.dsh）。</summary>
+        [JsonPropertyName("wslHome")]
+        public string WslHome { get; set; } = "";
+
+        /// <summary>WSL 实例停止后的关闭策略：smart（默认）| always | distroOnly。</summary>
+        [JsonPropertyName("wslShutdownPolicy")]
+        public string WslShutdownPolicy { get; set; } = "smart";
+
+        [JsonIgnore]
+        public bool IsWsl => Runtime != null && Runtime.Equals("wsl", StringComparison.OrdinalIgnoreCase);
+
         [JsonIgnore]
         public static string FilePath
         {

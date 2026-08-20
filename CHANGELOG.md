@@ -3,10 +3,54 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.4.0] - 开发中（待发布）
+
+> **WSL2 实例管理**：控制器现在可切换管理 Windows 与 WSL2 两种运行环境的 DeepSeek Harness 实例，
+> WSL 实例与 Windows 完全隔离（独立 Linux DSH_HOME、默认 Linux 工作区），仅按需共享 Windows 工作区，
+> 停止时按策略智能关闭发行版/VM。核心逻辑经独立验证版（DshWslCtrl）实测后移植。
+
+### 新增
+
+- **WSL 运行环境**：实例支持 `runtime: wsl`，经 `wsl.exe -d <发行版> --exec bash` 拉起 dsh web；DSH_HOME 经 WSLENV 传入 WSL，输出经 wsl.exe UTF-8 中继复用现有日志管道与就绪探测
+- **发行版内启动/停止**：启动脚本（pidfile + exec）写入发行版 /tmp；停止按 pidfile 校验 + 进程组 TERM→KILL 升级，同发行版多实例互不影响
+- **智能关闭（wslShutdownPolicy）**：发行版内无其他 harness 实例 → `wsl -t` 终止发行版；`smart` 策略下无其他发行版运行才 `wsl --shutdown` 释放 VM
+- **WSL 实例界面支持**：实例下拉显示 `[WIN]`/`[WSL 发行版]` 标识；实例设置新增运行环境选择、WSL 发行版、WSL DSH_HOME；新建实例对话框支持选择 WSL2 运行环境；状态卡显示 WSL 发行版与 Linux HOME
+- **凭据自动同步**：WSL 实例首次启动时，若发行版内无凭据且 Windows 侧 ~/.dsh 存在，自动复制 settings.yaml/.credentials.yaml（chmod 600）
+
+### 新增文件
+
+- `Core/WslTools.cs`：WSL 互操作层（wsl.exe 调用、UTF-16LE 解码、发行版管理、路径转换、/mnt/c 文件上传）
+- `Core/WslLaunch.cs`：WSL 启动脚本生成、发行版内停止、智能关闭
+
+### 修复
+
+- **工作区源码缺失恢复**：此前工作区误删的 `Core/`、`Styles/`、`Assets/`、`docs/` 等文件恢复为 HEAD 版本；`AppSettings` 补回 v0.3.1 新增的 `newInstanceWorkspace` 字段
+
+### 版本号统一
+
+- csproj / ErrorReporter / CHANGELOG 三处版本号统一为 0.4.0
+
+## [0.3.1] - 开发中（待发布）
+
+> **实例选择器可用性**：将实例选择 ComboBox 从标题栏移入内容区，修复下拉打不开问题；
+> **新建默认值优化**：继承当前选中实例的设置作为新建对话框默认值；
+> **Expander Save/Cancel**：为"实例设置"/"全局设置"添加独立保存与取消按钮。
+
+### 新增
+
+- **实例设置 / 全局设置独立保存**：两个设置 Expander 均新增"保存"/"取消"按钮，保存后自动收起；取消则放弃未保存修改并恢复原值
+- **全局设置新增"新建实例默认工作区"**：设置新建/克隆实例对话框中工作目录的默认值；留空则回退为继承当前选中实例的工作目录
+
+### 修复
+
+- **实例选择下拉打不开（严重）**：`ExtendsContentIntoTitleBar + SetTitleBar` 下标题栏内的 ComboBox 下拉箭头点击被拖拽命中测试拦截，导致下拉列表无法弹出——选择器移入内容区顶部保证所有交互正常（WinUI 3 已知问题，见 docs/FIX-MULTI-INSTANCE-SWITCH.md 补充说明）
+- **新建实例工作目录保持"我的文档"**：改为按"全局新建实例默认工作区 → 当前选中实例工作目录 → 我的文档"三级回退；用户修改主实例工作目录后，新建实例默认沿用同一路径
+- **诊断日志增强**：切换/刷新操作全程记录诊断信息
+
 ## [0.3.0] - 开发中（未发布）
 
 > **多实例功能**：一个控制器管理 N 个互相隔离的 DeepSeek Harness 实例。
-> 每个实例 = 独立 `$DSH_HOME`（数据/会话/凭据/插件全隔离）+ 独立端口 + 独立 workspace。
+每个实例 = 独立 `$DSH_HOME`（数据/会话/凭据/插件全隔离）+ 独立端口 + 独立 workspace。
 
 ### 新增
 
@@ -59,7 +103,7 @@
   - 外部后端运行时不再每秒同步起 netstat 子进程（3s 结果缓存）
   - `BackendManager` 显式状态机（Stopped/Starting/Running/Stopping/Restarting），
     启动等待期随时可"停止"（v0.1.0 启动中 180s 内按钮全禁用）
-  - 关闭窗口改用 AppWindow.Closing 拦截+重关模式，确保退出时进程树清理完成后窗口才销毁；
+  - 关闭窗口改用 AppWindow.Closing 拦截 + 重关模式，确保退出时进程树清理完成后窗口才销毁；
     关闭时静默保存设置，不再弹"端口无效"警告
 - **效率优化**：子进程输出走 `Channel` + 100ms 批量泵（替代每行一次 BeginInvoke），
   日志环形缓冲 2000 行，dsh 路径解析结果缓存
@@ -93,7 +137,7 @@
 
 - `--check` 等自检命令在 Windows App SDK 清单合并（mt.exe）下的启动问题
   （requestedExecutionLevel 的 UIAccess 属性导致 SxS 激活失败）
-- 外部后端直接点击“重启”并确认后无动作：UI 通过端口探测显示 Running，但
+- 外部后端直接点击"重启"并确认后无动作：UI 通过端口探测显示 Running，但
   `BackendManager` 内部状态仍为 Stopped，旧逻辑会提前返回；现在允许停止外部实例
   并由本程序重新启动后端（重启仍不打开浏览器）
 

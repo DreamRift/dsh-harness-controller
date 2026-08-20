@@ -73,7 +73,7 @@ namespace DshController.Core
             }
             Config cfg = def.ToConfig(_registry.Settings);
             bool ok = await For(id).StartAsync(cfg).ConfigureAwait(false);
-            if (ok && !string.IsNullOrEmpty(def.Home))
+            if (ok && !string.IsNullOrEmpty(def.Home) && !def.IsWsl)
             {
                 def.LastStartedAt = DateTime.UtcNow;
                 WriteLock(def, For(id).ChildPid);
@@ -86,17 +86,17 @@ namespace DshController.Core
         {
             InstanceDef def = _registry.Get(id);
             bool ok = await For(id).StopAsync(def.ToConfig(_registry.Settings), killExternal).ConfigureAwait(false);
-            if (!string.IsNullOrEmpty(def.Home)) DeleteLock(def);
+            if (!string.IsNullOrEmpty(def.Home) && !def.IsWsl) DeleteLock(def);
             return ok;
         }
 
         public async Task<bool> RestartAsync(string id)
         {
             InstanceDef def = _registry.Get(id);
-            if (string.IsNullOrEmpty(def.Home)) DeleteLock(def);
+            if (string.IsNullOrEmpty(def.Home) || def.IsWsl) DeleteLock(def);
             Config cfg = def.ToConfig(_registry.Settings);
             bool ok = await For(id).RestartAsync(cfg).ConfigureAwait(false);
-            if (ok && !string.IsNullOrEmpty(def.Home))
+            if (ok && !string.IsNullOrEmpty(def.Home) && !def.IsWsl)
             {
                 def.LastStartedAt = DateTime.UtcNow;
                 WriteLock(def, For(id).ChildPid);
@@ -111,6 +111,7 @@ namespace DshController.Core
         {
             pid = 0;
             if (!_registry.TryGet(id, out InstanceDef def) || string.IsNullOrEmpty(def.Home)) return false;
+            if (def.IsWsl) return false; // WSL 实例：锁由发行版内 pidfile 守护（Linux 路径在 Windows 侧无意义）
             return IsLocked(def, out pid);
         }
 

@@ -12,6 +12,7 @@ bin/
 obj/
 publish/
 publish-fixed/
+yinyong/
 *.exe
 *.pdb
 *.user

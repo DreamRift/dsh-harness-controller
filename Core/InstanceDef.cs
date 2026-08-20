@@ -48,6 +48,33 @@ namespace DshController.Core
         [JsonPropertyName("lastStartedAt")]
         public DateTime? LastStartedAt { get; set; }
 
+        /// <summary>运行环境：windows（默认）| wsl（v0.4.0 WSL 实例）。</summary>
+        [JsonPropertyName("runtime")]
+        public string Runtime { get; set; } = "windows";
+
+        /// <summary>WSL 发行版名称（Runtime=wsl 时有效）。</summary>
+        [JsonPropertyName("wslDistro")]
+        public string WslDistro { get; set; } = "";
+
+        /// <summary>Linux 侧 DSH_HOME（Runtime=wsl 时有效；~ 前缀展开，空 = ~/.dsh）。</summary>
+        [JsonPropertyName("wslHome")]
+        public string WslHome { get; set; } = "";
+
+        [JsonIgnore]
+        public bool IsWsl => Runtime != null && Runtime.Equals("wsl", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>界面显示名（WSL 实例带 [WSL] 标识）。</summary>
+        [JsonIgnore]
+        public string DisplayName
+        {
+            get
+            {
+                string n = string.IsNullOrWhiteSpace(Name) ? Id : Name;
+                return IsWsl ? n + "  [WSL " + (string.IsNullOrWhiteSpace(WslDistro) ? "?" : WslDistro) + "]"
+                             : n + "  [WIN]";
+            }
+        }
+
         /// <summary>转换为 BackendManager 使用的运行时配置（填充全局设置）。</summary>
         public Config ToConfig(AppSettings settings)
         {
@@ -67,7 +94,10 @@ namespace DshController.Core
                 ErrorReportDir = settings?.ErrorReportDir ?? "",
                 AutoOpenBrowser = AutoOpenBrowser,
                 StopOnExit = StopOnExit,
-                Theme = settings?.Theme ?? AppTheme.System
+                Theme = settings?.Theme ?? AppTheme.System,
+                Runtime = IsWsl ? "wsl" : "windows",
+                WslDistro = WslDistro ?? "",
+                WslHome = WslHome ?? ""
             };
         }
     }
