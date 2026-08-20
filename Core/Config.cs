@@ -72,6 +72,21 @@ namespace DshController.Core
         [JsonPropertyName("wslShutdownPolicy")]
         public string WslShutdownPolicy { get; set; } = "smart";
 
+        /// <summary>实例 ID（多实例；失败报告按实例归档，v0.5.0）。</summary>
+        [JsonPropertyName("instanceId")]
+        public string InstanceId { get; set; } = "";
+
+        /// <summary>实例显示名（失败报告展示，v0.5.0）。</summary>
+        [JsonPropertyName("instanceName")]
+        public string InstanceName { get; set; } = "";
+
+        /// <summary>
+        /// harness 版本锁定（v0.5.0）：空 = 使用当前环境主实例版本；
+        /// 非空 = 经 npx 拉取 @deepseek-ai/dsh@&lt;版本&gt; 启动。
+        /// </summary>
+        [JsonPropertyName("harnessVersion")]
+        public string HarnessVersion { get; set; } = "";
+
         [JsonIgnore]
         public bool IsWsl => Runtime != null && Runtime.Equals("wsl", StringComparison.OrdinalIgnoreCase);
 

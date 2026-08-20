@@ -20,11 +20,16 @@ namespace DshController.Core
 {
     public sealed class DshCommand
     {
-        public string Kind;    // "cmd"（npm shim）或 "node"（node + bin.js）
-        public string Path1;   // cmd shim 路径，或 node.exe 路径
-        public string Path2;   // node 模式：@deepseek-ai/dsh/lib/bin.js
+        public string Kind;    // "cmd"（npm shim）| "node"（node + bin.js）| "npx"（指定版本，v0.5.0）
+        public string Path1;   // cmd shim 路径 / node.exe 路径 / npx.cmd 路径
+        public string Path2;   // node 模式：@deepseek-ai/dsh/lib/bin.js；npx 模式：锁定版本号
 
-        public string Describe() { return Kind == "cmd" ? Path1 : Path1 + " \"" + Path2 + "\""; }
+        public string Describe()
+        {
+            if (Kind == "npx")
+                return "npx --yes @deepseek-ai/dsh@" + Path2 + "（经 " + Path1 + "）";
+            return Kind == "cmd" ? Path1 : Path1 + " \"" + Path2 + "\"";
+        }
     }
 
     public sealed class ResolutionStep

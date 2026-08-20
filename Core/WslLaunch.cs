@@ -23,26 +23,44 @@ namespace DshController.Core
 
         /// <summary>
         /// 生成发行版内启动脚本（LF 行尾）。前台模式：exec 直接替换为 dsh。
+        /// v0.5.0：harnessVersion 非空时 exec npx --yes @deepseek-ai/dsh@&lt;版本&gt; web ...，
+        /// 并把 npx 所在 bin 目录（与 node/npm 同目录）加入 PATH。
         /// --exec bash 是非登录 shell，dsh 是 npm shim、内部 exec node 依赖 PATH，
         /// 因此显式把 dsh 所在 bin 目录（与 node 同目录）加入 PATH。
         /// </summary>
         public static string BuildLaunchScript(int port, string wslWorkspace, string dshCmd,
-            IReadOnlyList<string> trustedHosts)
+            IReadOnlyList<string> trustedHosts, string harnessVersion = "", string npxDir = "")
         {
+            string pinned = (harnessVersion ?? "").Trim();
             var sb = new StringBuilder();
             sb.Append("#!/bin/bash\n");
             sb.Append("# DshController WSL 实例启动脚本 port=").Append(port).Append("\n");
-            int slash = dshCmd.LastIndexOf('/');
-            if (slash > 0)
+            if (pinned.Length > 0 && npxDir.Length > 0)
             {
-                string dshDir = dshCmd.Substring(0, slash);
-                sb.Append("export PATH=\"").Append(dshDir).Append(":$PATH\"\n");
+                sb.Append("export PATH=\"").Append(npxDir).Append(":$PATH\"\n");
+            }
+            else
+            {
+                int slash = dshCmd.LastIndexOf('/');
+                if (slash > 0)
+                {
+                    string dshDir = dshCmd.Substring(0, slash);
+                    sb.Append("export PATH=\"").Append(dshDir).Append(":$PATH\"\n");
+                }
             }
             sb.Append("cd ").Append(WslTools.Shq(wslWorkspace))
               .Append(" || { echo \"[dsh] 工作区不可访问: ").Append(wslWorkspace).Append("\" >&2; exit 1; }\n");
             sb.Append("echo $$ > /tmp/dshwsl-").Append(port).Append(".pid\n");
-            sb.Append("exec ").Append(WslTools.Shq(dshCmd))
-              .Append(" web --host 127.0.0.1 --port ").Append(port);
+
+            if (pinned.Length > 0)
+            {
+                sb.Append("exec npx --yes @deepseek-ai/dsh@").Append(pinned);
+            }
+            else
+            {
+                sb.Append("exec ").Append(WslTools.Shq(dshCmd));
+            }
+            sb.Append(" web --host 127.0.0.1 --port ").Append(port);
             if (trustedHosts != null)
                 foreach (var h in trustedHosts)
                     sb.Append(" --trusted-host ").Append(WslTools.Shq(h));

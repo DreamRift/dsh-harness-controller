@@ -60,6 +60,14 @@ namespace DshController.Core
         [JsonPropertyName("wslHome")]
         public string WslHome { get; set; } = "";
 
+        /// <summary>
+        /// harness 版本锁定（v0.5.0）：空 = 跟随当前环境主实例版本；
+        /// 非空 = 经 npx 拉取 @deepseek-ai/dsh@&lt;版本&gt; 启动。
+        /// 新建实例默认填入当前环境检测到的版本，可手动修改。
+        /// </summary>
+        [JsonPropertyName("harnessVersion")]
+        public string HarnessVersion { get; set; } = "";
+
         [JsonIgnore]
         public bool IsWsl => Runtime != null && Runtime.Equals("wsl", StringComparison.OrdinalIgnoreCase);
 
@@ -72,6 +80,24 @@ namespace DshController.Core
                 string n = string.IsNullOrWhiteSpace(Name) ? Id : Name;
                 return IsWsl ? n + "  [WSL " + (string.IsNullOrWhiteSpace(WslDistro) ? "?" : WslDistro) + "]"
                              : n + "  [WIN]";
+            }
+        }
+
+        /// <summary>
+        /// 实例下拉列表用的一行标签（v0.5.0 双界面：环境已由标签页区分，
+        /// 这里只补端口与版本锁定信息，便于同环境多实例快速辨认）。
+        /// </summary>
+        [JsonIgnore]
+        public string PickerLabel
+        {
+            get
+            {
+                string n = string.IsNullOrWhiteSpace(Name) ? Id : Name;
+                string tail = " · :" + Port;
+                string v = (HarnessVersion ?? "").Trim();
+                if (v.Length > 0) tail += " · v" + v;
+                if (IsWsl) tail += " · " + (string.IsNullOrWhiteSpace(WslDistro) ? "发行版未设置" : WslDistro);
+                return n + tail;
             }
         }
 
@@ -97,7 +123,12 @@ namespace DshController.Core
                 Theme = settings?.Theme ?? AppTheme.System,
                 Runtime = IsWsl ? "wsl" : "windows",
                 WslDistro = WslDistro ?? "",
-                WslHome = WslHome ?? ""
+                WslHome = WslHome ?? "",
+                WslShutdownPolicy = string.IsNullOrWhiteSpace(settings?.WslShutdownPolicy)
+                    ? "smart" : settings.WslShutdownPolicy.Trim(),
+                InstanceId = Id ?? "",
+                InstanceName = Name ?? "",
+                HarnessVersion = (HarnessVersion ?? "").Trim()
             };
         }
     }

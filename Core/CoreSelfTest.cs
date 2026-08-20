@@ -69,6 +69,13 @@ namespace DshController.Core
                 string unc = @"\\\\server\\share";
                 string uncClean = Config.SanitizePath(unc);
                 Check(uncClean == @"\\server\share", "UNC 前导双斜杠保留", unc + " -> " + uncClean);
+
+                // v0.5.0 harness 版本解析（dsh --version 输出）
+                Check(HarnessVersion.Parse("0.1.0-rc.7") == "0.1.0-rc.7", "版本解析: 纯版本号");
+                Check(HarnessVersion.Parse("dsh 版本 0.1.0-rc.7 (x64)") == "0.1.0-rc.7", "版本解析: 带前后缀");
+                Check(HarnessVersion.Parse("") == "", "版本解析: 空输出回退空串");
+                Check(HarnessVersion.Parse("no version here") == "", "版本解析: 无版本号回退空串");
+                Check(HarnessVersion.Parse("1.2.3-beta.2") == "1.2.3-beta.2", "版本解析: prerelease 后缀");
             }
 
             // ---------- 公共管理器 ----------
@@ -80,7 +87,7 @@ namespace DshController.Core
             mgr.StartFailed += (s, e) => { lock (failEvents) failEvents.Add(e); };
             mgr.Log += (s, l) => { lock (logs) logs.Add(l); };
 
-            // ---------- 1) 失败注入 → 报告（R3） ----------
+            // ---------- 1) 失败注入 → 报告（R3，v0.5.0 核心层自动落盘） ----------
             Console.WriteLine("[1] 失败注入 → 错误报告（自定义目录）");
             string failCmd = Path.Combine(binDir, "fail-dsh.cmd");
             File.WriteAllText(failCmd, "@exit /b 42\r\n");
@@ -90,7 +97,9 @@ namespace DshController.Core
                 Port = basePort,
                 Workspace = Path.GetTempPath(),
                 DshCommand = failCmd,
-                ErrorReportDir = rptDir
+                ErrorReportDir = rptDir,
+                InstanceId = "selftest-fail",
+                InstanceName = "自检失败实例"
             };
             failEvents.Clear();
             bool started = mgr.StartAsync(cfgFail).GetAwaiter().GetResult();
@@ -99,25 +108,16 @@ namespace DshController.Core
                 failEvents.Count > 0 ? failEvents[0].FailureKind : "无事件");
             Check(failEvents.Count > 0 && failEvents[0].ExitCode == 42, "退出码 42 透传");
 
-            string report = null;
-            if (failEvents.Count > 0)
-            {
-                try { report = ErrorReporter.WriteStartFailure(failEvents[0]); }
-                catch { }
-            }
-            if (report == null && Directory.Exists(rptDir))
-            {
-                try
-                {
-                    var fs = Directory.GetFiles(rptDir, "DshController-fail_*.md");
-                    if (fs.Length > 0) report = fs[0];
-                }
-                catch { }
-            }
-            Check(report != null, "报告生成于自定义目录", report ?? "未生成");
+            string report = failEvents.Count > 0 ? failEvents[0].ReportPath : null;
+            Check(report != null && File.Exists(report), "核心层自动生成报告于自定义目录", report ?? "未生成");
             if (report != null)
             {
                 string md = File.ReadAllText(report);
+                Check(Path.GetFileName(report).Contains("selftest-fail_"), "报告文件名含实例 ID",
+                    Path.GetFileName(report));
+                Check(md.Contains("## 实例信息"), "报告含实例信息节");
+                Check(md.Contains("自检失败实例"), "报告含实例名称");
+                Check(md.Contains("生成时间"), "报告含生成时间");
                 Check(md.Contains("## dsh 命令解析"), "报告含解析轨迹");
                 Check(md.Contains("## 本次配置"), "报告含配置节");
                 Check(md.Contains("## 子进程输出转录"), "报告含输出转录");

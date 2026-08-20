@@ -68,6 +68,11 @@ namespace DshController.Core
         private Channel<string> _output;
         private readonly object _ringLock = new object();
         private readonly LinkedList<string> _ring = new LinkedList<string>();
+        private readonly object _consoleLock = new object();
+        private readonly LinkedList<string> _consoleRing = new LinkedList<string>();
+        private readonly object _diagLock = new object();
+        private readonly List<KeyValuePair<string, string>> _diag = new List<KeyValuePair<string, string>>();
+        private const int ConsoleCapacity = 400;
 
         private BackendState _state = BackendState.Stopped;
         private bool _mine;
@@ -197,15 +202,49 @@ namespace DshController.Core
                 return await StartWslCoreAsync(cfg, opts).ConfigureAwait(false);
             }
 
-            // 1) 解析 dsh
-            DshCommand dsh = _resolver.Resolve(cfg);
-            if (dsh == null)
+            // 1) 解析启动命令：
+            //    锁定版本（harnessVersion 非空）→ 只需要 npx，不要求本机已装 dsh；
+            //    跟随环境（空）→ 4 级回退解析本机 dsh。
+            string pinnedVersion = (cfg.HarnessVersion ?? "").Trim();
+            ClearDiag();
+            Diag("运行环境", "Windows（本机直接拉起）");
+            Diag("实例", (cfg.InstanceName ?? "") + "（" + (cfg.InstanceId ?? "") + "）");
+            Diag("harness 版本", pinnedVersion.Length > 0
+                ? "锁定 " + pinnedVersion + "（npx 拉取 @deepseek-ai/dsh@" + pinnedVersion + "）"
+                : "跟随当前环境主实例版本");
+
+            DshCommand dsh;
+            if (pinnedVersion.Length > 0)
             {
-                FailStart(cfg, "dsh 命令未找到",
-                    "4 级回退（配置 → npm shim → PATH → node 入口）均未命中，详见解析表。",
-                    ex: null, exitCode: null);
-                return false;
+                string npx = HarnessVersion.FindNpxWindows();
+                Diag("npx 路径", string.IsNullOrEmpty(npx) ? "(未找到)" : npx);
+                if (string.IsNullOrEmpty(npx))
+                {
+                    FailStart(cfg, "npx 未找到",
+                        "实例锁定了 harness 版本 " + pinnedVersion + "，需要 npx 拉取指定版本，" +
+                        "但本机未找到 npx.cmd。请安装 Node.js/npm（npm i -g @deepseek-ai/dsh 自带 npx），" +
+                        "或把该实例的 harness 版本改回\"跟随当前环境\"。",
+                        ex: null, exitCode: null);
+                    return false;
+                }
+                dsh = new DshCommand { Kind = "npx", Path1 = npx, Path2 = pinnedVersion };
+                LogUi("harness 版本: 锁定 " + pinnedVersion +
+                      "（npx 拉取 @deepseek-ai/dsh@" + pinnedVersion + "，首次使用需联网下载）");
             }
+            else
+            {
+                dsh = _resolver.Resolve(cfg);
+                if (dsh == null)
+                {
+                    FailStart(cfg, "dsh 命令未找到",
+                        "4 级回退（配置 → npm shim → PATH → node 入口）均未命中，详见解析表。" +
+                        "也可以给该实例锁定一个 harness 版本，改用 npx 拉取指定版本启动。",
+                        ex: null, exitCode: null);
+                    return false;
+                }
+                LogUi("harness 版本: 跟随当前环境（" + dsh.Describe() + "）");
+            }
+            Diag("启动命令", dsh.Describe());
             LogUi("dsh 命令: " + dsh.Describe());
 
             // 2) 工作目录
@@ -245,6 +284,13 @@ namespace DshController.Core
                 psi.FileName = "cmd.exe";
                 psi.Arguments = "/d /s /c \"\"" + dsh.Path1 + "\" web --host " + cfg.Host + " --port " + cfg.Port + trusted + "\"";
             }
+            else if (dsh.Kind == "npx")
+            {
+                // v0.5.0 指定版本：npx --yes @deepseek-ai/dsh@<ver> web ...（npx 缓存于 npm 缓存目录）
+                psi.FileName = "cmd.exe";
+                psi.Arguments = "/d /s /c \"\"" + dsh.Path1 + "\" --yes @deepseek-ai/dsh@" +
+                    dsh.Path2 + " web --host " + cfg.Host + " --port " + cfg.Port + trusted + "\"";
+            }
             else
             {
                 psi.FileName = dsh.Path1;
@@ -254,6 +300,10 @@ namespace DshController.Core
             // v0.3.0 多实例：非空 DSH_HOME 注入到子进程环境，避免实例间共享 ~/.dsh。
             if (!string.IsNullOrEmpty(cfg.Home))
                 psi.EnvironmentVariables["DSH_HOME"] = cfg.Home;
+
+            Diag("工作目录", ws + (Directory.Exists(ws) ? "" : "（不存在）"));
+            Diag("DSH_HOME 注入", string.IsNullOrEmpty(cfg.Home) ? "（未注入，使用默认 ~/.dsh）" : cfg.Home);
+            Diag("命令行", psi.FileName + " " + psi.Arguments);
 
             SetState(BackendState.Starting, false, 0);
             ClearRing();
@@ -376,6 +426,15 @@ namespace DshController.Core
         private async Task<bool> StartWslCoreAsync(Config cfg, StartOptions opts)
         {
             string distro = string.IsNullOrWhiteSpace(cfg.WslDistro) ? "Ubuntu-24.04" : cfg.WslDistro.Trim();
+            string pinnedVersion = (cfg.HarnessVersion ?? "").Trim();
+
+            ClearDiag();
+            Diag("运行环境", "WSL2（发行版内运行）");
+            Diag("实例", (cfg.InstanceName ?? "") + "（" + (cfg.InstanceId ?? "") + "）");
+            Diag("发行版(配置)", distro);
+            Diag("harness 版本", pinnedVersion.Length > 0
+                ? "锁定 " + pinnedVersion + "（发行版内 npx 拉取）"
+                : "跟随发行版内主实例版本");
 
             // 1) 预检：WSL 本体
             if (!await WslTools.IsInstalledAsync().ConfigureAwait(false))
@@ -386,6 +445,7 @@ namespace DshController.Core
             }
             // 2) 发行版存在
             var distros = await WslTools.ListDistrosAsync().ConfigureAwait(false);
+            Diag("已安装发行版", distros.Count > 0 ? string.Join(", ", distros) : "（无）");
             if (!distros.Contains(distro, StringComparer.OrdinalIgnoreCase))
             {
                 FailStart(cfg, "发行版不存在",
@@ -416,6 +476,9 @@ namespace DshController.Core
             }
             string wslHome = WslTools.ResolveLinuxPath(cfg.WslHome, distroHomeRoot);
             await WslTools.RunInDistroAsync(distro, "mkdir -p " + WslTools.Shq(wslHome)).ConfigureAwait(false);
+            Diag("发行版用户", user);
+            Diag("Linux $HOME", distroHomeRoot);
+            Diag("DSH_HOME(Linux)", wslHome);
 
             // 首次启动：WSL home 无凭据且 Windows 侧存在 → 自动复制 settings.yaml/.credentials.yaml（chmod 600）
             var credCheck = await WslTools.RunInDistroAsync(distro,
@@ -441,13 +504,40 @@ namespace DshController.Core
                 }
             }
 
-            // 5) dsh 命令（排除 /mnt 的 Windows shim）
+            // 5) 启动命令：锁定版本 → 发行版内 npx（不要求发行版已装 dsh）；
+            //                跟随环境 → 发行版内原生 dsh（排除 /mnt 的 Windows shim）
             string dshCmd = await WslLaunch.ResolveWslDshAsync(distro, cfg.DshCommand).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(dshCmd))
+            Diag("发行版内 dsh", string.IsNullOrEmpty(dshCmd) ? "(未找到)" : dshCmd);
+            string npxDir = "";
+            string launchDsh = dshCmd;
+            if (pinnedVersion.Length > 0)
             {
-                FailStart(cfg, "WSL 内 dsh 未找到",
-                    "WSL " + distro + " 内未找到原生 dsh（已排除 /mnt 下的 Windows shim）。请在该发行版内执行: npm install -g @deepseek-ai/dsh", null, null);
-                return false;
+                string npx = await HarnessVersion.ResolveWslNpxAsync(distro).ConfigureAwait(false);
+                Diag("发行版内 npx", string.IsNullOrEmpty(npx) ? "(未找到)" : npx);
+                if (string.IsNullOrEmpty(npx))
+                {
+                    FailStart(cfg, "发行版内 npx 未找到",
+                        "实例锁定了 harness 版本 " + pinnedVersion + "，需要发行版内 npx 拉取指定版本，" +
+                        "但 " + distro + " 内未找到原生 npx。请在该发行版内安装 Node.js/npm，" +
+                        "或把该实例的 harness 版本改回\"跟随当前环境\"。",
+                        null, null);
+                    return false;
+                }
+                npxDir = HarnessVersion.DirOf(npx);
+                launchDsh = "npx"; // 启动脚本内 exec npx --yes @deepseek-ai/dsh@<ver> web ...
+                LogUi("harness 版本: 锁定 " + pinnedVersion + "（发行版内 npx " + npx + " 拉取，首次使用需联网下载）");
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(dshCmd))
+                {
+                    FailStart(cfg, "WSL 内 dsh 未找到",
+                        "WSL " + distro + " 内未找到原生 dsh（已排除 /mnt 下的 Windows shim）。" +
+                        "请在该发行版内执行: npm install -g @deepseek-ai/dsh；" +
+                        "或给该实例锁定一个 harness 版本，改用发行版内 npx 拉取指定版本启动。", null, null);
+                    return false;
+                }
+                LogUi("harness 版本: 跟随当前环境（" + dshCmd + "）");
             }
 
             // 6) 工作区路径：Windows 路径（C:\...）转 /mnt/c 按需共享；Linux 路径（~/ 或 /）原生隔离
@@ -458,6 +548,7 @@ namespace DshController.Core
                 wslWs = WslTools.ResolveLinuxPath(cfg.Workspace, distroHomeRoot);
             var dirCheck = await WslTools.RunInDistroAsync(distro,
                 "mkdir -p " + WslTools.Shq(wslWs) + "; test -d " + WslTools.Shq(wslWs) + " && echo DSHWSL_YES || echo DSHWSL_NO").ConfigureAwait(false);
+            Diag("工作区(Linux)", wslWs + (dirCheck.Output.Trim() == "DSHWSL_YES" ? "" : "（不可访问）"));
             if (dirCheck.Output.Trim() != "DSHWSL_YES")
             {
                 FailStart(cfg, "工作区不可访问", "工作区 " + wslWs + " 在 " + distro + " 内无法访问。", null, null);
@@ -467,7 +558,12 @@ namespace DshController.Core
             // 7) 写启动脚本（经 /mnt/c 拷贝，规避引号转义）
             string uploadDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "DshController-wsl");
             string scriptPath = "/tmp/dshwsl-" + cfg.Port + ".sh";
-            string script = WslLaunch.BuildLaunchScript(cfg.Port, wslWs, dshCmd, cfg.TrustedHosts);
+            string script = WslLaunch.BuildLaunchScript(cfg.Port, wslWs, launchDsh, cfg.TrustedHosts,
+                pinnedVersion, npxDir);
+            Diag("启动脚本", distro + ":" + scriptPath);
+            Diag("启动命令", pinnedVersion.Length > 0
+                ? "npx --yes @deepseek-ai/dsh@" + pinnedVersion + " web --host 127.0.0.1 --port " + cfg.Port
+                : dshCmd + " web --host 127.0.0.1 --port " + cfg.Port);
             if (!await WslTools.WriteDistroFileAsync(distro, scriptPath, script, uploadDir).ConfigureAwait(false))
             {
                 FailStart(cfg, "写入启动脚本失败", "无法把启动脚本写入 " + distro + ":/tmp/dshwsl-" + cfg.Port + ".sh", null, null);
@@ -705,10 +801,12 @@ namespace DshController.Core
             // 捕获 dsh 公告 URL
             try
             {
+                // 无捕获组的正则取整个匹配（m.Groups[1] 不存在会抛异常，
+                // 曾导致公告 URL 捕获静默失效，v0.5.0 修复）
                 Match m = Regex.Match(line, @"https?://[^\s]+");
                 if (m.Success)
                 {
-                    string u = m.Groups[1].Value;
+                    string u = m.Value;
                     if (u.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
                     {
                         _announcedUrl = u;
@@ -756,17 +854,42 @@ namespace DshController.Core
 
         private void FailStart(Config cfg, string kind, string summary, Exception ex, int? exitCode)
         {
+            LogUi("启动失败：" + kind + "。" + (summary ?? ""));
+
             var ctx = new StartFailureContext
             {
                 FailureKind = kind,
                 Summary = summary,
                 Exception = ex,
                 Config = cfg,
-                Trace = _resolver.Trace(cfg),
+                // WSL 实例的失败与"Windows 侧 dsh 4 级回退"无关，解析表只对 Windows 实例有意义
+                Trace = cfg != null && cfg.IsWsl ? null : _resolver.Trace(cfg),
                 CapturedOutput = RecentOutput(200),
+                ConsoleLog = RecentConsole(200),
+                Diagnostics = DiagSnapshot(),
+                InstanceId = cfg?.InstanceId ?? "",
+                InstanceHome = cfg?.Home ?? "",
+                Phase = "start",
                 ExitCode = exitCode
             };
-            LogUi("启动失败：" + kind + "。" + (summary ?? ""));
+
+            // v0.5.0：报告在核心层直接生成（不再依赖 UI 事件订阅）——
+            // 具体的报错信息（含控制台转录）+ 实例信息 + 时间 落盘到用户指定的报告目录，
+            // 文件名含实例 ID 与时间戳；写入失败兜底 exe 目录 reports\。
+            try
+            {
+                ctx.ReportPath = ErrorReporter.WriteStartFailure(ctx);
+                if (!string.IsNullOrEmpty(ctx.ReportPath))
+                    LogUi("已生成启动失败报告: " + ctx.ReportPath);
+                else
+                    LogUi("⚠ 启动失败报告写入失败（目标目录: " +
+                        (cfg?.EffectiveErrorReportDir ?? "（未知）") + "），请检查该目录是否存在/可写");
+            }
+            catch (Exception rex)
+            {
+                LogUi("⚠ 启动失败报告生成异常: " + rex.Message);
+            }
+
             RunOnUi(() =>
             {
                 var h = StartFailed;
@@ -778,6 +901,8 @@ namespace DshController.Core
 
         private void FailStop(Config cfg, string kind, string summary, string extra)
         {
+            LogUi("停止失败：" + kind + "。" + summary);
+
             var ctx = new StartFailureContext
             {
                 FailureKind = kind,
@@ -786,10 +911,21 @@ namespace DshController.Core
                 Config = cfg,
                 Trace = null,
                 CapturedOutput = RecentOutput(100),
+                ConsoleLog = RecentConsole(200),
+                Diagnostics = DiagSnapshot(),
+                InstanceId = cfg?.InstanceId ?? "",
+                InstanceHome = cfg?.Home ?? "",
+                Phase = "stop",
                 ExitCode = null,
                 Extra = "```\n" + (extra ?? "") + "\n```"
             };
-            LogUi("停止失败：" + kind + "。" + summary);
+            try
+            {
+                ctx.ReportPath = ErrorReporter.WriteStartFailure(ctx);
+                if (!string.IsNullOrEmpty(ctx.ReportPath))
+                    LogUi("已生成停止失败报告: " + ctx.ReportPath);
+            }
+            catch { }
             RunOnUi(() =>
             {
                 var h = StartFailed;
@@ -829,11 +965,54 @@ namespace DshController.Core
 
         private void LogUi(string line)
         {
+            // v0.5.0：控制台文本同时进入"控制台转录"环形缓冲，
+            // 启动失败时由 ErrorReporter 一并落盘（用户要求：控制台的具体报错信息进报告）
+            lock (_consoleLock)
+            {
+                _consoleRing.AddLast(DateTime.Now.ToString("HH:mm:ss") + "  " + line);
+                while (_consoleRing.Count > ConsoleCapacity) _consoleRing.RemoveFirst();
+            }
             RunOnUi(() =>
             {
                 var h = Log;
                 if (h != null) h(this, line);
             });
+        }
+
+        /// <summary>控制台转录（管理器日志 + 关键步骤），最近 maxLines 行。</summary>
+        public List<string> RecentConsole(int maxLines)
+        {
+            lock (_consoleLock)
+            {
+                return _consoleRing.Skip(Math.Max(0, _consoleRing.Count - maxLines)).ToList();
+            }
+        }
+
+        /// <summary>记录一条启动诊断（进报告的"启动诊断"表；同名键覆盖）。</summary>
+        private void Diag(string key, string value)
+        {
+            lock (_diagLock)
+            {
+                for (int i = 0; i < _diag.Count; i++)
+                {
+                    if (string.Equals(_diag[i].Key, key, StringComparison.Ordinal))
+                    {
+                        _diag[i] = new KeyValuePair<string, string>(key, value ?? "");
+                        return;
+                    }
+                }
+                _diag.Add(new KeyValuePair<string, string>(key, value ?? ""));
+            }
+        }
+
+        private List<KeyValuePair<string, string>> DiagSnapshot()
+        {
+            lock (_diagLock) { return new List<KeyValuePair<string, string>>(_diag); }
+        }
+
+        private void ClearDiag()
+        {
+            lock (_diagLock) { _diag.Clear(); }
         }
 
         private void RunOnUi(Action a)

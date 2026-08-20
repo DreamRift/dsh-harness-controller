@@ -107,6 +107,7 @@ namespace DshController.Core
             Out("backend      : " + (up ? "UP" : "DOWN"));
             if (up) Out("listener pid : " + PortTools.FindListenerPidAsync(port).GetAwaiter().GetResult());
             Out("report dir   : " + cfg.EffectiveErrorReportDir);
+            Out("harness ver  : " + HarnessVersion.ResolveWindowsAsync(cfg).GetAwaiter().GetResult());
             Out("launcher.json: " + InstanceRegistry.LegacyFilePath);
             Out("instances.json: " + InstanceRegistry.FilePath);
             Out("");
@@ -114,13 +115,18 @@ namespace DshController.Core
             foreach (InstanceDef def in registry.Instances)
             {
                 string home = string.IsNullOrEmpty(def.Home) ? "(默认 ~/.dsh)" : def.Home;
+                if (def.IsWsl) home = "wsl:" + (string.IsNullOrEmpty(def.WslHome) ? "~/.dsh" : def.WslHome);
                 bool instanceUp = PortTools.ProbeAsync(def.Host, def.Port).GetAwaiter().GetResult();
                 string listenerPid = instanceUp
                     ? PortTools.FindListenerPidAsync(def.Port).GetAwaiter().GetResult().ToString()
                     : "-";
-                Out("  [" + def.Id + "] " + def.Name + "  port=" + def.Port +
+                string ver = string.IsNullOrEmpty(def.HarnessVersion)
+                    ? "跟随当前环境" : "锁定 " + def.HarnessVersion;
+                Out("  [" + def.Id + "] " + def.Name +
+                    (def.IsWsl ? "  runtime=wsl(" + (string.IsNullOrEmpty(def.WslDistro) ? "?" : def.WslDistro) + ")" : "  runtime=windows") +
+                    "  port=" + def.Port +
                     "  home=" + home + "  backend=" + (instanceUp ? "UP" : "DOWN") +
-                    "  pid=" + listenerPid);
+                    "  pid=" + listenerPid + "  harness=" + ver);
             }
             WriteCliLog(transcript);
             return dsh == null ? 2 : 0;
@@ -340,11 +346,65 @@ namespace DshController.Core
             Action<string> Out, Action<StringBuilder> writeClilog, StringBuilder transcript)
         {
             Out("starting instance " + id + " ...");
-            bool ok = im.StartAsync(id).GetAwaiter().GetResult();
-            if (ok) Out("started");
-            else Out("FAIL: 启动失败，请查看上方日志");
-            writeClilog(transcript);
-            return ok ? 0 : 1;
+
+            // v0.5.0：CLI 启动改为"等到就绪或失败"再返回——
+            // 就绪 → 0；失败 → 1 并打印核心层生成的失败报告路径。
+            BackendManager mgr = im.For(id);
+            var settled = new ManualResetEventSlim(false);
+            string readyUrl = null;
+            string failKind = null;
+            string reportPath = null;
+
+            EventHandler<ReadyEventArgs> onReady = (s, e) =>
+            {
+                readyUrl = e.Url;
+                settled.Set();
+            };
+            EventHandler<StartFailureContext> onFail = (s, ctx) =>
+            {
+                failKind = ctx.FailureKind;
+                reportPath = ctx.ReportPath;
+                settled.Set();
+            };
+            mgr.Ready += onReady;
+            mgr.StartFailed += onFail;
+
+            try
+            {
+                bool entered = im.StartAsync(id).GetAwaiter().GetResult();
+                if (entered && !settled.IsSet)
+                {
+                    // 就绪循环在后台任务里跑：最多等 ReadyTimeout + 20s 余量
+                    settled.Wait(TimeSpan.FromSeconds(new StartOptions().ReadyTimeoutSeconds + 20));
+                }
+
+                if (readyUrl != null)
+                {
+                    Out("started, ready at " + readyUrl);
+                    writeClilog(transcript);
+                    return 0;
+                }
+                if (failKind != null)
+                {
+                    Out("FAIL: 启动失败（" + failKind + "）");
+                    Out(string.IsNullOrEmpty(reportPath)
+                        ? "report: (未生成，请检查报告目录是否可写)"
+                        : "report: " + reportPath);
+                    writeClilog(transcript);
+                    return 1;
+                }
+                Out(entered
+                    ? "FAIL: 等待就绪超时，未收到就绪或失败事件"
+                    : "FAIL: 启动未被受理（实例可能已在运行或正忙）");
+                writeClilog(transcript);
+                return 1;
+            }
+            finally
+            {
+                mgr.Ready -= onReady;
+                mgr.StartFailed -= onFail;
+                settled.Dispose();
+            }
         }
 
         private static int InstanceStop(string id, InstanceManager im,

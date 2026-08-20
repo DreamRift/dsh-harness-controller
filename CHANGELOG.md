@@ -3,6 +3,44 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.5.0] - 开发中（待发布）
+
+> **Win/WSL 双界面 + harness 版本锁定 + 失败报告修复**：
+> Windows 实例与 WSL 实例分别在两个独立标签页中管理（不再混用同一个实例下拉框）；
+> 每个实例可锁定指定 harness 版本启动（默认跟随当前环境主实例版本）；
+> 后端启动失败时，报错信息 + 实例信息 + 时间在核心层直接生成报告文件，
+> 保存到用户指定的目录（不再依赖界面事件链路）。
+
+### 新增
+
+- **Win/WSL 双界面**：主窗口改为 TabView 双标签页——"Windows 实例"与"WSL 实例"
+  各挂一个独立面板（`InstancePanel`），实例列表/状态/操作/设置互不混用；
+  每个面板独立记忆选中实例、独立状态轮询；共享控制台带 `[WIN·名称]`/`[WSL·名称]` 前缀
+- **harness 版本锁定**：实例新增 `harnessVersion` 字段——空 = 跟随当前环境主实例版本；
+  非空 = 经 `npx --yes @deepseek-ai/dsh@<版本> web ...` 拉取指定版本启动
+  （Windows 用 npx.cmd，WSL 用发行版内原生 npx，npx 缺失时给出明确失败报告）
+- **当前环境版本探测**：新增 `Core/HarnessVersion.cs`——Windows 读 npm 全局包
+  package.json / 执行 `dsh --version`；WSL 在发行版内执行 `dsh --version`（node 兜底）；
+  实例设置提供"检测当前版本"按钮，状态卡显示生效版本（锁定/环境默认）
+- **新建实例默认版本**：新建/克隆对话框默认填入当前环境检测到的 harness 主实例版本
+  （可改为任意指定版本）；克隆现有实例时默认继承源实例的版本锁定
+- **失败报告核心层生成**：`BackendManager.FailStart` 直接调用 `ErrorReporter`
+  落盘（不再依赖 UI 事件订阅），报告文件名 = `DshController-fail_<实例ID>_<时间戳>.md`，
+  内容含实例名称/ID/运行环境/端口/DSH_HOME/harness 版本/生成时间/输出转录/排障建议；
+  控制台同时打印报告路径；CLI `--instance start` 失败同样自动生成报告
+- **控制台优化**：新增"打开报告目录"按钮；日志带实例前缀，全局共享
+
+### 改进
+
+- 界面重构：状态卡新增环境徽章（WINDOWS/WSL2）与 harness 版本显示；
+  WSL 面板只显示发行版/WSL DSH_HOME，Windows 面板只显示 DSH_HOME；
+  删除实例确认框带运行环境与版本信息；移除冗余诊断日志
+- CLI `--check` 增加实例 runtime/harness 版本列与当前环境版本探测
+
+### 版本号统一
+
+- csproj / ErrorReporter / build.ps1 三处版本号统一为 0.5.0
+
 ## [0.4.0] - 开发中（待发布）
 
 > **WSL2 实例管理**：控制器现在可切换管理 Windows 与 WSL2 两种运行环境的 DeepSeek Harness 实例，

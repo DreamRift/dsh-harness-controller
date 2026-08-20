@@ -34,6 +34,14 @@ namespace DshController.Core
         [JsonPropertyName("newInstanceWorkspace")]
         public string NewInstanceWorkspace { get; set; } = "";
 
+        /// <summary>
+        /// WSL 实例停止后的关闭策略（v0.5.0：在 WSL 标签页的"环境设置"中单独配置）：
+        /// smart（默认：发行版内无其他 harness 实例 → 终止发行版；无其他发行版运行 → wsl --shutdown）
+        /// | distroOnly（只终止发行版，不关 VM） | always（总是 wsl --shutdown） | never（都不关闭）。
+        /// </summary>
+        [JsonPropertyName("wslShutdownPolicy")]
+        public string WslShutdownPolicy { get; set; } = "smart";
+
         /// <summary>解析后的实例目录根（配置值优先，否则默认目录）。</summary>
         [JsonIgnore]
         public string EffectiveHomeRoot

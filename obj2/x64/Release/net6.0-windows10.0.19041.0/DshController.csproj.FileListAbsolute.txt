@@ -1,0 +1,1 @@
+\\wsl.localhost\Ubuntu-26.04\home\dreamrift\DeepSeek Harness\杂项\DshController\源码\obj2\x64\Release\net6.0-windows10.0.19041.0\DshController.csproj.AssemblyReference.cache

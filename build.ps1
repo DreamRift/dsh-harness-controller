@@ -1,5 +1,5 @@
-﻿# ============================================================================
-#  Build DshController v0.3.0 (WinUI 3) with the dotnet SDK.
+# ============================================================================
+#  Build DshController v0.5.0 (WinUI 3) with the dotnet SDK.
 #  Requires: .NET SDK >= 6.0, NuGet connectivity (first build restores
 #  Microsoft.WindowsAppSDK). No Visual Studio needed.
 #
@@ -72,7 +72,7 @@ $exe = Join-Path $outDir 'DshController.exe'
 if (-not (Test-Path $exe)) { throw 'publish finished but DshController.exe not found' }
 
 # zip for distribution（排除本机 launcher.json、日志与报告）
-$zip = Join-Path $outDir 'DshController-0.3.0-win-x64.zip'
+$zip = Join-Path $outDir 'DshController-0.5.0-win-x64.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 $zipItems = Get-ChildItem $outDir -Force | Where-Object {
     $n = $_.Name
