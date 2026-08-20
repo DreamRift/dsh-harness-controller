@@ -15,6 +15,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +52,12 @@ namespace DshController.Core
                 return true;
             }
             return false; // 未知参数 → 继续启动 GUI（与 v0.1.0 行为一致）
+        }
+
+        /// <summary>版本号展示：空 → (未检测到)，否则加 v 前缀。</summary>
+        private static string FormatVer(string v)
+        {
+            return string.IsNullOrWhiteSpace(v) ? "(未检测到)" : "v" + v.Trim();
         }
 
         /// <summary>把 stdout 接到父进程控制台（从终端运行时可显示）。</summary>
@@ -106,8 +113,18 @@ namespace DshController.Core
             Out("workspace    : " + cfg.Workspace);
             Out("backend      : " + (up ? "UP" : "DOWN"));
             if (up) Out("listener pid : " + PortTools.FindListenerPidAsync(port).GetAwaiter().GetResult());
-            Out("report dir   : " + cfg.EffectiveErrorReportDir);
-            Out("harness ver  : " + HarnessVersion.ResolveWindowsAsync(cfg).GetAwaiter().GetResult());
+            Out("report dir   : " + cfg.EffectiveErrorReportDir +
+                (Directory.Exists(cfg.EffectiveErrorReportDir) ? " (存在)" : " (不存在，首次写报告时自动创建)"));
+            Out("harness ver  : " + FormatVer(HarnessVersion.ResolveWindowsAsync(cfg).GetAwaiter().GetResult()) +
+                "  (Windows 当前环境主实例)");
+            foreach (string distro in registry.Instances
+                .Where(d => d.IsWsl && !string.IsNullOrWhiteSpace(d.WslDistro))
+                .Select(d => d.WslDistro.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                Out("harness ver  : " + FormatVer(HarnessVersion.ResolveWslAsync(distro).GetAwaiter().GetResult()) +
+                    "  (WSL " + distro + ")");
+            }
             Out("launcher.json: " + InstanceRegistry.LegacyFilePath);
             Out("instances.json: " + InstanceRegistry.FilePath);
             Out("");

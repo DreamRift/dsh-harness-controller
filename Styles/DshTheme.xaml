@@ -174,6 +174,30 @@
     <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
   </Style>
 
+  <!-- ============ 小徽标 / 分组标题（v0.5.0 界面优化） ============ -->
+  <Style x:Key="Chip" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderBrushToken}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="9,2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style x:Key="ChipText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style x:Key="SectionHeader" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CharacterSpacing" Value="60" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelTertiaryBrush}" />
+    <Setter Property="Margin" Value="0,4,0,0" />
+  </Style>
+
   <!-- ============ 设置行标签列固定宽 ============ -->
   <x:Double x:Key="SettingsLabelWidth">96</x:Double>
 
