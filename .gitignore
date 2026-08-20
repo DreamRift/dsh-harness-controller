@@ -10,6 +10,8 @@ reports/
 # 构建产物（请用 build.ps1）
 bin/
 obj/
+bin2/
+obj2/
 publish/
 publish-fixed/
 yinyong/
