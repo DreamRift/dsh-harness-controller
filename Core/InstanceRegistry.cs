@@ -18,6 +18,7 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 
 namespace DshController.Core
 {
@@ -119,21 +120,33 @@ namespace DshController.Core
             // v0.5.0：自动发现"正在运行但未注册"的实例——
             // 换目录/发布目录/清单丢失后，仍能看到并管理仍在运行的后端
             // （尤其 WSL 实例，端口经 wslrelay 还在，但本地清单为空）。
-            // 仅当存在"未注册的监听端口"时才做完整探测（netstat → 进程命令行），
-            // 日常启动（清单完整）只花一次 netstat 的毫秒级成本。
+            // 仅当存在"未注册的监听端口"或"正在运行的 WSL 发行版"时才做完整探测；
+            // 日常启动（清单完整、WSL 未运行）只花一次 netstat 的毫秒级成本。
+            // v0.5.1 补充发行版条件：新版 WSL 下 wsl.exe 宿主不留存命令行，
+            // 且转发端口可能因网络模式差异不在 netstat 呈现，需进发行版内探测。
+            // v0.5.1 修复：探测整体放线程池执行——Load() 在 UI 线程被 OnLaunched
+            // 同步调用，而 UI 线程装有 DispatcherQueueSynchronizationContext，
+            // WslTools 异步续体会投递回 UI 队列；若在 UI 线程直接 GetResult()
+            // 阻塞等待，续体永远无法执行 → 启动死锁（窗口不出现）。
+            // 线程池上无 SyncContext，GetResult() 安全；UI 线程仅等最终结果。
             var discovered = new List<InstanceDef>();
             try
             {
-                var known = new HashSet<int>();
-                foreach (InstanceDef d in file.Instances) known.Add(d.Port);
-                if (InstanceDiscovery.HasUnregisteredListener(known))
+                // v0.5.1：去重键改为 (运行环境, 端口)——WSL 与 Windows 是独立网络空间，
+                // 两边各跑一个 3080 是合法并存的两实例，不能按端口一票否决。
+                var known = new HashSet<(bool Wsl, int Port)>();
+                foreach (InstanceDef d in file.Instances) known.Add((d.IsWsl, d.Port));
+                bool needScan = Task.Run(() =>
+                    InstanceDiscovery.HasUnregisteredListener(known.Select(k => k.Port).ToList()) ||
+                    InstanceDiscovery.HasRunningWslDistro()).GetAwaiter().GetResult();
+                if (needScan)
                 {
-                    foreach (InstanceDef d in InstanceDiscovery.Scan())
+                    foreach (InstanceDef d in Task.Run(() => InstanceDiscovery.Scan()).GetAwaiter().GetResult())
                     {
-                        if (!known.Contains(d.Port))
+                        if (!known.Contains((d.IsWsl, d.Port)))
                         {
                             discovered.Add(d);
-                            known.Add(d.Port);
+                            known.Add((d.IsWsl, d.Port));
                         }
                     }
                 }

@@ -1,11 +1,12 @@
 // ============================================================================
-//  MainWindow — 主窗口交互（v0.5.0 双界面布局，code-behind，无 MVVM）
+//  MainWindow — 主窗口交互（v0.5.1 侧边栏布局，code-behind，无 MVVM）
 //
 //  结构：
-//    - TabView 两个标签页分别挂 InstancePanel（Windows / WSL），
-//      实例选择、状态、操作、实例设置全部下沉到面板内，互不混用；
-//    - 本窗口只负责：标题栏/主题、全局设置（报告目录等）、共享控制台、
-//      页脚、关闭清理；
+//    - NavigationView 侧边栏三个页面：Windows 实例 / WSL 实例 / 全局设置；
+//      PanelWin / PanelWsl（InstancePanel）常驻不销毁，切换页面只改可见性，
+//      实例选择、状态轮询与操作不中断；全局设置从 Expander 移入独立页面；
+//    - 本窗口负责：标题栏/主题、侧边栏导航、全局设置页、共享控制台坞
+//      （可收起）、状态栏、关闭清理；
 //    - 控制台为全局共享：两个面板的所有后端日志经回调汇入，带
 //      [WIN·名称] / [WSL·名称] 前缀；
 //    - 启动失败报告由核心层（BackendManager.FailStart → ErrorReporter）
@@ -18,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using DshController.Core;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
@@ -35,6 +37,7 @@ namespace DshController
         private bool _closing;
         private bool _closeCleanupDone;
         private AppTheme _theme;
+        private bool _consoleVisible = true;   // 控制台坞展开状态
 
         public MainWindow(InstanceRegistry registry)
         {
@@ -44,12 +47,25 @@ namespace DshController
             _theme = _registry.Settings.Theme;
             ApplyTheme(_theme);
 
-            // 窗口外观：尺寸 + 图标（Assets/app.ico 已随构建复制到输出目录）
+            // 窗口外观：默认尺寸（v0.5.1：侧边栏布局下加宽，高可略低）+ 最小尺寸防遮挡 + 图标
             try
             {
-                AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(920, 860));
+                AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(1180, 800));
+                if (AppWindow.Presenter is OverlappedPresenter op)
+                {
+                    op.PreferredMinimumWidth = 960;
+                    op.PreferredMinimumHeight = 620;
+                }
                 string ico = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
                 if (File.Exists(ico)) AppWindow.SetIcon(ico);
+            }
+            catch { }
+            // 主题按钮精确避开系统标题按钮（Win11 compact overlay 返回实际内边距，兜底 150px）
+            try
+            {
+                var tb = AppWindow.TitleBar;
+                if (tb != null && tb.RightInset > 0)
+                    BtnTheme.Margin = new Thickness(0, 0, tb.RightInset + 12, 0);
             }
             catch { }
             ExtendsContentIntoTitleBar = true;
@@ -64,6 +80,9 @@ namespace DshController
             PanelWsl.Init(_registry, _instanceMgr, "wsl", AppendLog, UpdateFooter);
 
             LoadGlobalSettings();
+
+            // 侧边栏默认选中 Windows 实例页（触发 Nav_SelectionChanged → 页面可见性）
+            Nav.SelectedItem = NavWin;
 
             Closed += OnWindowClosed;
             // 关闭前清理：AppWindow.Closing 无 deferral（WASDK 1.5），用 取消+重关 模式，
@@ -87,7 +106,7 @@ namespace DshController
             };
 
             AppendLog("DshController 已启动（v" + ErrorReporter.AppVersion + "）。" +
-                      "Windows 与 WSL 实例分别在两个标签页管理。");
+                      "Windows 与 WSL 实例分别在侧边栏两个页面管理，控制台可点击「隐藏」收起。");
             UpdateFooter();
         }
 
@@ -141,6 +160,32 @@ namespace DshController
             return false;
         }
 
+        // ==================== 侧边栏导航 ====================
+
+        private void Nav_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
+        {
+            string tag = (args.SelectedItemContainer?.Tag as string) ?? "win";
+            ShowPage(tag);
+        }
+
+        /// <summary>按侧边栏标签切换页面可见性（面板常驻不销毁，仅隐藏/显示）。</summary>
+        private void ShowPage(string tag)
+        {
+            PanelWin.Visibility = tag == "win" ? Visibility.Visible : Visibility.Collapsed;
+            PanelWsl.Visibility = tag == "wsl" ? Visibility.Visible : Visibility.Collapsed;
+            PageSettings.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // ==================== 控制台坞 ====================
+
+        private void BtnToggleConsole_Click(object sender, RoutedEventArgs e)
+        {
+            _consoleVisible = !_consoleVisible;
+            TxtLog.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
+            BtnToggleConsole.Content = _consoleVisible ? "隐藏" : "显示";
+            if (_consoleVisible) ScrollLogToEnd();
+        }
+
         // ==================== 全局设置 ====================
 
         private void LoadGlobalSettings()
@@ -159,7 +204,7 @@ namespace DshController
             _registry.Settings.DshCommand = TxtDshCommand.Text.Trim();
             _registry.Settings.Theme = _theme;
             try { _registry.Save(); } catch { }
-            ExpGlobalSettings.IsExpanded = false;
+            Nav.SelectedItem = NavWin;
             AppendLog("全局设置已保存（报告目录: " +
                 (string.IsNullOrEmpty(_registry.Settings.ErrorReportDir)
                     ? "默认" : _registry.Settings.ErrorReportDir) + "）");
@@ -169,7 +214,7 @@ namespace DshController
         private void BtnCancelGlobal_Click(object sender, RoutedEventArgs e)
         {
             LoadGlobalSettings();
-            ExpGlobalSettings.IsExpanded = false;
+            Nav.SelectedItem = NavWin;
             AppendLog("全局设置已取消");
         }
 
@@ -329,13 +374,13 @@ namespace DshController
             FooterText.Text = "Windows 实例 " + win + " 个 · WSL 实例 " + wsl + " 个" + vers +
                 " · 报告目录: " + report + " · v" + ErrorReporter.AppVersion;
 
-            // 标签页头实时显示各环境实例数与运行数（面板状态已与端口探测同步）
+            // 侧边栏导航项实时显示各环境实例数与运行数（面板状态已与端口探测同步）
             int winRun = 0, wslRun = 0;
             try { winRun = PanelWin.RunningCount(); } catch { }
             try { wslRun = PanelWsl.RunningCount(); } catch { }
-            TabWin.Header = "Windows 实例" + (win > 0 ? " · " + win + " 个" : "") +
+            NavWin.Content = "Windows 实例" + (win > 0 ? " · " + win + " 个" : "") +
                 (winRun > 0 ? " · " + winRun + " 运行中" : "");
-            TabWsl.Header = "WSL 实例" + (wsl > 0 ? " · " + wsl + " 个" : "") +
+            NavWsl.Content = "WSL 实例" + (wsl > 0 ? " · " + wsl + " 个" : "") +
                 (wslRun > 0 ? " · " + wslRun + " 运行中" : "");
         }
 

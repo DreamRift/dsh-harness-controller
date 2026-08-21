@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ============================================================================
-  InstancePanel — 单个运行环境（Windows / WSL）的实例管理面板（v0.5.0）
+  InstancePanel — 单个运行环境（Windows / WSL）的实例管理面板（v0.5.1）
 
-  Windows 实例与 WSL 实例在 MainWindow 的 TabView 中各占一个独立标签页，
-  每个面板持有自己的实例列表 / 状态卡 / 操作按钮 / 实例设置 / 环境设置，
-  互不混用同一个"实例选项"。
+  Windows 实例与 WSL 实例在 MainWindow 的 NavigationView 侧边栏中各占一个
+  独立页面（面板常驻，仅切换可见性），每个面板持有自己的实例列表 / 状态卡 /
+  操作按钮 / 实例设置 / 环境设置，互不混用同一个"实例选项"。
 
   布局自上而下：
     ① 实例选择行（含新建 / 克隆 / 删除）
@@ -30,6 +30,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
@@ -69,10 +70,17 @@
                             <TextBlock Text="删除" />
                         </StackPanel>
                     </Button>
+                    <Button Grid.Column="5" x:Name="BtnScan" Style="{StaticResource BtnCompact}" Click="BtnScan_Click"
+                            ToolTipService.ToolTip="扫描本环境中正在运行但未注册的 harness 实例（含 WSL 发行版内手动启动的）并加入列表">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
+                            <TextBlock x:Name="TxtScanLabel" Text="扫描" />
+                        </StackPanel>
+                    </Button>
                 </Grid>
 
                 <TextBlock x:Name="TxtInstanceHint" Style="{StaticResource FooterText}"
-                           TextWrapping="NoWrap" Margin="30,-6,0,0" />
+                           TextWrapping="NoWrap" Margin="30,0,0,0" />
 
                 <!-- ==================== ② 启动失败提示条 ==================== -->
                 <InfoBar x:Name="FailBar" IsOpen="False" Severity="Error" IsClosable="True"
@@ -245,7 +253,7 @@
                                     ToolTipService.ToolTip="在资源管理器中打开工作目录" />
                         </Grid>
                         <TextBlock x:Name="TxtWorkspaceHint" Style="{StaticResource FooterText}"
-                                   TextWrapping="Wrap" Margin="106,-6,0,0" Text="" />
+                                   TextWrapping="Wrap" Margin="106,0,0,0" Text="" />
 
                         <!-- Windows 专属：DSH_HOME -->
                         <Grid ColumnSpacing="10" x:Name="RowWinHome">
@@ -321,7 +329,7 @@
                                     ToolTipService.ToolTip="从 npm registry 拉取 @deepseek-ai/dsh 已发布版本（需联网）" />
                         </Grid>
                         <TextBlock x:Name="TxtVersionHint" Style="{StaticResource FooterText}"
-                                   TextWrapping="Wrap" Margin="106,-6,0,0"
+                                   TextWrapping="Wrap" Margin="106,0,0,0"
                                    Text="「跟随当前环境」= 直接用已安装的 dsh；填/选具体版本 = 经 npx 拉取该版本启动（首次需联网）" />
 
                         <!-- 分组：高级 -->

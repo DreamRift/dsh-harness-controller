@@ -1270,6 +1270,70 @@ namespace DshController
             }
         }
 
+        // ==================== 手动扫描运行中实例（v0.5.1） ====================
+
+        private bool _scanning;
+
+        /// <summary>
+        /// 手动扫描"正在运行但未注册"的本环境实例并加入列表。
+        /// Windows：netstat → 进程命令行识别；WSL：发行版内 pgrep + /proc 解析
+        /// （对 GUI 启动之后才在 WSL 终端手动启动的实例同样有效）。
+        /// 发现项不立即落盘（与启动时自动发现语义一致，编辑保存后持久化）。
+        /// </summary>
+        private async void BtnScan_Click(object sender, RoutedEventArgs e)
+        {
+            if (_scanning || _closing) return;
+            _scanning = true;
+            BtnScan.IsEnabled = false;
+            TxtScanLabel.Text = "扫描中…";
+            PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 正在扫描运行中但未注册的实例…");
+            try
+            {
+                List<InstanceDef> found = await Task.Run(() => InstanceDiscovery.Scan()).ConfigureAwait(true);
+                // v0.5.1：去重键改为 (运行环境, 端口)——跨环境同端口是合法并存
+                var known = new HashSet<(bool Wsl, int Port)>(
+                    _registry.Instances.Select(d => (d.IsWsl, d.Port)));
+                int added = 0;
+                foreach (InstanceDef d in found)
+                {
+                    if (known.Contains((d.IsWsl, d.Port))) continue; // 已注册（含本次扫描刚加入的）
+                    known.Add((d.IsWsl, d.Port));
+                    if (d.IsWsl != IsWslPanel) continue;            // 只收本环境的实例
+                    try
+                    {
+                        _registry.Add(d);
+                        WireInstance(d);
+                        added++;
+                        PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 发现运行中实例: " + d.Name +
+                            "（端口 " + d.Port +
+                            (d.IsWsl ? "，发行版 " + d.WslDistro +
+                                (string.IsNullOrEmpty(d.WslHome) ? "" : "，DSH_HOME " + d.WslHome) : "") + "）");
+                    }
+                    catch { /* id 冲突等：跳过该条 */ }
+                }
+                if (added > 0)
+                {
+                    RefreshInstanceList();
+                    NotifyInstancesChanged();
+                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：新增 " + added + " 个实例");
+                }
+                else
+                {
+                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：未发现新的运行中实例");
+                }
+            }
+            catch (Exception ex)
+            {
+                PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描失败: " + ex.Message);
+            }
+            finally
+            {
+                _scanning = false;
+                BtnScan.IsEnabled = true;
+                TxtScanLabel.Text = "扫描";
+            }
+        }
+
         private CloneLevel SelectedCloneLevel(ComboBox cmbLevel)
         {
             if (cmbLevel != null && cmbLevel.SelectedItem is CreateLevelItem item)
