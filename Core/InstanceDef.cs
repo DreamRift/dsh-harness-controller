@@ -61,7 +61,7 @@ namespace DshController.Core
         public string WslHome { get; set; } = "";
 
         /// <summary>
-        /// harness 版本锁定（v0.5.0）：空 = 跟随当前环境主实例版本；
+        /// harness 指定版本（v0.5.0）：空 = 跟随当前环境主实例版本；
         /// 非空 = 经 npx 拉取 @deepseek-ai/dsh@&lt;版本&gt; 启动。
         /// 新建实例默认填入当前环境检测到的版本，可手动修改。
         /// </summary>
@@ -85,7 +85,7 @@ namespace DshController.Core
 
         /// <summary>
         /// 实例下拉列表用的一行标签（v0.5.0 双界面：环境已由标签页区分，
-        /// 这里只补端口与版本锁定信息，便于同环境多实例快速辨认）。
+        /// 这里只补端口与指定版本信息，便于同环境多实例快速辨认）。
         /// </summary>
         [JsonIgnore]
         public string PickerLabel

@@ -81,7 +81,7 @@ namespace DshController.Core
         public string InstanceName { get; set; } = "";
 
         /// <summary>
-        /// harness 版本锁定（v0.5.0）：空 = 使用当前环境主实例版本；
+        /// harness 指定版本（v0.5.0）：空 = 使用当前环境主实例版本；
         /// 非空 = 经 npx 拉取 @deepseek-ai/dsh@&lt;版本&gt; 启动。
         /// </summary>
         [JsonPropertyName("harnessVersion")]

@@ -28,3 +28,8 @@ Assets/icon-*.png
 .vs/
 Thumbs.db
 .DS_Store
+
+# any instances.json* copies and .bak backups (local paths, never commit)
+instances.json.*
+*.bak
+*.bak-*

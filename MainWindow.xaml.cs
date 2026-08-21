@@ -317,8 +317,17 @@ namespace DshController
             int wsl = _registry.Instances.Count(d => d.IsWsl);
             string report = string.IsNullOrEmpty(_registry.Settings.ErrorReportDir)
                 ? "默认目录" : _registry.Settings.ErrorReportDir;
-            FooterText.Text = "Windows 实例 " + win + " 个 · WSL 实例 " + wsl + " 个 · 报告目录: " +
-                report + " · v" + ErrorReporter.AppVersion;
+
+            // 各环境检测到的 harness 主实例版本（面板异步探测后回调刷新）
+            string vWin = "", vWsl = "";
+            try { vWin = PanelWin.DetectedVersion ?? ""; } catch { }
+            try { vWsl = PanelWsl.DetectedVersion ?? ""; } catch { }
+            string vers = "";
+            if (vWin.Length > 0) vers += " · WIN harness v" + vWin;
+            if (vWsl.Length > 0) vers += " · WSL harness v" + vWsl;
+
+            FooterText.Text = "Windows 实例 " + win + " 个 · WSL 实例 " + wsl + " 个" + vers +
+                " · 报告目录: " + report + " · v" + ErrorReporter.AppVersion;
 
             // 标签页头实时显示各环境实例数与运行数（面板状态已与端口探测同步）
             int winRun = 0, wslRun = 0;

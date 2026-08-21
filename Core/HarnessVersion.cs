@@ -39,7 +39,7 @@ namespace DshController.Core
         }
 
         /// <summary>
-        /// 规范化用户输入的版本号（v0.5.0）：去空白、去前缀 v/V、去"（锁定）"等中文后缀，
+        /// 规范化用户输入的版本号（v0.5.0）：去空白、去前缀 v/V、去“（当前指定）”等中文后缀，
         /// 校验必须是 x.y.z[-预发布] 形态。空输入 = 跟随当前环境（返回 true + 空串）。
         /// </summary>
         public static bool TryNormalizeVersion(string input, out string normalized)

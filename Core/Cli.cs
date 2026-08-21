@@ -138,7 +138,7 @@ namespace DshController.Core
                     ? PortTools.FindListenerPidAsync(def.Port).GetAwaiter().GetResult().ToString()
                     : "-";
                 string ver = string.IsNullOrEmpty(def.HarnessVersion)
-                    ? "跟随当前环境" : "锁定 " + def.HarnessVersion;
+                    ? "跟随当前环境" : "指定 " + def.HarnessVersion;
                 Out("  [" + def.Id + "] " + def.Name +
                     (def.IsWsl ? "  runtime=wsl(" + (string.IsNullOrEmpty(def.WslDistro) ? "?" : def.WslDistro) + ")" : "  runtime=windows") +
                     "  port=" + def.Port +
@@ -350,11 +350,20 @@ namespace DshController.Core
             bool up = PortTools.ProbeAsync(def.Host, def.Port).GetAwaiter().GetResult();
             int listenerPid = up ? PortTools.FindListenerPidAsync(def.Port).GetAwaiter().GetResult() : 0;
             Out("id: " + def.Id);
+            Out("name: " + def.Name);
+            Out("runtime: " + (def.IsWsl
+                ? "wsl(" + (string.IsNullOrWhiteSpace(def.WslDistro) ? "?" : def.WslDistro) + ")"
+                : "windows"));
             Out("state: " + (up ? "Running" : "Stopped"));
             Out("port: " + def.Port);
             Out("pid: " + (listenerPid > 0 ? listenerPid.ToString() : "0"));
             Out("url: " + PortTools.Url(def.Host, def.Port));
-            Out("home: " + (string.IsNullOrEmpty(def.Home) ? "(默认 ~/.dsh)" : def.Home));
+            Out("home: " + (def.IsWsl
+                ? "wsl:" + (string.IsNullOrWhiteSpace(def.WslHome) ? "~/.dsh" : def.WslHome)
+                : (string.IsNullOrEmpty(def.Home) ? "(默认 ~/.dsh)" : def.Home)));
+            Out("workspace: " + def.Workspace);
+            Out("harness: " + (string.IsNullOrEmpty(def.HarnessVersion)
+                ? "跟随当前环境" : "指定 " + def.HarnessVersion));
             writeClilog(transcript);
             return 0;
         }

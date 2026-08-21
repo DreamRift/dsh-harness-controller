@@ -126,8 +126,8 @@ namespace DshController.Core
             }
             string hv = (cfg.HarnessVersion ?? "").Trim();
             sb.AppendLine("- harness 版本: " + (hv.Length > 0
-                ? "**锁定 " + hv + "**（经 npx 拉取）"
-                : "跟随当前环境主实例版本（未锁定）"));
+                ? "**指定 " + hv + "**（经 npx 拉取该版本启动）"
+                : "跟随当前环境主实例版本（未指定固定版本）"));
             sb.AppendLine("- 工作目录: `" + cfg.Workspace + "`" + (cfg.IsWsl
                 ? "（WSL 实例：路径在发行版内解析，Windows 侧不校验）"
                 : "（" + (Directory.Exists(cfg.Workspace) ? "存在" : "不存在") + "）"));
@@ -280,7 +280,7 @@ namespace DshController.Core
         private static void AppendEnvironment(StringBuilder sb)
         {
             sb.AppendLine();
-            sb.AppendLine("## 环境");
+            sb.AppendLine("## 环境（控制器所在 Windows 侧）");
             sb.AppendLine();
             sb.AppendLine("- 操作系统: " + PortTools.OsDescription());
             sb.AppendLine("- .NET: " + Environment.Version + (Environment.Is64BitProcess ? " (x64 进程)" : ""));
@@ -303,7 +303,7 @@ namespace DshController.Core
                 return "1. `wsl --list --verbose` 确认发行版名称与本实例设置完全一致（区分大小写以外的拼写）\n" +
                        "2. 首次使用发行版需先 `wsl -d <发行版>` 完成用户初始化（默认用户不能是 root）\n" +
                        "3. 发行版内安装 harness：`npm install -g @deepseek-ai/dsh`（WSL 实例不使用 Windows 侧 dsh）\n" +
-                       "4. 也可以给该实例锁定 harness 版本，改用发行版内 npx 拉取指定版本启动";
+                       "4. 也可以给该实例指定 harness 版本，改用发行版内 npx 拉取该版本启动";
             if (k.Contains("npx") || k.Contains("版本"))
                 return "1. 指定版本启动依赖 npx：确认" + (isWsl ? "WSL 发行版内" : "本机") + "已安装 Node.js/npm\n" +
                        "2. 确认版本号拼写正确（形如 0.1.0-rc.7）；可先执行 `npx --yes @deepseek-ai/dsh@<版本> --version` 验证\n" +
@@ -317,17 +317,17 @@ namespace DshController.Core
                 return "1. 确认已安装：`npm i -g @deepseek-ai/dsh`\n" +
                        "2. 或在全局设置的 dshCommand 中填写 dsh.cmd 完整路径\n" +
                        "3. 安装后无需重启本程序，直接重试启动\n" +
-                       "4. 或给该实例锁定 harness 版本，改用 npx 拉取指定版本启动";
+                       "4. 或给该实例指定 harness 版本，改用 npx 拉取该版本启动";
             if (k.Contains("启动") || k.Contains("Spawn"))
                 return "1. 检查工作目录是否可访问（见上方配置节）\n" +
                        "2. 从服务/非交互环境启动时确认 cmd.exe 在 PATH 中\n" +
                        "3. 尝试在终端手动执行「启动诊断」表里的命令行验证";
             if (k.Contains("早退"))
                 return "1. 查看上方「控制台转录」「子进程输出转录」中的报错行\n" +
-                       "2. 常见原因：node 版本过低 / 端口参数被占用 / DSH_HOME 损坏 / 锁定的版本不存在\n" +
+                       "2. 常见原因：node 版本过低 / 端口参数被占用 / DSH_HOME 损坏 / 指定的版本不存在\n" +
                        "3. 可在终端手动运行「启动诊断」表里的命令行复现并观察完整输出";
             if (k.Contains("超时"))
-                return "1. 首次启动可能较慢（依赖初始化；锁定版本时 npx 还要下载包），可直接重试\n" +
+                return "1. 首次启动可能较慢（依赖初始化；指定版本时 npx 还要下载包），可直接重试\n" +
                        "2. 查看输出转录确认无报错卡点\n" +
                        "3. 机器负载高时适当延长等待";
             if (k.Contains("端口"))

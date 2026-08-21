@@ -203,14 +203,14 @@ namespace DshController.Core
             }
 
             // 1) 解析启动命令：
-            //    锁定版本（harnessVersion 非空）→ 只需要 npx，不要求本机已装 dsh；
+            //    指定版本（harnessVersion 非空）→ 只需要 npx，不要求本机已装 dsh；
             //    跟随环境（空）→ 4 级回退解析本机 dsh。
             string pinnedVersion = (cfg.HarnessVersion ?? "").Trim();
             ClearDiag();
             Diag("运行环境", "Windows（本机直接拉起）");
             Diag("实例", (cfg.InstanceName ?? "") + "（" + (cfg.InstanceId ?? "") + "）");
             Diag("harness 版本", pinnedVersion.Length > 0
-                ? "锁定 " + pinnedVersion + "（npx 拉取 @deepseek-ai/dsh@" + pinnedVersion + "）"
+                ? "指定 " + pinnedVersion + "（npx 拉取 @deepseek-ai/dsh@" + pinnedVersion + "）"
                 : "跟随当前环境主实例版本");
 
             DshCommand dsh;
@@ -221,14 +221,14 @@ namespace DshController.Core
                 if (string.IsNullOrEmpty(npx))
                 {
                     FailStart(cfg, "npx 未找到",
-                        "实例锁定了 harness 版本 " + pinnedVersion + "，需要 npx 拉取指定版本，" +
+                        "实例指定了 harness 版本 " + pinnedVersion + "，需要 npx 拉取指定版本，" +
                         "但本机未找到 npx.cmd。请安装 Node.js/npm（npm i -g @deepseek-ai/dsh 自带 npx），" +
                         "或把该实例的 harness 版本改回\"跟随当前环境\"。",
                         ex: null, exitCode: null);
                     return false;
                 }
                 dsh = new DshCommand { Kind = "npx", Path1 = npx, Path2 = pinnedVersion };
-                LogUi("harness 版本: 锁定 " + pinnedVersion +
+                LogUi("harness 版本: 指定 " + pinnedVersion +
                       "（npx 拉取 @deepseek-ai/dsh@" + pinnedVersion + "，首次使用需联网下载）");
             }
             else
@@ -238,7 +238,7 @@ namespace DshController.Core
                 {
                     FailStart(cfg, "dsh 命令未找到",
                         "4 级回退（配置 → npm shim → PATH → node 入口）均未命中，详见解析表。" +
-                        "也可以给该实例锁定一个 harness 版本，改用 npx 拉取指定版本启动。",
+                        "也可以给该实例指定一个 harness 版本，改用 npx 拉取该版本启动。",
                         ex: null, exitCode: null);
                     return false;
                 }
@@ -433,7 +433,7 @@ namespace DshController.Core
             Diag("实例", (cfg.InstanceName ?? "") + "（" + (cfg.InstanceId ?? "") + "）");
             Diag("发行版(配置)", distro);
             Diag("harness 版本", pinnedVersion.Length > 0
-                ? "锁定 " + pinnedVersion + "（发行版内 npx 拉取）"
+                ? "指定 " + pinnedVersion + "（发行版内 npx 拉取）"
                 : "跟随发行版内主实例版本");
 
             // 1) 预检：WSL 本体
@@ -504,7 +504,7 @@ namespace DshController.Core
                 }
             }
 
-            // 5) 启动命令：锁定版本 → 发行版内 npx（不要求发行版已装 dsh）；
+            // 5) 启动命令：指定版本 → 发行版内 npx（不要求发行版已装 dsh）；
             //                跟随环境 → 发行版内原生 dsh（排除 /mnt 的 Windows shim）
             string dshCmd = await WslLaunch.ResolveWslDshAsync(distro, cfg.DshCommand).ConfigureAwait(false);
             Diag("发行版内 dsh", string.IsNullOrEmpty(dshCmd) ? "(未找到)" : dshCmd);
@@ -517,7 +517,7 @@ namespace DshController.Core
                 if (string.IsNullOrEmpty(npx))
                 {
                     FailStart(cfg, "发行版内 npx 未找到",
-                        "实例锁定了 harness 版本 " + pinnedVersion + "，需要发行版内 npx 拉取指定版本，" +
+                        "实例指定了 harness 版本 " + pinnedVersion + "，需要发行版内 npx 拉取指定版本，" +
                         "但 " + distro + " 内未找到原生 npx。请在该发行版内安装 Node.js/npm，" +
                         "或把该实例的 harness 版本改回\"跟随当前环境\"。",
                         null, null);
@@ -525,7 +525,7 @@ namespace DshController.Core
                 }
                 npxDir = HarnessVersion.DirOf(npx);
                 launchDsh = "npx"; // 启动脚本内 exec npx --yes @deepseek-ai/dsh@<ver> web ...
-                LogUi("harness 版本: 锁定 " + pinnedVersion + "（发行版内 npx " + npx + " 拉取，首次使用需联网下载）");
+                LogUi("harness 版本: 指定 " + pinnedVersion + "（发行版内 npx " + npx + " 拉取，首次使用需联网下载）");
             }
             else
             {
@@ -534,7 +534,7 @@ namespace DshController.Core
                     FailStart(cfg, "WSL 内 dsh 未找到",
                         "WSL " + distro + " 内未找到原生 dsh（已排除 /mnt 下的 Windows shim）。" +
                         "请在该发行版内执行: npm install -g @deepseek-ai/dsh；" +
-                        "或给该实例锁定一个 harness 版本，改用发行版内 npx 拉取指定版本启动。", null, null);
+                        "或给该实例指定一个 harness 版本，改用发行版内 npx 拉取该版本启动。", null, null);
                     return false;
                 }
                 LogUi("harness 版本: 跟随当前环境（" + dshCmd + "）");

@@ -118,7 +118,10 @@ namespace DshController.Core
                     }
                 }
             }
-            string pattern = "[p]ort " + port; // [x] 技巧：wrapper 自身命令行不含字面 "--port N"
+            // v0.5.0：模式收窄为“harness 进程 + 该端口”，避免误杀命令行里恰好含
+            // “port <N>”的无关进程（例如脚本里的 echo/grep）。
+            // 兼容两种形态：dsh web --port N / npm exec @deepseek-ai/dsh@ver web --port N
+            string pattern = @"(@deepseek-ai/[d]sh|[d]sh).*--port " + port;
             if (!signaled)
             {
                 log?.Invoke("  SIGTERM → 匹配进程（pattern: port " + port + "）");
@@ -144,12 +147,23 @@ namespace DshController.Core
         }
 
         /// <summary>
-        /// 按策略智能关闭：发行版内已无 harness 实例 → wsl -t 终止发行版；
-        /// always → 无条件 wsl --shutdown；smart → 无其他发行版运行才 --shutdown；
-        /// distroOnly → 只 -t（VM 由系统空闲后自动回收）。
+        /// 按策略关闭（v0.5.0：策略在 WSL 界面单独设置，四档都被严格遵守）：
+        ///   never      → 发行版与 VM 都不关（只停实例进程）；
+        ///   distroOnly → 发行版内已无 harness 实例时 wsl -t 终止发行版，不关 VM；
+        ///   smart      → distroOnly + 无其他发行版运行时再 wsl --shutdown 释放 VM（默认）；
+        ///   always     → 终止发行版后无条件 wsl --shutdown。
+        /// 任何情况下，发行版内仍有其他 harness 实例时都不会终止发行版。
         /// </summary>
         public static async Task SmartShutdownAsync(string distro, string policy, WslLogLine log)
         {
+            string p = string.IsNullOrWhiteSpace(policy) ? "smart" : policy.Trim();
+
+            if (p.Equals("never", StringComparison.OrdinalIgnoreCase))
+            {
+                log?.Invoke("  关闭策略 never: 保留发行版与 WSL 虚拟机（仅停止实例进程）");
+                return;
+            }
+
             var remaining = await WslTools.PgrepAsync(distro, AnyDshPattern);
             if (remaining.Count > 0)
             {
@@ -159,23 +173,28 @@ namespace DshController.Core
             log?.Invoke("  终止发行版 " + distro + " ...");
             await WslTools.TerminateDistroAsync(distro);
 
-            if (policy != null && policy.Equals("always", StringComparison.OrdinalIgnoreCase))
+            if (p.Equals("distroOnly", StringComparison.OrdinalIgnoreCase))
+            {
+                log?.Invoke("  关闭策略 distroOnly: 保留 WSL 虚拟机（由系统空闲后回收）");
+                return;
+            }
+            if (p.Equals("always", StringComparison.OrdinalIgnoreCase))
             {
                 log?.Invoke("  always 策略: wsl --shutdown ...");
                 await WslTools.ShutdownVmAsync();
+                return;
             }
-            else if (policy == null || policy.Equals("smart", StringComparison.OrdinalIgnoreCase))
+
+            // 默认 smart
+            var running = await WslTools.ListRunningDistrosAsync();
+            if (running.Count == 0)
             {
-                var running = await WslTools.ListRunningDistrosAsync();
-                if (running.Count == 0)
-                {
-                    log?.Invoke("  无其他发行版运行，wsl --shutdown 立即释放 VM 资源 ...");
-                    await WslTools.ShutdownVmAsync();
-                }
-                else
-                {
-                    log?.Invoke("  仍有其他发行版在运行（" + string.Join(", ", running) + "），跳过 wsl --shutdown");
-                }
+                log?.Invoke("  无其他发行版运行，wsl --shutdown 立即释放 VM 资源 ...");
+                await WslTools.ShutdownVmAsync();
+            }
+            else
+            {
+                log?.Invoke("  仍有其他发行版在运行（" + string.Join(", ", running) + "），跳过 wsl --shutdown");
             }
         }
     }

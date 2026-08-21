@@ -5,37 +5,68 @@
 
 ## [0.5.0] - 开发中（待发布）
 
-> **Win/WSL 双界面 + harness 版本锁定 + 失败报告修复**：
+> **Win/WSL 双界面 + harness 指定版本 + 失败报告落盘修复**：
 > Windows 实例与 WSL 实例分别在两个独立标签页中管理（不再混用同一个实例下拉框）；
-> 每个实例可锁定指定 harness 版本启动（默认跟随当前环境主实例版本）；
-> 后端启动失败时，报错信息 + 实例信息 + 时间在核心层直接生成报告文件，
+> 每个实例可指定 harness 版本启动（默认跟随当前环境主实例版本）；
+> 后端启动失败时，控制台报错信息 + 启动诊断 + 实例信息 + 时间在核心层直接生成报告文件，
 > 保存到用户指定的目录（不再依赖界面事件链路）。
 
 ### 新增
 
 - **Win/WSL 双界面**：主窗口改为 TabView 双标签页——"Windows 实例"与"WSL 实例"
   各挂一个独立面板（`InstancePanel`），实例列表/状态/操作/设置互不混用；
-  每个面板独立记忆选中实例、独立状态轮询；共享控制台带 `[WIN·名称]`/`[WSL·名称]` 前缀
-- **harness 版本锁定**：实例新增 `harnessVersion` 字段——空 = 跟随当前环境主实例版本；
-  非空 = 经 `npx --yes @deepseek-ai/dsh@<版本> web ...` 拉取指定版本启动
-  （Windows 用 npx.cmd，WSL 用发行版内原生 npx，npx 缺失时给出明确失败报告）
+  每个面板独立记忆选中实例、独立状态轮询、独立版本探测；标签页头显示
+  各环境实例数与运行中数量；共享控制台带 `[WIN·名称]`/`[WSL·名称]` 前缀
+- **harness 指定版本**：实例新增 `harnessVersion` 字段——空 = 跟随当前环境主实例版本；
+  非空 = 经 `npx --yes @deepseek-ai/dsh@<版本> web ...` 拉取该版本启动
+  （Windows 用 npx.cmd，WSL 用发行版内原生 npx；npx 缺失时给出明确失败报告）。
+  指定版本时**不再要求本机/发行版已装 dsh**（只需 node/npm）
 - **当前环境版本探测**：新增 `Core/HarnessVersion.cs`——Windows 读 npm 全局包
   package.json / 执行 `dsh --version`；WSL 在发行版内执行 `dsh --version`（node 兜底）；
-  实例设置提供"检测当前版本"按钮，状态卡显示生效版本（锁定/环境默认）
-- **新建实例默认版本**：新建/克隆对话框默认填入当前环境检测到的 harness 主实例版本
-  （可改为任意指定版本）；克隆现有实例时默认继承源实例的版本锁定
-- **失败报告核心层生成**：`BackendManager.FailStart` 直接调用 `ErrorReporter`
-  落盘（不再依赖 UI 事件订阅），报告文件名 = `DshController-fail_<实例ID>_<时间戳>.md`，
-  内容含实例名称/ID/运行环境/端口/DSH_HOME/harness 版本/生成时间/输出转录/排障建议；
+  实例设置提供"检测当前版本"按钮，状态卡与页脚显示生效版本（指定/当前环境）
+- **版本列表拉取**：实例设置新增"拉取版本列表"按钮，经 `npm view @deepseek-ai/dsh versions`
+  （Windows 侧或发行版内）列出已发布版本供直接选择；离线时仍可手工输入
+- **版本号校验**：保存/新建时统一规范化（去 `v` 前缀、允许 `x.y.z[-预发布]`），
+  非法输入不会写入配置，控制台给出明确提示
+- **新建实例默认版本**：新建/克隆对话框默认"跟随当前环境（v当前版本）"，
+  下拉同时提供"指定为当前环境版本"与已发布版本列表；克隆现有实例时默认继承源实例设置
+- **失败报告核心层生成**：`BackendManager.FailStart/FailStop` 直接调用 `ErrorReporter`
+  落盘（不再依赖 UI 事件订阅），报告文件名 = `DshController-fail_<实例ID>_<时间戳>.md`
+  （停止失败为 `stopfail_`）；内容含实例名称/ID/运行环境/端口/DSH_HOME/harness 版本/
+  生成时间 + **控制台转录** + **启动诊断表**（发行版列表、发行版用户、Linux $HOME、
+  dsh/npx 路径、工作区解析结果、真实命令行）+ 子进程输出转录 + 排障建议；
   控制台同时打印报告路径；CLI `--instance start` 失败同样自动生成报告
-- **控制台优化**：新增"打开报告目录"按钮；日志带实例前缀，全局共享
+- **失败提示条（InfoBar）**：面板顶部内联提示失败类型与报告路径，
+  提供"打开报告 / 打开报告目录 / 复制报告路径"，替代打断式弹窗
+- **WSL 环境专属设置**：WSL 标签页可单独设置"停止后关闭"策略
+  （`smart` / `distroOnly` / `always` / `never`），并提供"扫描发行版"下拉
+- **实用小按钮**：推荐空闲端口、打开工作目录、打开 DSH_HOME、复制日志
 
 ### 改进
 
-- 界面重构：状态卡新增环境徽章（WINDOWS/WSL2）与 harness 版本显示；
-  WSL 面板只显示发行版/WSL DSH_HOME，Windows 面板只显示 DSH_HOME；
-  删除实例确认框带运行环境与版本信息；移除冗余诊断日志
-- CLI `--check` 增加实例 runtime/harness 版本列与当前环境版本探测
+- 界面重构：状态卡（状态点 + 环境徽章 + harness 版本徽标 + 地址 + HOME + 启动方式 + PID）、
+  实例下拉显示"名称 · 端口 · 指定版本"、实例设置按"网络/路径/harness 版本/高级"分组、
+  空状态卡直接给出"新建实例"入口；全局设置报告目录新增"打开"按钮
+- 报告可读性：`json` 配置节改为合法 JSON（转义反斜杠/引号）、WSL 实例不再打印
+  无关的 Windows 侧 dsh 4 级回退表、工作目录存在性按运行环境判断、
+  排障建议按 WSL/版本/端口/工作区分类
+- CLI：`--instance <id> start` 改为**等待就绪或失败**再返回（退出码 0/1，
+  失败时打印报告路径）；`--check` 增加 runtime/harness 版本列、Windows 与各
+  WSL 发行版的当前环境版本、报告目录存在性
+- 新建 WSL 实例默认使用 Linux 原生工作区（`~/dsh-workspaces/<id>`）与
+  独立 `DSH_HOME`（`~/dsh-instances/<id>`），避免多实例共用 `~/.dsh`
+
+### 修复
+
+- **XAML 编译失败（阻断构建）**：`TabView` 不存在 `CanCloseTabs` 属性、
+  XML 注释中出现非法的 `--` 连字符串——WASDK 1.5 的 XamlCompiler 遇到二者会
+  **静默崩溃（exit 1 且无任何诊断输出）**，导致整个项目无法构建；已改为
+  `TabViewItem.IsClosable` 与合法注释
+- **WSL 关闭策略未被遵守**：`SmartShutdownAsync` 此前无论策略如何都会终止发行版，
+  `distroOnly` / `never` 形同虚设；现四档策略严格生效（`never` 完全不动发行版与 VM）
+- **停止 WSL 实例可能误杀无关进程**：pkill 兜底模式 `[p]ort <N>` 会匹配任何命令行
+  里含"port N"的进程；收窄为 `(@deepseek-ai/[d]sh|[d]sh).*--port <N>`
+- 公告 URL 捕获：无捕获组的正则误用 `Groups[1]` 导致 `dsh web: http://...` 捕获失效
 
 ### 版本号统一
 

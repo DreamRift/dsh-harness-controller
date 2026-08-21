@@ -5,8 +5,8 @@
 //    - 实例列表按运行环境过滤（Windows 标签只列 windows 实例，WSL 标签只列 wsl）；
 //    - 每面板独立记忆选中实例、独立状态轮询、独立设置字段（WSL 显示发行版/
 //      WSL DSH_HOME，Windows 显示 DSH_HOME）；
-//    - harness 版本锁定：实例可跟随当前环境主实例版本（默认），也可锁定
-//      指定版本（npx 拉取）；新建实例默认填入当前环境检测到的版本；
+//    - harness 版本：实例默认跟随当前环境主实例版本，也可指定任意版本
+//      （经 npx 拉取该版本启动）；新建实例默认跟随当前环境检测到的版本；
 //    - 启动失败报告由核心层生成（BackendManager.FailStart → ErrorReporter），
 //      本面板只负责把报告路径打到控制台并弹窗让用户打开/定位。
 // ============================================================================
@@ -53,10 +53,16 @@ namespace DshController
         private bool _uiMine;
         private string _detectedVersion = "";          // 当前环境 harness 主实例版本（检测缓存）
         private bool _versionDetectDone;               // 是否已执行过一次版本检测
+        private string _detectedFor = "";              // 版本检测对应的环境键（windows / wsl:<发行版>）
+        private List<string> _publishedVersions = new List<string>();  // npm registry 拉取到的版本
+        private string _lastReportPath = "";           // 最近一次失败报告路径（InfoBar 按钮用）
 
         public bool IsWslPanel { get { return _env == "wsl"; } }
         public string EnvironmentName { get { return _env; } }
         public string SelectedId { get { return _selectedId; } }
+
+        /// <summary>本环境检测到的 harness 主实例版本（供 MainWindow 页脚展示）。</summary>
+        public string DetectedVersion { get { return _detectedVersion; } }
 
         /// <summary>本环境当前处于运行状态的实例数（供 MainWindow 标签页头显示）。</summary>
         public int RunningCount()
@@ -95,10 +101,15 @@ namespace DshController
             RowWinHome.Visibility = IsWslPanel ? Visibility.Collapsed : Visibility.Visible;
             RowWslDistro.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             RowWslHome.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
+            RowWslPolicy.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             EnvBadgeText.Text = IsWslPanel ? "WSL2" : "WINDOWS";
             EmptyHintText.Text = IsWslPanel
-                ? "本环境暂无 WSL 实例，点击「新建实例」创建（需已安装 WSL2 发行版）"
+                ? "本环境暂无 WSL 实例，点击「新建实例」创建（需已安装 WSL2 发行版并在其中装好 node/npm）"
                 : "本环境暂无 Windows 实例，点击「新建实例」创建";
+            TxtWorkspaceHint.Text = IsWslPanel
+                ? "填 ~/xxx 或 /xxx = 发行版内原生路径（完全隔离）；填 Windows 路径（C:\\…）= 经 /mnt/c 按需共享"
+                : "";
+            InitWslPolicyCombo();
 
             WireAll();
             RefreshInstanceList();
@@ -197,9 +208,12 @@ namespace DshController
             try
             {
                 CmbInstance.ItemsSource = InstancesOfEnv().ToList();
-                TxtInstanceHint.Text = IsWslPanel
+                string ver = _detectedVersion.Length > 0
+                    ? " · 当前环境 harness v" + _detectedVersion
+                    : (_versionDetectDone ? " · 当前环境未检测到 harness" : "");
+                TxtInstanceHint.Text = (IsWslPanel
                     ? "共 " + InstancesOfEnv().Count() + " 个 WSL 实例 · 在发行版内运行"
-                    : "共 " + InstancesOfEnv().Count() + " 个 Windows 实例 · 本机直接运行";
+                    : "共 " + InstancesOfEnv().Count() + " 个 Windows 实例 · 本机直接运行") + ver;
             }
             finally { _loadingList = false; }
         }
@@ -220,6 +234,17 @@ namespace DshController
                 _selectedId = id;
 
             // 同步 ComboBox 选中项（引用匹配 + 索引兜底）
+            SyncPickerSelection();
+
+            _externalPidCache = 0;
+            _cachedSelectedId = _selectedId;
+            RefreshSelectedControls();
+            _ = ProbeTickAsync();
+        }
+
+        /// <summary>把实例下拉的选中项对齐到 _selectedId（引用匹配优先，索引兜底）。</summary>
+        private void SyncPickerSelection()
+        {
             _loadingSettings = true;
             try
             {
@@ -243,17 +268,6 @@ namespace DshController
                 }
             }
             finally { _loadingSettings = false; }
-
-            _externalPidCache = 0;
-            _cachedSelectedId = _selectedId;
-            RefreshSelectedControls();
-            _ = ProbeTickAsync();
-        }
-
-        private async void ProbeAsyncAfterSwitch()
-        {
-            try { await ProbeTickAsync(); }
-            catch { }
         }
 
         private void RefreshSelectedControls()
@@ -269,16 +283,18 @@ namespace DshController
                     TxtWorkspace.Text = "";
                     TxtHome.Text = "";
                     TxtTrustedHosts.Text = "";
-                    TxtWslDistro.Text = "";
+                    CmbWslDistro.Text = "";
                     TxtWslHome.Text = "";
                     SwAutoOpen.IsOn = false;
                     SwStopOnExit.IsOn = false;
                     UrlLink.Content = "—";
                     try { UrlLink.NavigateUri = null; } catch { }
                     HomeText.Text = IsWslPanel ? "WSL 实例 · DSH_HOME(Linux): —" : "DSH_HOME: —";
-                    StatusText.Text = "无实例，请新建";
+                    StatusText.Text = "无实例";
                     PidText.Text = "—";
                     VersionText.Text = "harness 版本未知";
+                    LaunchModeText.Text = "";
+                    TxtSettingsSubtitle.Text = "";
                     TxtAnnounced.Visibility = Visibility.Collapsed;
                     TxtAnnounced.Text = "";
                     PopulateVersionCombo(null);
@@ -294,8 +310,9 @@ namespace DshController
                 TxtTrustedHosts.Text = def.TrustedHosts == null ? "" : string.Join(", ", def.TrustedHosts);
                 SwAutoOpen.IsOn = def.AutoOpenBrowser;
                 SwStopOnExit.IsOn = def.StopOnExit;
-                TxtWslDistro.Text = def.WslDistro ?? "";
+                CmbWslDistro.Text = def.WslDistro ?? "";
                 TxtWslHome.Text = def.WslHome ?? "";
+                TxtSettingsSubtitle.Text = "· " + (def.Name ?? "") + "（" + def.Id + "）";
                 EmptyHint.Visibility = Visibility.Collapsed;
                 PopulateVersionCombo(def);
                 UpdateHomeLabel(def);
@@ -342,16 +359,34 @@ namespace DshController
         private void UpdateVersionText(InstanceDef def)
         {
             string pinned = (def?.HarnessVersion ?? "").Trim();
-            if (pinned.Length > 0)
-                VersionText.Text = "harness v" + pinned + " · 锁定版本";
-            else if (!string.IsNullOrEmpty(_detectedVersion))
-                VersionText.Text = "harness v" + _detectedVersion + " · 环境默认";
-            else
+            if (def == null)
+            {
                 VersionText.Text = "harness 版本未知";
+                LaunchModeText.Text = "";
+                return;
+            }
+
+            if (pinned.Length > 0)
+            {
+                VersionText.Text = "harness v" + pinned + " · 指定版本";
+                LaunchModeText.Text = IsWslPanel
+                    ? "启动方式: 发行版内 npx --yes @deepseek-ai/dsh@" + pinned + "（首次拉取需联网）"
+                    : "启动方式: npx --yes @deepseek-ai/dsh@" + pinned + "（首次拉取需联网）";
+            }
+            else
+            {
+                VersionText.Text = _detectedVersion.Length > 0
+                    ? "harness v" + _detectedVersion + " · 当前环境"
+                    : "harness 版本未知 · 当前环境";
+                LaunchModeText.Text = IsWslPanel
+                    ? "启动方式: 发行版内已安装的 dsh（跟随当前环境主实例版本）"
+                    : "启动方式: 本机已安装的 dsh（跟随当前环境主实例版本）";
+            }
         }
 
         // ==================== harness 版本（v0.5.0） ====================
 
+        /// <summary>版本下拉：① 跟随当前环境（默认）② 当前已指定的版本 ③ 拉取到的已发布版本。</summary>
         private void PopulateVersionCombo(InstanceDef def)
         {
             _loadingSettings = true;
@@ -360,39 +395,145 @@ namespace DshController
                 CmbVersion.Items.Clear();
                 var defItem = new ComboBoxItem
                 {
-                    Content = string.IsNullOrEmpty(_detectedVersion)
-                        ? "默认（跟随当前环境）"
-                        : "默认（当前环境 v" + _detectedVersion + "）",
+                    Content = _detectedVersion.Length > 0
+                        ? "跟随当前环境（v" + _detectedVersion + "）"
+                        : "跟随当前环境",
                     Tag = ""
                 };
                 CmbVersion.Items.Add(defItem);
 
                 string pinned = (def?.HarnessVersion ?? "").Trim();
                 if (pinned.Length > 0)
+                    CmbVersion.Items.Add(new ComboBoxItem { Content = pinned + "（当前指定）", Tag = pinned });
+
+                // 当前环境版本也提供「显式指定」入口（与「跟随」区分：显式 = 走 npx 拉取该版本）
+                if (_detectedVersion.Length > 0 && _detectedVersion != pinned)
+                    CmbVersion.Items.Add(new ComboBoxItem
+                    {
+                        Content = _detectedVersion + "（指定为当前环境版本）",
+                        Tag = _detectedVersion
+                    });
+
+                foreach (string v in _publishedVersions)
                 {
-                    if (!CmbVersion.Items.OfType<ComboBoxItem>().Any(i => (i.Tag as string) == pinned))
-                        CmbVersion.Items.Add(new ComboBoxItem
-                        {
-                            Content = pinned + "（锁定）",
-                            Tag = pinned
-                        });
-                    CmbVersion.SelectedItem = CmbVersion.Items.OfType<ComboBoxItem>()
-                        .First(i => (i.Tag as string) == pinned);
+                    if (v == pinned || v == _detectedVersion) continue;
+                    CmbVersion.Items.Add(new ComboBoxItem { Content = v, Tag = v });
                 }
-                else
-                {
-                    CmbVersion.SelectedItem = defItem;
-                }
+
+                CmbVersion.SelectedItem = pinned.Length > 0
+                    ? CmbVersion.Items.OfType<ComboBoxItem>().First(i => (i.Tag as string) == pinned)
+                    : defItem;
             }
             finally { _loadingSettings = false; }
         }
 
+        /// <summary>
+        /// 读取版本下拉当前值：返回规范化后的版本号；空串 = 跟随当前环境。
+        /// 输入非法（不是 x.y.z[-预发布]）时返回 null，由调用方提示并放弃保存。
+        /// </summary>
         private string ReadVersionCombo()
         {
-            if (CmbVersion.SelectedItem is ComboBoxItem itm && itm.Tag is string tag && tag.Length > 0)
-                return tag;
-            string t = (CmbVersion.Text ?? "").Trim();
-            return t.StartsWith("默认", StringComparison.Ordinal) ? "" : t;
+            if (CmbVersion.SelectedItem is ComboBoxItem itm && itm.Tag is string tag)
+            {
+                // 选中项就是权威值（下拉项文案带中文说明，不能按文本解析）
+                string sel = (CmbVersion.Text ?? "").Trim();
+                string selContent = (itm.Content as string ?? "").Trim();
+                if (sel.Length == 0 || sel == selContent) return tag;
+            }
+            string typed = (CmbVersion.Text ?? "").Trim();
+            string normalized;
+            if (!HarnessVersion.TryNormalizeVersion(typed, out normalized)) return null;
+            return normalized;
+        }
+
+        private void InitWslPolicyCombo()
+        {
+            if (!IsWslPanel) return;
+            _loadingSettings = true;
+            try
+            {
+                CmbWslPolicy.Items.Clear();
+                CmbWslPolicy.Items.Add(new ComboBoxItem { Content = "smart（推荐：按需关发行版/VM）", Tag = "smart" });
+                CmbWslPolicy.Items.Add(new ComboBoxItem { Content = "distroOnly（只终止发行版）", Tag = "distroOnly" });
+                CmbWslPolicy.Items.Add(new ComboBoxItem { Content = "always（总是 wsl --shutdown）", Tag = "always" });
+                CmbWslPolicy.Items.Add(new ComboBoxItem { Content = "never（都不关闭）", Tag = "never" });
+                string cur = (_registry.Settings.WslShutdownPolicy ?? "smart").Trim();
+                CmbWslPolicy.SelectedItem = CmbWslPolicy.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => string.Equals(i.Tag as string, cur, StringComparison.OrdinalIgnoreCase))
+                    ?? CmbWslPolicy.Items[0];
+            }
+            finally { _loadingSettings = false; }
+        }
+
+        private async void BtnListDistros_Click(object sender, RoutedEventArgs e)
+        {
+            BtnListDistros.IsEnabled = false;
+            try
+            {
+                string keep = (CmbWslDistro.Text ?? "").Trim();
+                var distros = await WslTools.ListDistrosAsync();
+                _loadingSettings = true;
+                try
+                {
+                    CmbWslDistro.Items.Clear();
+                    foreach (string d in distros) CmbWslDistro.Items.Add(d);
+                    CmbWslDistro.Text = keep;
+                }
+                finally { _loadingSettings = false; }
+                PushLog(distros.Count > 0
+                    ? "已安装的 WSL 发行版: " + string.Join(", ", distros)
+                    : "未检测到已安装的 WSL 发行版（可在管理员 PowerShell 执行 wsl --install -d <发行版>）");
+            }
+            catch (Exception ex) { PushLog("扫描发行版失败: " + ex.Message); }
+            finally { BtnListDistros.IsEnabled = true; }
+        }
+
+        private async void BtnFetchVersions_Click(object sender, RoutedEventArgs e)
+        {
+            BtnFetchVersions.IsEnabled = false;
+            string old = BtnFetchVersions.Content as string;
+            BtnFetchVersions.Content = "拉取中…";
+            try
+            {
+                List<string> versions;
+                if (IsWslPanel)
+                {
+                    string distro = CurrentDistro();
+                    if (distro.Length == 0)
+                    {
+                        PushLog("⚠ 请先填写 WSL 发行版名称，再拉取版本列表");
+                        return;
+                    }
+                    versions = await HarnessVersion.ListVersionsWslAsync(distro);
+                }
+                else
+                {
+                    versions = await HarnessVersion.ListVersionsWindowsAsync();
+                }
+
+                if (versions.Count == 0)
+                {
+                    PushLog("未能从 npm registry 拉取版本列表（检查网络/npm 是否可用）；可直接手动输入版本号");
+                    return;
+                }
+                _publishedVersions = versions;
+                PopulateVersionCombo(SelectedDef());
+                PushLog("已拉取 " + versions.Count + " 个已发布版本，最新: " + versions[0]);
+            }
+            catch (Exception ex) { PushLog("拉取版本列表失败: " + ex.Message); }
+            finally
+            {
+                BtnFetchVersions.Content = old ?? "拉取版本列表";
+                BtnFetchVersions.IsEnabled = true;
+            }
+        }
+
+        /// <summary>WSL 面板当前生效的发行版（优先输入框，其次选中实例配置）。</summary>
+        private string CurrentDistro()
+        {
+            string typed = (CmbWslDistro.Text ?? "").Trim();
+            if (typed.Length > 0) return typed;
+            return (SelectedDef()?.WslDistro ?? "").Trim();
         }
 
         private async void BtnDetectVersion_Click(object sender, RoutedEventArgs e)
@@ -404,13 +545,15 @@ namespace DshController
 
         private async Task DetectVersionAsync(bool show, bool force = false)
         {
-            if (!force && _versionDetectDone) return;
+            string envKey = IsWslPanel ? "wsl:" + CurrentDistro() : "windows";
+            if (!force && _versionDetectDone && _detectedFor == envKey) return;
+
             string v = "";
             try
             {
                 if (IsWslPanel)
                 {
-                    string distro = (SelectedDef()?.WslDistro ?? "").Trim();
+                    string distro = CurrentDistro();
                     if (distro.Length == 0)
                     {
                         if (show) PushLog("⚠ 请先在实例设置中填写发行版名称，再检测 WSL 内 harness 版本");
@@ -429,13 +572,15 @@ namespace DshController
 
             _detectedVersion = v;
             _versionDetectDone = true;
+            _detectedFor = envKey;
             if (show)
             {
                 PushLog(v.Length > 0
-                    ? "当前环境 harness 主实例版本: v" + v
+                    ? (IsWslPanel ? "WSL " + CurrentDistro() + " 内" : "Windows 环境") + " harness 主实例版本: v" + v
                     : "未检测到当前环境 harness 版本（请确认 dsh 已安装）");
             }
             RefreshSelectedControls();
+            NotifyInstancesChanged();
         }
 
         // ==================== 状态刷新 ====================
@@ -558,6 +703,7 @@ namespace DshController
             if (string.IsNullOrEmpty(_selectedId)) return;
             if (!TryReadSettings(showErrors: true)) return;
             SaveAllSettings();
+            FailBar.IsOpen = false;                       // 新的一次启动：清掉上次失败提示
             await RunOpAsync(() => _instanceMgr.StartAsync(_selectedId));
         }
 
@@ -671,46 +817,129 @@ namespace DshController
 
         // ==================== 失败报告（报告由核心层生成，此处只提示） ====================
 
-        private async void OnStartFailed(object sender, StartFailureContext ctx)
+        private void OnStartFailed(object sender, StartFailureContext ctx)
         {
             if (_closing) return;
             InstanceDef def = DefForSender(sender);
             string who = def != null ? "[" + (IsWslPanel ? "WSL·" : "WIN·") + def.Name + "] " : "";
             PushLog(who + "后端启动失败：" + ctx.FailureKind +
                 (string.IsNullOrEmpty(ctx.Summary) ? "" : "。" + ctx.Summary));
-            if (string.IsNullOrEmpty(ctx.ReportPath))
-            {
+
+            // 只为本面板的实例弹提示条（另一个环境的失败不打扰当前界面）
+            if (def == null) return;
+
+            _lastReportPath = ctx.ReportPath ?? "";
+            FailBar.Title = "启动失败：" + (ctx.FailureKind ?? "未知") + "（" + def.Name + "）";
+            FailBar.Message = (string.IsNullOrEmpty(ctx.Summary) ? "" : ctx.Summary + "\n") +
+                (string.IsNullOrEmpty(_lastReportPath)
+                    ? "⚠ 失败报告未生成，请检查报告目录是否可写（全局设置 → 报告目录）"
+                    : "报错详情 + 实例信息 + 时间已写入报告：" + _lastReportPath);
+            FailBar.Severity = InfoBarSeverity.Error;
+            BtnOpenReport.IsEnabled = !string.IsNullOrEmpty(_lastReportPath);
+            BtnCopyReportPath.IsEnabled = !string.IsNullOrEmpty(_lastReportPath);
+            FailBar.IsOpen = true;
+
+            if (!string.IsNullOrEmpty(_lastReportPath))
+                PushLog(who + "已生成失败报告: " + _lastReportPath);
+            else
                 PushLog(who + "⚠ 失败报告未生成（请检查报告目录是否可写）");
-                return;
-            }
-            PushLog(who + "已生成失败报告: " + ctx.ReportPath);
-            await ShowReportDialogAsync(ctx.ReportPath, ctx.FailureKind);
         }
 
-        private async Task ShowReportDialogAsync(string path, string kind)
+        private void BtnOpenReport_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(_lastReportPath)) return;
+            try { Process.Start(new ProcessStartInfo(_lastReportPath) { UseShellExecute = true }); }
+            catch (Exception ex) { PushLog("打开报告失败: " + ex.Message); }
+        }
+
+        private void BtnOpenReportDir_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                var dlg = new ContentDialog
+                if (!string.IsNullOrEmpty(_lastReportPath) && File.Exists(_lastReportPath))
                 {
-                    Title = "后端启动失败：" + kind,
-                    Content = "具体的报错信息已结合实例信息与时间生成报告：\n" + path + "\n\n是否打开查看？",
-                    PrimaryButtonText = "打开报告",
-                    SecondaryButtonText = "打开目录",
-                    CloseButtonText = "关闭",
-                    DefaultButton = ContentDialogButton.Primary,
-                    XamlRoot = XamlRoot
-                };
-                var r = await dlg.ShowAsync();
-                if (r == ContentDialogResult.Primary)
-                    Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
-                else if (r == ContentDialogResult.Secondary)
-                    Process.Start("explorer.exe", "/select,\"" + path + "\"");
+                    Process.Start("explorer.exe", "/select,\"" + _lastReportPath + "\"");
+                    return;
+                }
+                string dir = ReportDir();
+                Directory.CreateDirectory(dir);
+                Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
             }
-            catch (Exception ex)
+            catch (Exception ex) { PushLog("打开报告目录失败: " + ex.Message); }
+        }
+
+        private void BtnCopyReportPath_Click(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                PushLog("报告对话框失败: " + ex.Message);
+                var dp = new DataPackage();
+                dp.SetText(string.IsNullOrEmpty(_lastReportPath) ? ReportDir() : _lastReportPath);
+                Clipboard.SetContent(dp);
+                PushLog("已复制报告路径到剪贴板。");
             }
+            catch (Exception ex) { PushLog("复制失败: " + ex.Message); }
+        }
+
+        /// <summary>生效的报告目录（全局设置为空时用「我的文档\DshController\error-reports」）。</summary>
+        private string ReportDir()
+        {
+            string dir = (_registry.Settings.ErrorReportDir ?? "").Trim();
+            if (dir.Length > 0) return dir;
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "DshController", "error-reports");
+        }
+
+        private async void BtnSuggestPort_Click(object sender, RoutedEventArgs e)
+        {
+            BtnSuggestPort.IsEnabled = false;
+            try
+            {
+                int suggested = await PortAllocatorSuggestAsync(IsWslPanel ? 3081 : 3080);
+                if (suggested > 0)
+                {
+                    TxtPort.Text = suggested.ToString();
+                    PushLog("推荐端口: " + suggested);
+                }
+                else PushLog("3080–3099 段内没有空闲端口，请手动指定。");
+            }
+            catch (Exception ex) { PushLog("端口推荐失败: " + ex.Message); }
+            finally { BtnSuggestPort.IsEnabled = true; }
+        }
+
+        private void BtnOpenWs_Click(object sender, RoutedEventArgs e)
+        {
+            string ws = (TxtWorkspace.Text ?? "").Trim();
+            if (ws.Length == 0) { PushLog("工作目录为空。"); return; }
+            if (IsWslPanel && !WslTools.IsWindowsPath(ws))
+            {
+                // WSL 原生路径经 \\wsl$\<发行版>\ 打开
+                string distro = CurrentDistro();
+                if (distro.Length == 0) { PushLog("请先填写 WSL 发行版名称。"); return; }
+                string unc = @"\\wsl$\" + distro + (ws.StartsWith("~", StringComparison.Ordinal)
+                    ? @"\home" + ws.Substring(1).Replace('/', '\\')
+                    : ws.Replace('/', '\\'));
+                OpenPath(unc);
+                return;
+            }
+            OpenPath(ws);
+        }
+
+        private void BtnOpenHome_Click(object sender, RoutedEventArgs e)
+        {
+            string home = (TxtHome.Text ?? "").Trim();
+            if (home.Length == 0)
+                home = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dsh");
+            OpenPath(home);
+        }
+
+        private void OpenPath(string path)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+                PushLog("已打开: " + path);
+            }
+            catch (Exception ex) { PushLog("打开失败（" + path + "）: " + ex.Message); }
         }
 
         private async Task<bool> ConfirmAsync(string message, string title)
@@ -753,15 +982,19 @@ namespace DshController
                 // 新建实例默认 = 当前环境 harness 主实例版本：先确保版本检测完成
                 if (!_versionDetectDone) await DetectVersionAsync(show: false);
 
-                int suggested = await PortAllocatorSuggestAsync(3081);
+                int suggested = await PortAllocatorSuggestAsync(IsWslPanel ? 3081 : 3080);
                 var txtName = new TextBox { PlaceholderText = "实例名称，如 项目A" };
                 var txtPort = new TextBox { Text = suggested > 0 ? suggested.ToString() : "自动分配", PlaceholderText = "0 或空 = 由 dsh 分配" };
 
                 string inheritedWs = _registry.Settings.NewInstanceWorkspace?.Trim();
                 if (string.IsNullOrWhiteSpace(inheritedWs))
                     inheritedWs = SelectedDef()?.Workspace;
+                if (IsWslPanel && !string.IsNullOrWhiteSpace(inheritedWs) && WslTools.IsWindowsPath(inheritedWs))
+                    inheritedWs = null;                    // WSL 面板默认给 Linux 原生路径，避免默认就走 /mnt/c
                 if (string.IsNullOrWhiteSpace(inheritedWs))
-                    inheritedWs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                    inheritedWs = IsWslPanel
+                        ? "~/dsh-workspaces"
+                        : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
                 var txtWorkspace = new TextBox { Text = inheritedWs };
                 var btnBrowseWs = new Button
                 {
@@ -799,39 +1032,53 @@ namespace DshController
                 TextBox txtWslHome = null;
                 if (IsWslPanel)
                 {
-                    txtWslDistro = new TextBox { PlaceholderText = "如 Ubuntu-26.04" };
-                    txtWslHome = new TextBox { PlaceholderText = "留空 = ~/.dsh" };
+                    txtWslDistro = new TextBox
+                    {
+                        PlaceholderText = "如 Ubuntu-26.04",
+                        Text = CurrentDistro()
+                    };
+                    txtWslHome = new TextBox { PlaceholderText = "留空 = ~/.dsh；建议 ~/dsh-instances/<名称>" };
                     layout.Children.Add(LabelledField("WSL 发行版", txtWslDistro));
                     layout.Children.Add(LabelledField("WSL DSH_HOME", txtWslHome));
                 }
 
-                // harness 版本：默认 = 当前环境主实例版本（可改为指定版本）
+                // harness 版本：默认跟随当前环境主实例版本（可改为任意指定版本）
                 var cmbVersion = new ComboBox { Width = 320, IsEditable = true };
                 var verDefault = new ComboBoxItem
                 {
-                    Content = string.IsNullOrEmpty(_detectedVersion)
-                        ? "默认（跟随当前环境）"
-                        : "默认（当前环境 v" + _detectedVersion + "）",
+                    Content = _detectedVersion.Length > 0
+                        ? "跟随当前环境（v" + _detectedVersion + "）"
+                        : "跟随当前环境",
                     Tag = ""
                 };
                 cmbVersion.Items.Add(verDefault);
-                cmbVersion.SelectedItem = verDefault;
-                if (!string.IsNullOrEmpty(_detectedVersion))
-                {
+                if (_detectedVersion.Length > 0)
                     cmbVersion.Items.Add(new ComboBoxItem
                     {
-                        Content = _detectedVersion + "（当前环境主实例版本）",
+                        Content = _detectedVersion + "（指定为当前环境版本）",
                         Tag = _detectedVersion
                     });
-                    cmbVersion.SelectedIndex = 1; // 新实例默认使用当前环境主实例版本
+                foreach (string v in _publishedVersions)
+                {
+                    if (v == _detectedVersion) continue;
+                    cmbVersion.Items.Add(new ComboBoxItem { Content = v, Tag = v });
                 }
+                cmbVersion.SelectedItem = verDefault;      // 默认 = 当前环境主实例版本
                 var verRow = new StackPanel { Spacing = 4 };
                 verRow.Children.Add(new TextBlock
                 {
-                    Text = "harness 版本（默认 = 当前环境主实例版本，可改为指定版本）",
+                    Text = "harness 版本（默认跟随当前环境主实例版本，可改为指定版本）",
                     Style = (Style)Application.Current.Resources["FieldLabel"]
                 });
                 verRow.Children.Add(cmbVersion);
+                verRow.Children.Add(new TextBlock
+                {
+                    Text = _detectedVersion.Length > 0
+                        ? "当前环境检测到 v" + _detectedVersion + "；填写其他版本号则该实例经 npx 拉取指定版本启动"
+                        : "未检测到当前环境版本；可直接填写版本号（如 0.1.0-rc.7）由 npx 拉取",
+                    Style = (Style)Application.Current.Resources["FooterText"],
+                    TextWrapping = TextWrapping.Wrap
+                });
                 layout.Children.Add(verRow);
 
                 ComboBox cmbSource = null;
@@ -911,18 +1158,26 @@ namespace DshController
                 }
 
                 string workspace = string.IsNullOrWhiteSpace(txtWorkspace.Text)
-                    ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                    ? DefaultWorkspace()
                     : txtWorkspace.Text.Trim();
 
-                // 版本：下拉选中项 Tag 非空 → 锁定；否则取用户手输文本
+                // 版本：下拉选中项 Tag 非空 → 指定版本；否则解析用户手输文本
                 string pinnedVersion = "";
-                if (cmbVersion.SelectedItem is ComboBoxItem vitm && vitm.Tag is string vtag && vtag.Length > 0)
+                if (cmbVersion.SelectedItem is ComboBoxItem vitm && vitm.Tag is string vtag && vtag.Length > 0 &&
+                    string.Equals((cmbVersion.Text ?? "").Trim(), (vitm.Content as string ?? "").Trim(), StringComparison.Ordinal))
+                {
                     pinnedVersion = vtag;
+                }
                 else
                 {
                     string typed = (cmbVersion.Text ?? "").Trim();
-                    if (typed.Length > 0 && !typed.StartsWith("默认", StringComparison.Ordinal))
-                        pinnedVersion = typed;
+                    string normalized;
+                    if (!HarnessVersion.TryNormalizeVersion(typed, out normalized))
+                    {
+                        PushLog("harness 版本格式无效（需形如 0.1.0-rc.7），未创建实例。");
+                        return;
+                    }
+                    pinnedVersion = normalized;
                 }
 
                 string home = "";
@@ -976,13 +1231,19 @@ namespace DshController
                     _homeMgr.CreateBlank(home);
                 }
 
+                // WSL 实例默认给每个实例独立的 Linux 侧 DSH_HOME 与工作区（留空会共用 ~/.dsh，失去隔离）
+                string wslHomeInput = IsWslPanel ? (txtWslHome?.Text.Trim() ?? "") : "";
+                if (IsWslPanel && wslHomeInput.Length == 0) wslHomeInput = "~/dsh-instances/" + id;
+                if (IsWslPanel && workspace.TrimEnd('/') == "~/dsh-workspaces")
+                    workspace = "~/dsh-workspaces/" + id;
+
                 var def = new InstanceDef
                 {
                     Id = id,
                     Name = name,
                     Home = home,
                     Host = "127.0.0.1",
-                    Port = port == 0 ? 3081 : port,
+                    Port = port == 0 ? (suggested > 0 ? suggested : (IsWslPanel ? 3081 : 3080)) : port,
                     TrustedHosts = new List<string>(),
                     Workspace = workspace,
                     AutoOpenBrowser = true,
@@ -990,7 +1251,7 @@ namespace DshController
                     CreatedAt = DateTime.UtcNow,
                     Runtime = IsWslPanel ? "wsl" : "windows",
                     WslDistro = IsWslPanel ? (txtWslDistro?.Text.Trim() ?? "") : "",
-                    WslHome = IsWslPanel ? (txtWslHome?.Text.Trim() ?? "") : "",
+                    WslHome = wslHomeInput,
                     HarnessVersion = pinnedVersion
                 };
                 _registry.Add(def);
@@ -998,8 +1259,9 @@ namespace DshController
                 WireInstance(def);
                 RefreshInstanceList();
                 SelectInstance(def.Id, refreshLog: true);
-                PushLog("已创建实例: " + def.Name + "（" + def.Id + "，端口 " + def.Port + "，" +
-                    (pinnedVersion.Length > 0 ? "harness v" + pinnedVersion + " 锁定" : "harness 跟随当前环境") + "）");
+                PushLog("已创建" + (IsWslPanel ? " WSL" : " Windows") + "实例: " + def.Name +
+                    "（" + def.Id + "，端口 " + def.Port + "，" +
+                    (pinnedVersion.Length > 0 ? "harness 指定 v" + pinnedVersion : "harness 跟随当前环境") + "）");
                 NotifyInstancesChanged();
             }
             catch (Exception ex)
@@ -1172,24 +1434,58 @@ namespace DshController
                 return false;
             }
 
+            string version = ReadVersionCombo();
+            if (version == null)
+            {
+                if (showErrors)
+                    PushLog("harness 版本格式无效（需形如 0.1.0 或 0.1.0-rc.7；留空/选「跟随当前环境」= 用当前环境版本），未保存设置。");
+                return false;
+            }
+
+            if (IsWslPanel)
+            {
+                string distro = (CmbWslDistro.Text ?? "").Trim();
+                if (distro.Length == 0 && showErrors)
+                    PushLog("⚠ WSL 实例未填写发行版名称，启动前请补齐（可点「扫描发行版」）。");
+                def.WslDistro = distro;
+                def.WslHome = TxtWslHome.Text.Trim();
+
+                // WSL 关闭策略属于 WSL 环境公共设置，随实例设置一起保存
+                if (CmbWslPolicy.SelectedItem is ComboBoxItem pol && pol.Tag is string polTag)
+                    _registry.Settings.WslShutdownPolicy = polTag;
+            }
+            else
+            {
+                def.WslDistro = "";
+                def.WslHome = "";
+            }
+
             def.Host = host;
             def.Port = port;
             def.Workspace = string.IsNullOrWhiteSpace(TxtWorkspace.Text.Trim())
-                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                ? DefaultWorkspace()
                 : TxtWorkspace.Text.Trim();
             def.Home = IsWslPanel ? "" : TxtHome.Text.Trim();
             def.TrustedHosts = SplitTrustedHosts(TxtTrustedHosts.Text);
             def.AutoOpenBrowser = SwAutoOpen.IsOn;
             def.StopOnExit = SwStopOnExit.IsOn;
             def.Runtime = IsWslPanel ? "wsl" : "windows";
-            def.WslDistro = IsWslPanel ? TxtWslDistro.Text.Trim() : "";
-            def.WslHome = IsWslPanel ? TxtWslHome.Text.Trim() : "";
-            def.HarnessVersion = ReadVersionCombo();
+            def.HarnessVersion = version;
 
             UpdateHomeLabel(def);
             UpdateUrl(def);
             UpdateVersionText(def);
+            RefreshInstanceList();
+            SyncPickerSelection();
             return true;
+        }
+
+        /// <summary>本环境的默认工作目录（WSL 用 Linux 家目录相对路径，Windows 用我的文档）。</summary>
+        private string DefaultWorkspace()
+        {
+            return IsWslPanel
+                ? "~/"
+                : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
         }
 
         private static List<string> SplitTrustedHosts(string text)

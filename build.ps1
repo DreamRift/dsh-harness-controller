@@ -1,4 +1,4 @@
-# ============================================================================
+﻿# ============================================================================
 #  Build DshController v0.5.0 (WinUI 3) with the dotnet SDK.
 #  Requires: .NET SDK >= 6.0, NuGet connectivity (first build restores
 #  Microsoft.WindowsAppSDK). No Visual Studio needed.

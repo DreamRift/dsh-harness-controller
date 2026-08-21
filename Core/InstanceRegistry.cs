@@ -116,10 +116,38 @@ namespace DshController.Core
             file.Settings.ErrorReportDir = Config.SanitizePath(file.Settings.ErrorReportDir);
             file.Settings.HomeRoot = Config.SanitizePath(file.Settings.HomeRoot);
 
-            // 兜底：全新环境（无 launcher.json 且无 instances.json）或损坏回退时，
+            // v0.5.0：自动发现"正在运行但未注册"的实例——
+            // 换目录/发布目录/清单丢失后，仍能看到并管理仍在运行的后端
+            // （尤其 WSL 实例，端口经 wslrelay 还在，但本地清单为空）。
+            // 仅当存在"未注册的监听端口"时才做完整探测（netstat → 进程命令行），
+            // 日常启动（清单完整）只花一次 netstat 的毫秒级成本。
+            var discovered = new List<InstanceDef>();
+            try
+            {
+                var known = new HashSet<int>();
+                foreach (InstanceDef d in file.Instances) known.Add(d.Port);
+                if (InstanceDiscovery.HasUnregisteredListener(known))
+                {
+                    foreach (InstanceDef d in InstanceDiscovery.Scan())
+                    {
+                        if (!known.Contains(d.Port))
+                        {
+                            discovered.Add(d);
+                            known.Add(d.Port);
+                        }
+                    }
+                }
+            }
+            catch { /* 发现失败不阻断启动 */ }
+
+            // 兜底：仅当"既没有可迁移清单、也没有发现到任何运行中实例"时，
             // 预置一个 default 实例（home 空 = 不注入 DSH_HOME，行为与 v0.2.0 一致），
             // 保证 GUI 打开即有可操作的实例。
-            if (file.Instances.Count == 0)
+            if (discovered.Count > 0)
+            {
+                file.Instances.AddRange(discovered);
+            }
+            else if (file.Instances.Count == 0)
             {
                 file.Instances.Add(new InstanceDef
                 {

@@ -22,7 +22,7 @@ namespace DshController.Core
     {
         public string Kind;    // "cmd"（npm shim）| "node"（node + bin.js）| "npx"（指定版本，v0.5.0）
         public string Path1;   // cmd shim 路径 / node.exe 路径 / npx.cmd 路径
-        public string Path2;   // node 模式：@deepseek-ai/dsh/lib/bin.js；npx 模式：锁定版本号
+        public string Path2;   // node 模式：@deepseek-ai/dsh/lib/bin.js；npx 模式：指定的版本号
 
         public string Describe()
         {
