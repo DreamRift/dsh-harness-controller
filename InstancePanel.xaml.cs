@@ -104,8 +104,8 @@ namespace DshController
             RowWslPolicy.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             EnvBadgeText.Text = IsWslPanel ? "WSL2" : "WINDOWS";
             EmptyHintText.Text = IsWslPanel
-                ? "本环境暂无 WSL 实例，点击「新建实例」创建（需已安装 WSL2 发行版并在其中装好 node/npm）"
-                : "本环境暂无 Windows 实例，点击「新建实例」创建";
+                ? "本环境暂无 WSL 实例。点击「新建实例」创建；若发行版内已有正在运行的 dsh web（含终端手动启动），点「扫描」即可加入列表"
+                : "本环境暂无 Windows 实例。点击「新建实例」创建；若本机已有运行中的 dsh web，点「扫描」即可加入列表";
             TxtWorkspaceHint.Text = IsWslPanel
                 ? "填 ~/xxx 或 /xxx = 发行版内原生路径（完全隔离）；填 Windows 路径（C:\\…）= 经 /mnt/c 按需共享"
                 : "";
@@ -1319,7 +1319,10 @@ namespace DshController
                 }
                 else
                 {
-                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：未发现新的运行中实例");
+                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：未发现新的运行中实例" +
+                        (IsWslPanel
+                            ? "（请确认实例进程仍在运行——WSL 发行版闲置被系统回收时，其中的实例会一并停止；重新启动后再次扫描即可）"
+                            : "（请确认实例进程仍在运行）"));
                 }
             }
             catch (Exception ex)
