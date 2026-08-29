@@ -1,0 +1,35 @@
+# 运行时生成的文件（含本机路径，不提交）
+launcher.json
+launcher.json.*
+instances.json
+instances.json.tmp
+cli.log
+crash.log
+reports/
+
+# 构建产物（请用 build.ps1）
+bin/
+obj/
+bin2/
+obj2/
+publish/
+publish-fixed/
+yinyong/
+*.exe
+*.pdb
+*.user
+
+# 图标中间产物（保留 app.ico / whale.svg / whale-white.svg）
+Assets/icon-*.png
+
+# 编辑器/系统
+.vscode/
+.idea/
+.vs/
+Thumbs.db
+.DS_Store
+
+# any instances.json* copies and .bak backups (local paths, never commit)
+instances.json.*
+*.bak
+*.bak-*
