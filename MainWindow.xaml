@@ -263,29 +263,30 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="16,2,16,0">
+                        <Grid Grid.Row="0" BorderBrush="{ThemeResource BorderBrushToken}" BorderThickness="0,1,0,0"
+                              Padding="16,2,16,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" x:Name="ConsoleTitle" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D4;" FontSize="13"
+                            <StackPanel Grid.Column="0" x:Name="ConsoleTitle" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D4;" FontSize="11"
                                           Foreground="{ThemeResource LabelSecondaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="控制台" FontWeight="SemiBold" FontSize="13"
+                                <TextBlock Text="控制台" FontWeight="SemiBold" FontSize="12"
                                            Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
                             </StackPanel>
-                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="滚动：开" Click="BtnAutoScroll_Click" />
-                                <Button x:Name="BtnCopyLog" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="复制日志" Click="BtnCopyLog_Click"
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                                <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" MinHeight="22" Padding="8,1" FontSize="12" Content="滚动：开" Click="BtnAutoScroll_Click" />
+                                <Button x:Name="BtnCopyLog" Style="{StaticResource BtnCompact}" MinHeight="22" Padding="8,1" FontSize="12" Content="复制日志" Click="BtnCopyLog_Click"
                                         ToolTipService.ToolTip="把控制台全部日志复制到剪贴板" />
-                                <Button x:Name="BtnClearLog" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="清空" Click="BtnClearLog_Click" />
-                                <Button x:Name="BtnOpenReportDir" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="打开报告目录" Click="BtnOpenReportDir_Click"
+                                <Button x:Name="BtnClearLog" Style="{StaticResource BtnCompact}" MinHeight="22" Padding="8,1" FontSize="12" Content="清空" Click="BtnClearLog_Click" />
+                                <Button x:Name="BtnOpenReportDir" Style="{StaticResource BtnCompact}" MinHeight="22" Padding="8,1" FontSize="12" Content="打开报告目录" Click="BtnOpenReportDir_Click"
                                         ToolTipService.ToolTip="在资源管理器中打开错误报告保存目录" />
                             </StackPanel>
                             <!-- 右侧收起/展开按钮（常驻） -->
-                            <Button Grid.Column="3" x:Name="BtnConsoleToggle" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Margin="8,0,0,0"
+                            <Button Grid.Column="3" x:Name="BtnConsoleToggle" Style="{StaticResource BtnCompact}" MinHeight="22" Padding="8,1" FontSize="12" Margin="6,0,0,0"
                                     Click="BtnConsoleToggle_Click"
                                     ToolTipService.ToolTip="收起/展开控制台日志（默认收起，日志仍在后台记录）">
                                 <StackPanel Orientation="Horizontal" Spacing="5">
