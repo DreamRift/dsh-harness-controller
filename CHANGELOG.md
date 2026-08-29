@@ -3,6 +3,49 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [0.6.0] - 开发中（待发布）
+
+> **插件市场与插件管理**：侧边栏新增「插件市场」「插件管理」两个页面——
+> 从社区目录搜索插件，按 DSH 官方方式（`dsh plugin --profile <p> add`）安装到
+> 指定实例；已装插件可升级、卸载。插件随实例 DSH_HOME 落盘，实例间天然隔离。
+
+### 新增
+
+- **插件市场页**：数据源为 awesome-dsh-plugin 社区目录（每日抓取 GitHub
+  `dsh-plugin` topic 并人工复核；默认源 `awesome-dsh-plugin.com/plugins.json`，
+  全局设置可更换兼容镜像/自建源）。支持中英文关键字搜索、分类过滤、
+  热度/更新时间排序、"仅可安装/仅人工复核"开关；目录数据本地缓存 24 小时，
+  网络失败自动回退过期缓存兜底
+- **支持版本展示**：插件仓库明确声明了支持的 DSH 版本（目录 `minHost` 字段，
+  缺失时兜底查 npm registry 包元数据的 peerDependencies/engines 并标注来源）
+  时原样展示"支持 DSH ≥ x.y.z"，并与所选实例的 harness 版本比对给出
+  兼容 / 低于要求 / 未检测三态提示；仓库未声明则如实显示"未声明"，不做推测
+- **官方方式安装**：卡片一键安装严格调用 `dsh plugin --profile <p> add
+  <npm包名 | github:owner/repo>`（与 BackendManager 同一套 dsh 解析与
+  DSH_HOME 注入；WSL 实例在发行版内执行）；安装前确认弹窗包含目标实例、
+  HOME 路径、共享默认 ~/.dsh 的隔离警告与未初始化 HOME 提示；安装输出实时
+  打入共享控制台；安装成功后对比实例 HOME 包集合新增市场安装记录，实例
+  运行中可一键重启使 bundle 插件生效
+- **插件管理页**：读取实例 HOME 的 `profiles/<profile>/package.json`
+  （dependencies + dsh.profile.bundles）与 node_modules 版本号，真实展示
+  已装插件（bundle 生效标记、来源徽标：市场安装/官方基础包/手动安装/本地链接）；
+  升级与卸载走官方 `dsh plugin update/remove` 命令（官方基础包禁止操作），
+  危险操作二次确认，卸载同步清除市场记录
+- **新增核心层**：`HttpFetch`（首个联网点，单例 HttpClient + 系统代理 +
+  独立超时）、`PluginCatalog`（目录拉取/双源回退/缓存/过滤）、`PluginCompat`
+  （版本声明提取与 semver 比较）、`PluginInstaller`（官方命令封装，Windows
+  spawn + WSL 发行版内执行，目标白名单校验规避 pnpm/cmd 含空格路径拆断坑）、
+  `InstalledPlugins`（HOME 黑盒读取）、`PluginRecords`（按实例分文件的市场
+  安装记录）
+- **CLI 自检**：`--selftest-plugins`——目录解析/过滤排序/版本兼容判定/市场
+  记录读写/profile package.json 解析/命令拼装与目标校验，44 项断言全离线运行
+- **全局设置**：新增「插件市场源」配置（留空 = 官方默认源）
+
+### 变更
+
+- 版本号 0.5.1 → 0.6.0（csproj / ErrorReporter.AppVersion / build.ps1 三处同步）
+- README 新增插件市场与插件管理章节、自检命令与项目结构说明
+
 ## [0.5.1] - 开发中（待发布）
 
 > **侧边栏界面改版**：主窗口从 TabView 双标签页改为 NavigationView 左侧边栏

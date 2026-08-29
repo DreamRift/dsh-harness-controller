@@ -84,8 +84,21 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItemSeparator />
+                <NavigationViewItem x:Name="NavMarket" Content="插件市场" Tag="market"
+                                    ToolTipService.ToolTip="搜索社区插件并按 DSH 官方方式安装到指定实例（实例间隔离）">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="15" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavPlugins" Content="插件管理" Tag="plugins"
+                                    ToolTipService.ToolTip="查看各实例已安装的插件并进行管理（升级 / 卸载）">
+                    <NavigationViewItem.Icon>
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71D;" FontSize="15" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItemSeparator />
                 <NavigationViewItem x:Name="NavSettings" Content="全局设置" Tag="settings"
-                                    ToolTipService.ToolTip="报告目录 / 实例目录根 / 默认工作区 / dshCommand">
+                                    ToolTipService.ToolTip="报告目录 / 实例目录根 / 默认工作区 / dshCommand / 插件市场源">
                     <NavigationViewItem.Icon>
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="15" />
                     </NavigationViewItem.Icon>
@@ -99,9 +112,11 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <!-- ============ 页面层：Win / WSL / 全局设置（切换只改可见性） ============ -->
+                    <!-- ============ 页面层：Win / WSL / 插件市场 / 插件管理 / 全局设置（切换只改可见性） ============ -->
                     <local:InstancePanel x:Name="PanelWin" Grid.Row="0" />
                     <local:InstancePanel x:Name="PanelWsl" Grid.Row="0" Visibility="Collapsed" />
+                    <local:PluginMarketPanel x:Name="PanelMarket" Grid.Row="0" Visibility="Collapsed" />
+                    <local:PluginManagePanel x:Name="PanelPlugins" Grid.Row="0" Visibility="Collapsed" />
 
                     <ScrollViewer x:Name="PageSettings" Grid.Row="0" Visibility="Collapsed"
                                   VerticalScrollBarVisibility="Auto">
@@ -174,6 +189,18 @@
                                                    ToolTipService.ToolTip="Windows 环境 dsh 命令覆盖；留空自动查找（npm shim / PATH / node 入口）" />
                                         <TextBox Grid.Column="1" x:Name="TxtDshCommand" Style="{StaticResource InputBox}"
                                                  PlaceholderText="留空自动查找" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="插件市场源" Style="{StaticResource FieldLabel}"
+                                                   Width="{StaticResource SettingsLabelWidth}"
+                                                   ToolTipService.ToolTip="插件市场目录数据源 URL（需兼容 awesome-dsh-plugin 目录规范）；留空 = 官方默认源，可填镜像或自建源" />
+                                        <TextBox Grid.Column="1" x:Name="TxtRegistry" Style="{StaticResource InputBox}"
+                                                 PlaceholderText="留空 = https://awesome-dsh-plugin.com/plugins.json" />
                                     </Grid>
 
                                     <!-- 保存 / 取消 -->

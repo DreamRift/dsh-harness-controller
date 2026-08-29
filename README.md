@@ -2,7 +2,9 @@
 
 > Windows 桌面小应用：一键启动 / 重启 / 停止 / 打开 **DeepSeek Harness** 的 Web 后端，
 > **Windows 与 WSL2 实例在左侧边栏两个独立页面中分别管理**，支持互相隔离的多实例、
-> **按实例指定 harness 版本**（默认跟随当前环境主实例版本）。
+> **按实例指定 harness 版本**（默认跟随当前环境主实例版本），
+> 内置**插件市场**（按 DSH 官方方式把社区插件装到指定实例）与**插件管理**
+> （升级/卸载，实例间隔离）。
 > WinUI 3 原生界面（侧边栏导航 + Mica 材质），DeepSeek Harness 同款设计语言与鲸鱼图标。
 
 ![License](https://img.shields.io/github/license/DreamRift/dsh-harness-controller)
@@ -26,6 +28,7 @@
 - [构建方法](#构建方法)
 - [部署自检](#部署自检)
 - [与 dsh 文档的对应关系](#与-dsh-文档的对应关系)
+- [插件市场与插件管理（v0.6.0）](#插件市场与插件管理v060)
 - [工作原理](#工作原理)
 - [项目结构](#项目结构)
 - [常见问题](#常见问题-faq)
@@ -85,6 +88,20 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
   Windows 实例 / WSL 实例 / 全局设置三个页面，实例面板常驻不销毁，
   切换页面不中断状态轮询；控制台为底部可收起的共享坞；默认窗口
   1180×800（最小 960×620），任何窗口尺寸下内容不再互相遮挡
+- **插件市场（v0.6.0）**：侧边栏新增「插件市场」页——从 awesome-dsh-plugin
+  社区目录（每日抓取 GitHub `dsh-plugin` topic + 人工复核，支持自定义镜像源）
+  搜索插件，按 **DSH 官方方式**（`dsh plugin --profile <p> add <npm包名 |
+  github:owner/repo>`）一键安装到所选实例；插件仓库明确声明了支持的 DSH
+  版本时（目录 `minHost` / npm 包元数据）原样展示并与实例 harness 版本比对；
+  目录数据本地缓存 24 小时，网络失败自动回退过期缓存
+- **插件管理（v0.6.0）**：侧边栏新增「插件管理」页——读取实例 HOME 的
+  `profiles/<profile>/package.json` 真实展示已装插件（版本、bundle 生效标记、
+  来源徽标：市场安装/官方基础包/手动安装/本地链接），支持官方命令升级
+  （`dsh plugin update`）与卸载（`dsh plugin remove`，官方基础包禁止），
+  操作后可一键重启实例生效
+- **插件实例隔离**：插件一律装入所选实例自己的 `DSH_HOME`（Windows 绝对路径 /
+  WSL 发行版内路径），各实例的插件、bundle、配置互不可见；市场安装记录也按
+  实例分文件保存；实例使用共享默认 ~/.dsh 时安装前会显式警告
 - **harness 指定版本（v0.5.0）**：每实例可指定任意 harness 版本（经 `npx` 拉取
   `@deepseek-ai/dsh@<版本>` 启动，指定版本时无需全局安装 dsh）；默认**跟随当前环境
   主实例版本**（自动检测 Windows 全局 dsh / WSL 发行版内 dsh 的版本）；
@@ -104,10 +121,10 @@ AI 编码代理框架，其 Web 界面通过 `dsh web` 命令启动（默认监�
 │ │ 实例 · 1 个 │ 共 1 个 Windows 实例 · 本机直接运行 · harness v0.1.0  │ │
 │ │ 🐧 WSL      │ ⛔ 启动失败：子进程早退（主实例）     [打开报告]        │ │ ← 失败提示条
 │ │ 实例 · 1 个 │ ┌──────────────────────────────────────────────────┐ │ │
-│ │ ────────   │ │ ● 运行中 · 本程序启动 [WINDOWS] (harness v0.1.0)   │ │ │
-│ │ ⚙ 全局设置  │ │ http://127.0.0.1:3080/ [复制]           进程 PID   │ │ │ ← 状态卡
-│ │            │ │ DSH_HOME: C:\…\instances\default           18672   │ │ │
-│ │            │ │ 启动方式: 本机已安装的 dsh（跟随当前环境主实例版本） │ │ │
+│ │ 🛒 插件市场 │ │ ● 运行中 · 本程序启动 [WINDOWS] (harness v0.1.0)   │ │ │
+│ │ 🧩 插件管理 │ │ http://127.0.0.1:3080/ [复制]           进程 PID   │ │ │ ← 状态卡
+│ │ ────────   │ │ DSH_HOME: C:\…\instances\default           18672   │ │ │
+│ │ ⚙ 全局设置  │ │ 启动方式: 本机已安装的 dsh（跟随当前环境主实例版本） │ │ │
 │ │            │ └──────────────────────────────────────────────────┘ │ │
 │ │            │ [▶ 启动] [⟳ 重启] [⏹ 停止] [🌐 打开界面]               │ │
 │ │            │ ▾ 实例设置 · 主实例（default）…                       │ │
@@ -343,6 +360,7 @@ DshController.exe --check                        # 打印 dsh 解析结果与端
 DshController.exe --spawn-test --port 3137       # 真实启动/停止一个 dsh web 实例（不开浏览器）
 DshController.exe --spawn-test-node --port 3137  # 仅验证进程管线（微型 node 服务，不涉及 dsh）
 DshController.exe --selftest-core --port 3185     # 核心链路无头自检（启动/重启/停止/报告）
+DshController.exe --selftest-plugins             # 插件市场核心自检（目录/兼容/记录/命令拼装，全离线）
 DshController.exe --version                      # 打印版本
 ```
 
@@ -371,6 +389,39 @@ cmd /s /c ""<npm 全局目录>\dsh.cmd" web --host 127.0.0.1 --port 3080"
 找不到 npm shim 时自动回退到：`node <dsh 包>\lib\bin.js web --host ... --port ...`。
 实例指定了 harness 版本时改为：`npx --yes @deepseek-ai/dsh@<版本> web --host ... --port ...`
 （WSL 实例在发行版内执行同语义脚本）。
+
+## 插件市场与插件管理（v0.6.0）
+
+**数据来源**：[awesome-dsh-plugin](https://github.com/bruc3van/awesome-dsh-plugin)
+社区目录——脚本每日抓取 GitHub `dsh-plugin` topic 并逐个人工复核，提供下游市场
+数据接口（字段契约含 `pkg`/`repo`/`dshBundle`/`minHost`/`verified` 等）。默认源
+`https://awesome-dsh-plugin.com/plugins.json`，可在全局设置「插件市场源」更换为
+兼容镜像/自建源；数据本地缓存 24 小时，网络失败自动回退过期缓存兜底。
+
+**支持版本展示原则**：插件仓库明确声明了支持的 DSH 版本时原样展示，不做推测——
+① 目录条目 `minHost`（标注"仓库声明"）；② 缺失时兜底查 npm registry 包元数据的
+`peerDependencies`/`engines`（标注"包元数据"）；③ 都没有则显示"未声明"。
+声明会与所选实例的 harness 版本比对，给出 兼容 / 低于要求 / 未检测 三态。
+
+**安装方式（严格官方）**：
+
+```
+dsh plugin --profile web add <npm包名 | github:owner/repo>
+dsh plugin --profile web update <包名>     # 升级
+dsh plugin --profile web remove <包名>     # 卸载
+```
+
+- Windows 实例：与启动后端同一套 dsh 解析（配置 → npm shim → PATH → node 入口；
+  实例锁定 harness 版本时走 npx），`DSH_HOME` 注入语义与启动一致；
+- WSL 实例：在发行版内经登录 shell 执行（DSH_HOME 内联传递，路径单引号包装）；
+- 插件只落入所选实例自己的 `DSH_HOME`，各实例互相隔离（实例使用共享默认
+  `~/.dsh` 时安装前会显式警告）；
+- bundle 插件增删改后需**重启实例**才生效，安装/升级/卸载完成时弹窗可一键重启；
+- 已装状态 100% 读实例 HOME 文件（`profiles/<profile>/package.json` 的
+  dependencies + `dsh.profile.bundles` + node_modules 内版本号），不做缓存假设；
+  "市场安装"徽标来自按实例分文件保存的安装记录（`%LOCALAPPDATA%\DshController\plugin-records\`）；
+- 目标一律经白名单字符校验——`dsh plugin` 把参数转发 pnpm 时经 cmd.exe 重建
+  命令行，**含空格的本地路径会被拆断**（npm 包名/github 来源天然安全）。
 
 ## 工作原理
 
@@ -405,6 +456,9 @@ dsh-harness-controller/
 ├── App.xaml / App.xaml.cs     # 应用入口 + 全局异常兜底
 ├── MainWindow.xaml / .cs      # 主窗口（侧边栏导航 + 页面切换 + 共享控制台坞）
 ├── InstancePanel.xaml / .cs   # 单环境实例面板（Windows / WSL 各一份实例）
+├── PluginMarketPanel.xaml/.cs # 插件市场（目录搜索/支持版本比对/官方方式安装）
+├── PluginManagePanel.xaml/.cs # 插件管理（真实已装状态/升级/卸载/一键重启）
+├── PluginUiHelper.cs          # 插件页共享辅助（实例版本缓存/HOME 解析/初始化检查）
 ├── Styles/DshTheme.xaml       # DSH 设计令牌 → Light/Dark 资源字典
 ├── Core/                      # 纯逻辑层（无 UI 依赖）
 │   ├── Config.cs              # launcher.json（System.Text.Json + 旧值净化迁移）
@@ -416,9 +470,16 @@ dsh-harness-controller/
 │   ├── InstanceDef.cs         # 实例定义（runtime/wslDistro/wslHome 等字段）
 │   ├── InstanceManager.cs     # N 个实例的路由 + HOME 锁
 │   ├── HarnessVersion.cs      # harness 版本探测 / npx 解析 / 版本列表拉取
+│   ├── HttpFetch.cs           # 轻量 HTTP GET（插件目录/npm 元数据；系统代理+独立超时）
+│   ├── PluginCatalog.cs       # 插件目录：拉取/双源回退/24h 缓存/过滤排序
+│   ├── PluginCompat.cs        # 支持版本声明提取与 semver 比较（仓库声明优先）
+│   ├── PluginInstaller.cs     # 官方插件命令封装（add/remove/update，Win+WSL）
+│   ├── InstalledPlugins.cs    # 实例 HOME 已装插件黑盒读取（package.json+bundles）
+│   ├── PluginRecords.cs       # 市场安装记录（按实例分文件，来源标注用）
 │   ├── ErrorReporter.cs       # 失败/崩溃 Markdown 报告（控制台转录 + 启动诊断）
-│   ├── Cli.cs                 # --check / --spawn-test / --selftest-core 自检
+│   ├── Cli.cs                 # --check / --spawn-test / --selftest-* 自检
 │   ├── CoreSelfTest.cs        # 核心链路无头自检（启动/重启/停止/报告/配置迁移）
+│   ├── PluginSelfTest.cs      # 插件市场核心自检（44 项断言，全离线）
 │   └── NativeMethods.cs       # Win32 P/Invoke（AttachConsole 等）
 ├── Assets/                    # app.ico（鲸鱼九尺寸）、whale.svg(-white)
 ├── legacy/DshController.cs    # v0.1.0 WinForms 源码留档

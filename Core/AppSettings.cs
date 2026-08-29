@@ -42,6 +42,10 @@ namespace DshController.Core
         [JsonPropertyName("wslShutdownPolicy")]
         public string WslShutdownPolicy { get; set; } = "smart";
 
+        /// <summary>插件市场目录源 URL（v0.6.0）；空 = 官方默认 awesome-dsh-plugin 快照，可填兼容镜像。</summary>
+        [JsonPropertyName("pluginRegistryUrl")]
+        public string PluginRegistryUrl { get; set; } = "";
+
         /// <summary>解析后的实例目录根（配置值优先，否则默认目录）。</summary>
         [JsonIgnore]
         public string EffectiveHomeRoot

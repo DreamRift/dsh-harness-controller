@@ -78,6 +78,9 @@ namespace DshController
             // 两个独立面板（各自持有实例列表 / 状态 / 设置）
             PanelWin.Init(_registry, _instanceMgr, "windows", AppendLog, UpdateFooter);
             PanelWsl.Init(_registry, _instanceMgr, "wsl", AppendLog, UpdateFooter);
+            // 插件市场 / 插件管理（页面惰性加载：首次切过去才拉目录 / 读实例 HOME）
+            PanelMarket.Init(_registry, _instanceMgr, AppendLog);
+            PanelPlugins.Init(_registry, _instanceMgr, AppendLog);
 
             LoadGlobalSettings();
 
@@ -174,6 +177,11 @@ namespace DshController
             PanelWin.Visibility = tag == "win" ? Visibility.Visible : Visibility.Collapsed;
             PanelWsl.Visibility = tag == "wsl" ? Visibility.Visible : Visibility.Collapsed;
             PageSettings.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
+            PanelMarket.Visibility = tag == "market" ? Visibility.Visible : Visibility.Collapsed;
+            PanelPlugins.Visibility = tag == "plugins" ? Visibility.Visible : Visibility.Collapsed;
+            // 插件页惰性动作：首次进入拉目录；再次进入刷新已装状态
+            if (tag == "market") PanelMarket.OnShown();
+            if (tag == "plugins") PanelPlugins.OnShown();
         }
 
         // ==================== 控制台坞 ====================
@@ -194,6 +202,7 @@ namespace DshController
             TxtHomeRoot.Text = _registry.Settings.HomeRoot;
             TxtNewWs.Text = _registry.Settings.NewInstanceWorkspace;
             TxtDshCommand.Text = _registry.Settings.DshCommand;
+            TxtRegistry.Text = _registry.Settings.PluginRegistryUrl;
         }
 
         private void BtnSaveGlobal_Click(object sender, RoutedEventArgs e)
@@ -202,6 +211,7 @@ namespace DshController
             _registry.Settings.HomeRoot = TxtHomeRoot.Text.Trim();
             _registry.Settings.NewInstanceWorkspace = TxtNewWs.Text.Trim();
             _registry.Settings.DshCommand = TxtDshCommand.Text.Trim();
+            _registry.Settings.PluginRegistryUrl = TxtRegistry.Text.Trim();
             _registry.Settings.Theme = _theme;
             try { _registry.Save(); } catch { }
             Nav.SelectedItem = NavWin;
@@ -391,6 +401,9 @@ namespace DshController
             _closing = true;
             try { PanelWin.Shutdown(); } catch { }
             try { PanelWsl.Shutdown(); } catch { }
+            try { PanelMarket.Shutdown(); } catch { }
+            try { PanelPlugins.Shutdown(); } catch { }
+            try { PluginInstaller.KillAll(); } catch { }   // 终止仍在进行的插件命令（Windows 侧）
             try { _instanceMgr.DisposeAll(); } catch { }
         }
     }

@@ -51,6 +51,12 @@ namespace DshController.Core
                 exitCode = CoreSelfTest.Run(args);
                 return true;
             }
+            if (a == "--selftest-plugins")
+            {
+                AttachConsoleOutput();
+                exitCode = PluginSelfTest.Run(args);
+                return true;
+            }
             return false; // 未知参数 → 继续启动 GUI（与 v0.1.0 行为一致）
         }
 
