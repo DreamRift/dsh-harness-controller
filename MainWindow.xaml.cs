@@ -47,11 +47,11 @@ namespace DshController
             _theme = _registry.Settings.Theme;
             ApplyTheme(_theme);
 
-            // 窗口外观：默认尺寸与 ZCode 桌面窗口一致（实测 1530×960 外框，客户区扣标题栏约 35px）
-            // + 最小尺寸防遮挡 + 图标
+            // 窗口外观：默认尺寸对齐 ZCode 桌面窗口（外框 1530×960；
+            // 实测窗口边框+标题栏占 18/47，客户区 1512×913 → 外框精确一致）
             try
             {
-                AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(1530, 925));
+                AppWindow.ResizeClient(new Windows.Graphics.SizeInt32(1512, 913));
                 if (AppWindow.Presenter is OverlappedPresenter op)
                 {
                     op.PreferredMinimumWidth = 960;
