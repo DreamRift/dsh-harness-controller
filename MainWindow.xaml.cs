@@ -37,7 +37,7 @@ namespace DshController
         private bool _closing;
         private bool _closeCleanupDone;
         private AppTheme _theme;
-        private bool _consoleVisible = true;   // 控制台坞展开状态
+        private bool _consoleVisible = false;  // 控制台坞展开状态（v0.6.1：默认收起，日志后台照常记录）
 
         public MainWindow(InstanceRegistry registry)
         {
@@ -83,6 +83,7 @@ namespace DshController
             PanelPlugins.Init(_registry, _instanceMgr, AppendLog);
 
             LoadGlobalSettings();
+            ApplyConsoleVisibility();   // v0.6.1：控制台默认收起（右侧按钮展开）
 
             // 侧边栏默认选中 Windows 实例页（触发 Nav_SelectionChanged → 页面可见性）
             Nav.SelectedItem = NavWin;
@@ -186,11 +187,20 @@ namespace DshController
 
         // ==================== 控制台坞 ====================
 
-        private void BtnToggleConsole_Click(object sender, RoutedEventArgs e)
+        /// <summary>右侧常驻的收起/展开按钮（v0.6.1：默认收起，日志后台照常记录）。</summary>
+        private void BtnConsoleToggle_Click(object sender, RoutedEventArgs e)
         {
             _consoleVisible = !_consoleVisible;
+            ApplyConsoleVisibility();
+        }
+
+        private void ApplyConsoleVisibility()
+        {
             TxtLog.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
-            BtnToggleConsole.Content = _consoleVisible ? "隐藏" : "显示";
+            ConsoleAuxButtons.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
+            TxtConsoleHint.Visibility = _consoleVisible ? Visibility.Collapsed : Visibility.Visible;
+            TxtConsoleToggle.Text = _consoleVisible ? "收起" : "展开";
+            IconConsoleToggle.Glyph = _consoleVisible ? "\uE70D" : "\uE70E";   // 收起▼ / 展开▲
             if (_consoleVisible) ScrollLogToEnd();
         }
 

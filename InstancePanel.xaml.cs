@@ -1389,11 +1389,12 @@ namespace DshController
             catch { return 0; }
 
             int added = 0;
+            InstanceDef firstAdded = null;
             foreach (InstanceDiscovery.DistroInstallInfo info in installed)
             {
-                string id = "auto-wslinst-" + info.Distro;
-                // 发行版名只含字母/数字/./-/_，与实例 ID 规则一致；防御性净化一次
-                id = new string(id.Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.' ? c : '_').ToArray());
+                // 实例 ID 仅允许字母/数字/_/-（IsValidId）：发行版名中的 '.' 一并转为 '_'
+                string id = "auto-wslinst-" + new string(info.Distro.Select(
+                    c => char.IsLetterOrDigit(c) || c == '-' || c == '_' ? c : '_').ToArray());
                 int port = await PortAllocatorSuggestAsync(3081).ConfigureAwait(true);
                 var def = new InstanceDef
                 {
@@ -1414,11 +1415,19 @@ namespace DshController
                     _registry.Add(def);
                     WireInstance(def);
                     added++;
+                    if (firstAdded == null) firstAdded = def;
                     PushLog("[WSL] 发现已安装 dsh 的发行版: " + info.Distro +
                         (info.DshVersion.Length > 0 ? "（dsh v" + info.DshVersion + "）" : "") +
                         " → 已添加为实例（端口 " + def.Port + "，未运行）");
                 }
-                catch { /* id 冲突等：跳过该条 */ }
+                catch (Exception ex)
+                {
+                    PushLog("[WSL] 添加实例失败（" + info.Distro + "）: " + ex.Message);
+                }
+            }
+            if (firstAdded != null)
+            {
+                try { SelectInstance(firstAdded.Id, refreshLog: false); } catch { }
             }
             return added;
         }
