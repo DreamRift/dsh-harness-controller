@@ -95,6 +95,10 @@ namespace DshController
         public Visibility UnverifiedVis =>
             Entry != null && Entry.Unverified ? Visibility.Visible : Visibility.Collapsed;
 
+        /// <summary>支持版本行：仅当仓库/包元数据明确声明了版本时显示（未声明整行隐藏，不显示占位文案）。</summary>
+        public Visibility CompatVis =>
+            string.IsNullOrEmpty(CompatText) ? Visibility.Collapsed : Visibility.Visible;
+
         public string PkgText
         {
             get
@@ -484,11 +488,13 @@ namespace DshController
             var items = new List<MarketItem>();
             foreach (CatalogEntry en in entries)
             {
+                CompatInfo ci = PluginCompat.Judge(en, _instanceVersion);
                 items.Add(new MarketItem
                 {
                     Entry = en,
                     IsInstalled = IsEntryInstalled(en),
-                    CompatText = PluginCompat.Judge(en, _instanceVersion).Text
+                    // 未声明支持版本的条目整行隐藏（用户要求：声明了才显示）
+                    CompatText = ci.State == CompatState.NotDeclared ? "" : ci.Text
                 });
             }
             ListPlugins.ItemsSource = items;
@@ -714,13 +720,15 @@ namespace DshController
                 Foreground = Application.Current.Resources["LabelSecondaryBrush"] as Brush
             };
             panel.Children.Add(compat);
-            panel.Children.Add(new TextBlock
+            var note = new TextBlock
             {
-                Text = "声明缺失时才会查询包元数据兜底；仓库未声明则如实显示「未声明」，不做推测。",
+                Text = "声明缺失时才会查询包元数据兜底；仓库未声明则不显示该行，不做推测。",
                 FontSize = 11,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = Application.Current.Resources["LabelTertiaryBrush"] as Brush
-            });
+            };
+            panel.Children.Add(note);
+            if (en.MinHost.Trim().Length > 0) note.Visibility = Visibility.Collapsed;   // 已声明，无需说明
 
             var dlg = new ContentDialog
             {
@@ -769,7 +777,7 @@ namespace DshController
                 }
             }
 
-            // 兼容信息兜底查询（minHost 缺失 → npm registry 包元数据）
+            // 兼容信息兜底查询（minHost 缺失 → npm registry 包元数据；仍未声明则整行隐藏）
             if (en.MinHost.Trim().Length == 0)
             {
                 _ = Task.Run(async () =>
@@ -777,7 +785,14 @@ namespace DshController
                     CompatInfo ci = await PluginCompat.JudgeDetailedAsync(en, _instanceVersion);
                     _dq.TryEnqueue(() =>
                     {
-                        try { compat.Text = "支持版本：" + ci.Text; } catch { }
+                        try
+                        {
+                            bool declared = ci.State != CompatState.NotDeclared;
+                            compat.Text = declared ? "支持版本：" + ci.Text : "";
+                            compat.Visibility = declared ? Visibility.Visible : Visibility.Collapsed;
+                            note.Visibility = declared ? Visibility.Visible : Visibility.Collapsed;
+                        }
+                        catch { }
                     });
                 });
             }

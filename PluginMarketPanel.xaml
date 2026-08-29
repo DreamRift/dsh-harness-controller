@@ -163,7 +163,8 @@
                                     <TextBlock Text="{x:Bind PkgText}" FontSize="11.5" FontFamily="Consolas"
                                                Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
                                     <TextBlock Text="{x:Bind CompatText}" FontSize="11.5"
-                                               Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                               Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis"
+                                               Visibility="{x:Bind CompatVis}" />
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
                                     <Button Style="{StaticResource BtnPrimary}" Content="{x:Bind InstallLabel}"

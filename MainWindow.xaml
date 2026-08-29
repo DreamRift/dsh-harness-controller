@@ -232,29 +232,26 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- ============ 控制台坞（共享；右侧收起/展开，默认收起） ============ -->
+                    <!-- ============ 控制台坞（共享；右侧收起/展开，默认收起，收起后仅留一行薄条） ============ -->
                     <Grid x:Name="ConsoleDock" Grid.Row="1" Background="Transparent">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
-                        <Grid Grid.Row="0" Margin="16,8,16,0">
+                        <Grid Grid.Row="0" Margin="16,2,16,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0" x:Name="ConsoleTitle" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                 <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8D4;" FontSize="13"
                                           Foreground="{ThemeResource LabelSecondaryBrush}" VerticalAlignment="Center" />
                                 <TextBlock Text="控制台" FontWeight="SemiBold" FontSize="13"
                                            Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock x:Name="TxtConsoleHint" Text="（已收起，点右侧展开）" FontSize="11"
-                                           Foreground="{ThemeResource LabelTertiaryBrush}" VerticalAlignment="Center"
-                                           Visibility="Visible" />
                             </StackPanel>
-                            <StackPanel Grid.Column="2" x:Name="ConsoleAuxButtons" Orientation="Horizontal" Spacing="8">
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
                                 <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" Content="滚动：开" Click="BtnAutoScroll_Click" />
                                 <Button x:Name="BtnCopyLog" Style="{StaticResource BtnCompact}" Content="复制日志" Click="BtnCopyLog_Click"
                                         ToolTipService.ToolTip="把控制台全部日志复制到剪贴板" />

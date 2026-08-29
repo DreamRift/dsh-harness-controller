@@ -196,9 +196,9 @@ namespace DshController
 
         private void ApplyConsoleVisibility()
         {
+            // 收起时只留一行薄条：辅助按钮 + 展开/收起箭头（标题与日志区隐藏，日志后台照常记录）
+            ConsoleTitle.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
             TxtLog.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
-            ConsoleAuxButtons.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
-            TxtConsoleHint.Visibility = _consoleVisible ? Visibility.Collapsed : Visibility.Visible;
             TxtConsoleToggle.Text = _consoleVisible ? "收起" : "展开";
             IconConsoleToggle.Glyph = _consoleVisible ? "\uE70D" : "\uE70E";   // 收起▼ / 展开▲
             if (_consoleVisible) ScrollLogToEnd();
