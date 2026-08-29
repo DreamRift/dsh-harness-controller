@@ -206,8 +206,6 @@ namespace DshController.Core
 
     public static class PluginCatalog
     {
-        private static readonly TimeSpan FreshWindow = TimeSpan.FromHours(24);
-
         private static readonly object Lock = new object();
         private static readonly Dictionary<string, CatalogSourceData> Memory =
             new Dictionary<string, CatalogSourceData>(StringComparer.OrdinalIgnoreCase);
@@ -267,15 +265,19 @@ namespace DshController.Core
         /// <summary>
         /// 并行加载全部启用来源 → 合并去重。单个来源失败自动回退其过期缓存；
         /// 全部失败且无缓存时返回空目录（UI 显示各源状态）。
+        /// 缓存新鲜窗口 = 设置的自动刷新间隔（小时，默认 24，0 = 每次都联网）。
         /// </summary>
         public static async Task<MarketLoadResult> LoadAllAsync(AppSettings settings, bool force)
         {
             List<MarketSource> sources = SelectSources(settings);
+            int hours = settings?.PluginAutoRefreshHours ?? 24;
+            if (hours < 0) hours = 0;
+            TimeSpan freshWindow = TimeSpan.FromHours(hours);
 
             var tasks = sources.Select(async s =>
             {
                 var st = new SourceStatus { Id = s.Id, Name = s.Name };
-                CatalogSourceData data = await LoadSourceAsync(s, force, st).ConfigureAwait(false);
+                CatalogSourceData data = await LoadSourceAsync(s, force, freshWindow, st).ConfigureAwait(false);
                 return new { source = s, status = st, data };
             }).ToArray();
 
@@ -294,17 +296,32 @@ namespace DshController.Core
         }
 
         private static async Task<CatalogSourceData> LoadSourceAsync(MarketSource source, bool force,
-            SourceStatus status)
+            TimeSpan freshWindow, SourceStatus status)
         {
             // ① 内存缓存
             CatalogSourceData mem;
             lock (Lock) Memory.TryGetValue(source.Id, out mem);
-            if (!force && mem != null && DateTime.UtcNow - mem.FetchedAt < FreshWindow)
+            if (!force && mem != null && DateTime.UtcNow - mem.FetchedAt < freshWindow)
             {
                 status.Ok = true;
                 status.Count = mem.Entries.Count;
                 status.FetchedAt = mem.FetchedAt;
                 return mem;
+            }
+
+            // ①.5 磁盘缓存仍在新鲜窗口内（应用重启后内存为空）→ 直接用，不联网
+            if (!force && mem == null)
+            {
+                CatalogSourceData disk = ReadCache(source.Id);
+                if (disk != null && DateTime.UtcNow - disk.FetchedAt < freshWindow)
+                {
+                    lock (Lock) Memory[source.Id] = disk;
+                    status.Ok = true;
+                    status.FromCache = true;
+                    status.Count = disk.Entries.Count;
+                    status.FetchedAt = disk.FetchedAt;
+                    return disk;
+                }
             }
 
             // ② 网络（URL 回退链）

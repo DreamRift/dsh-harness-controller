@@ -97,8 +97,8 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItemSeparator />
-                <NavigationViewItem x:Name="NavSettings" Content="全局设置" Tag="settings"
-                                    ToolTipService.ToolTip="报告目录 / 实例目录根 / 默认工作区 / dshCommand / 插件市场源">
+                <NavigationViewItem x:Name="NavSettings" Content="应用设置" Tag="settings"
+                                    ToolTipService.ToolTip="报告目录 / 实例目录根 / 默认工作区（Win/WSL）/ dshCommand / 市场源与刷新间隔">
                     <NavigationViewItem.Icon>
                         <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="15" />
                     </NavigationViewItem.Icon>
@@ -126,9 +126,9 @@
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,4">
                                 <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE713;" FontSize="15"
                                           Foreground="{ThemeResource LabelSecondaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="全局设置" FontSize="18" FontWeight="SemiBold"
+                                <TextBlock Text="应用设置" FontSize="18" FontWeight="SemiBold"
                                            Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
-                                <TextBlock Text="作用于所有环境与实例的共享配置" Style="{StaticResource FooterText}"
+                                <TextBlock Text="作用于整个控制器应用与所有实例的共享配置" Style="{StaticResource FooterText}"
                                            VerticalAlignment="Center" Margin="4,1,0,0" />
                             </StackPanel>
 
@@ -171,12 +171,37 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="新实例默认工作区" Style="{StaticResource FieldLabel}"
+                                        <TextBlock Grid.Column="0" Text="Win 工作区" Style="{StaticResource FieldLabel}"
                                                    Width="{StaticResource SettingsLabelWidth}"
-                                                   ToolTipService.ToolTip="新建/克隆实例对话框中工作目录的默认值；留空则回退为当前选中实例的工作目录" />
-                                        <TextBox Grid.Column="1" x:Name="TxtNewWs" Style="{StaticResource InputBox}"
+                                                   ToolTipService.ToolTip="新建/克隆 Windows 实例对话框中工作目录的默认值；留空则回退为当前选中实例的工作目录" />
+                                        <TextBox Grid.Column="1" x:Name="TxtNewWsWin" Style="{StaticResource InputBox}"
                                                  PlaceholderText="留空 = 继承当前选中实例的工作目录" />
-                                        <Button Grid.Column="2" x:Name="BtnBrowseNewWs" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseNewWs_Click" />
+                                        <Button Grid.Column="2" x:Name="BtnBrowseNewWsWin" Style="{StaticResource BtnCompact}" Content="浏览…" Click="BtnBrowseNewWs_Click" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="WSL 工作区" Style="{StaticResource FieldLabel}"
+                                                   Width="{StaticResource SettingsLabelWidth}"
+                                                   ToolTipService.ToolTip="新建/克隆 WSL 实例对话框中工作目录的默认值（发行版内路径，如 ~/dsh-workspaces）；留空则回退为当前选中实例的工作目录" />
+                                        <TextBox Grid.Column="1" x:Name="TxtNewWsWsl" Style="{StaticResource InputBox}"
+                                                 PlaceholderText="留空 = ~/dsh-workspaces 或继承当前选中实例" />
+                                    </Grid>
+
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="目录刷新间隔" Style="{StaticResource FieldLabel}"
+                                                   Width="{StaticResource SettingsLabelWidth}"
+                                                   ToolTipService.ToolTip="打开插件市场时，目录数据超过该间隔（小时）自动重新联网拉取；0 = 每次打开都刷新；拉取失败始终用本地缓存兜底" />
+                                        <TextBox Grid.Column="1" x:Name="TxtCatalogRefresh" Style="{StaticResource InputBox}" MinWidth="72" Text="24" />
+                                        <TextBlock Grid.Column="2" Text="小时（0 = 每次打开都刷新）" Style="{StaticResource FieldLabel}" />
                                     </Grid>
 
                                     <Grid ColumnSpacing="10">
@@ -252,15 +277,15 @@
                                            Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" Content="滚动：开" Click="BtnAutoScroll_Click" />
-                                <Button x:Name="BtnCopyLog" Style="{StaticResource BtnCompact}" Content="复制日志" Click="BtnCopyLog_Click"
+                                <Button x:Name="BtnAutoScroll" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="滚动：开" Click="BtnAutoScroll_Click" />
+                                <Button x:Name="BtnCopyLog" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="复制日志" Click="BtnCopyLog_Click"
                                         ToolTipService.ToolTip="把控制台全部日志复制到剪贴板" />
-                                <Button x:Name="BtnClearLog" Style="{StaticResource BtnCompact}" Content="清空" Click="BtnClearLog_Click" />
-                                <Button x:Name="BtnOpenReportDir" Style="{StaticResource BtnCompact}" Content="打开报告目录" Click="BtnOpenReportDir_Click"
+                                <Button x:Name="BtnClearLog" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="清空" Click="BtnClearLog_Click" />
+                                <Button x:Name="BtnOpenReportDir" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Content="打开报告目录" Click="BtnOpenReportDir_Click"
                                         ToolTipService.ToolTip="在资源管理器中打开错误报告保存目录" />
                             </StackPanel>
                             <!-- 右侧收起/展开按钮（常驻） -->
-                            <Button Grid.Column="3" x:Name="BtnConsoleToggle" Style="{StaticResource BtnCompact}" Margin="8,0,0,0"
+                            <Button Grid.Column="3" x:Name="BtnConsoleToggle" Style="{StaticResource BtnCompact}" MinHeight="26" Padding="10,3" Margin="8,0,0,0"
                                     Click="BtnConsoleToggle_Click"
                                     ToolTipService.ToolTip="收起/展开控制台日志（默认收起，日志仍在后台记录）">
                                 <StackPanel Orientation="Horizontal" Spacing="5">

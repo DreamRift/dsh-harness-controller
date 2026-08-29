@@ -204,13 +204,15 @@ namespace DshController
             if (_consoleVisible) ScrollLogToEnd();
         }
 
-        // ==================== 全局设置 ====================
+        // ==================== 应用设置 ====================
 
         private void LoadGlobalSettings()
         {
             TxtReportDir.Text = _registry.Settings.ErrorReportDir;
             TxtHomeRoot.Text = _registry.Settings.HomeRoot;
-            TxtNewWs.Text = _registry.Settings.NewInstanceWorkspace;
+            TxtNewWsWin.Text = _registry.Settings.NewInstanceWorkspaceWin;
+            TxtNewWsWsl.Text = _registry.Settings.NewInstanceWorkspaceWsl;
+            TxtCatalogRefresh.Text = Math.Max(0, _registry.Settings.PluginAutoRefreshHours).ToString();
             TxtDshCommand.Text = _registry.Settings.DshCommand;
             TxtRegistry.Text = _registry.Settings.PluginRegistryUrl;
         }
@@ -219,13 +221,17 @@ namespace DshController
         {
             _registry.Settings.ErrorReportDir = TxtReportDir.Text.Trim();
             _registry.Settings.HomeRoot = TxtHomeRoot.Text.Trim();
-            _registry.Settings.NewInstanceWorkspace = TxtNewWs.Text.Trim();
+            _registry.Settings.NewInstanceWorkspaceWin = TxtNewWsWin.Text.Trim();
+            _registry.Settings.NewInstanceWorkspaceWsl = TxtNewWsWsl.Text.Trim();
+            // 刷新间隔：非法输入保持原值；负数按 0（每次打开都刷新）处理
+            if (int.TryParse(TxtCatalogRefresh.Text.Trim(), out int hours))
+                _registry.Settings.PluginAutoRefreshHours = Math.Max(0, hours);
             _registry.Settings.DshCommand = TxtDshCommand.Text.Trim();
             _registry.Settings.PluginRegistryUrl = TxtRegistry.Text.Trim();
             _registry.Settings.Theme = _theme;
             try { _registry.Save(); } catch { }
             Nav.SelectedItem = NavWin;
-            AppendLog("全局设置已保存（报告目录: " +
+            AppendLog("应用设置已保存（报告目录: " +
                 (string.IsNullOrEmpty(_registry.Settings.ErrorReportDir)
                     ? "默认" : _registry.Settings.ErrorReportDir) + "）");
             UpdateFooter();
@@ -235,7 +241,7 @@ namespace DshController
         {
             LoadGlobalSettings();
             Nav.SelectedItem = NavWin;
-            AppendLog("全局设置已取消");
+            AppendLog("应用设置已取消");
         }
 
         private async void BtnBrowseRd_Click(object sender, RoutedEventArgs e)
@@ -252,8 +258,8 @@ namespace DshController
 
         private async void BtnBrowseNewWs_Click(object sender, RoutedEventArgs e)
         {
-            string dir = await PickFolderAsync("选择新建实例默认工作区目录");
-            if (dir != null) TxtNewWs.Text = dir;
+            string dir = await PickFolderAsync("选择新建 Windows 实例默认工作区目录");
+            if (dir != null) TxtNewWsWin.Text = dir;
         }
 
         private async Task<string> PickFolderAsync(string title)

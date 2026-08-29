@@ -986,7 +986,7 @@ namespace DshController
                 var txtName = new TextBox { PlaceholderText = "实例名称，如 项目A" };
                 var txtPort = new TextBox { Text = suggested > 0 ? suggested.ToString() : "自动分配", PlaceholderText = "0 或空 = 由 dsh 分配" };
 
-                string inheritedWs = _registry.Settings.NewInstanceWorkspace?.Trim();
+                string inheritedWs = _registry.Settings.EffectiveNewInstanceWorkspaceFor(IsWslPanel)?.Trim();
                 if (string.IsNullOrWhiteSpace(inheritedWs))
                     inheritedWs = SelectedDef()?.Workspace;
                 if (IsWslPanel && !string.IsNullOrWhiteSpace(inheritedWs) && WslTools.IsWindowsPath(inheritedWs))

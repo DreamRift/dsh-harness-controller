@@ -6,7 +6,7 @@
 //
 //  v0.6.1 多来源：内置 官方全量 / GitHub精选（jsDelivr 镜像）/ GitHub实时 三个
 //  来源可多选（「数据源」按钮），多选时按 npm 包名或 owner/repo 合并去重，
-//  详情里可指定"从哪个源的条目安装"；自定义源 URL 保留（全局设置）。
+//  详情里可指定"从哪个源的条目安装"；自定义源 URL 保留（应用设置）。
 //  分类标签全部中文（来源官方中文分类 + 内置映射，未知代码原样显示不编造）。
 //
 //  安装严格走 DSH 官方命令（Core/PluginInstaller）：dsh plugin --profile <p> add，
@@ -148,7 +148,6 @@ namespace DshController
 
         private bool _closing;
         private bool _busy;
-        private bool _catalogStarted;
         private bool _loadingInstances;
         private bool _loadingCategory;
         private CatalogFile _catalog;                       // 已加载（合并去重）的目录数据
@@ -170,7 +169,7 @@ namespace DshController
             _console = console;
             _dq = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
             RefreshInstances();
-            ShowEmpty("正在加载插件目录…首次进入需要联网，之后 24 小时内复用缓存。");
+            ShowEmpty("正在加载插件目录…数据超过设置的刷新间隔时自动重新联网拉取，失败用本地缓存兜底。");
         }
 
         /// <summary>窗口关闭时终止后台动作。</summary>
@@ -179,20 +178,14 @@ namespace DshController
             _closing = true;
         }
 
-        /// <summary>MainWindow 切到本页时调用：惰性加载目录 / 刷新实例与已装状态。</summary>
+        /// <summary>MainWindow 切到本页时调用：按设置的刷新间隔自动更新目录，并刷新实例与已装状态。</summary>
         public void OnShown()
         {
             if (_closing || _busy) return;
             RefreshInstances();
-            if (!_catalogStarted)
-            {
-                _catalogStarted = true;
-                _ = LoadCatalogAsync(force: false);
-            }
-            else
-            {
-                _ = RefreshInstalledAsync();
-            }
+            // 每次进入都走一次加载：缓存新鲜（未超过设置的自动刷新间隔）时零成本，
+            // 超过间隔则自动重新联网拉取（拉取失败回退本地缓存）
+            _ = LoadCatalogAsync(force: false);
         }
 
         // ==================== 数据加载 ====================
@@ -209,7 +202,7 @@ namespace DshController
             if (_catalog == null || _catalog.Plugins.Count == 0)
             {
                 ShowEmpty("插件目录加载失败：所有启用来源都不可用。请点「数据源」检查来源选择、" +
-                          "点「刷新目录」重试，或在全局设置中更换自定义源。");
+                          "点「刷新」重试，或在应用设置中更换自定义源。");
                 return;
             }
             if (_catalog.Plugins.Count > 0)
@@ -821,7 +814,9 @@ namespace DshController
         private async void BtnRefreshCatalog_Click(object sender, RoutedEventArgs e)
         {
             if (_busy) return;
+            // 手动刷新 = 强制重新联网拉取目录 + 刷新当前实例的已装状态
             await LoadCatalogAsync(force: true);
+            await RefreshInstalledAsync();
         }
 
         private void BtnOpenHome_Click(object sender, RoutedEventArgs e)

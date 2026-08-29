@@ -31,9 +31,32 @@ namespace DshController.Core
         [JsonPropertyName("homeRoot")]
         public string HomeRoot { get; set; } = "";
 
-        /// <summary>新建实例默认工作区目录（v0.3.1）。</summary>
+        /// <summary>新建实例默认工作区目录（v0.3.1 旧字段，仅作向后兼容兜底；v0.6.1 起按环境拆分）。</summary>
         [JsonPropertyName("newInstanceWorkspace")]
         public string NewInstanceWorkspace { get; set; } = "";
+
+        /// <summary>新建 Windows 实例默认工作区（v0.6.1）；空 = 回退旧字段 NewInstanceWorkspace。</summary>
+        [JsonPropertyName("newInstanceWorkspaceWin")]
+        public string NewInstanceWorkspaceWin { get; set; } = "";
+
+        /// <summary>新建 WSL 实例默认工作区（v0.6.1，发行版内路径如 ~/dsh-workspaces）；空 = 回退旧字段。</summary>
+        [JsonPropertyName("newInstanceWorkspaceWsl")]
+        public string NewInstanceWorkspaceWsl { get; set; } = "";
+
+        /// <summary>
+        /// 插件市场目录自动刷新间隔（小时，v0.6.1）：打开插件市场时数据超过该间隔自动
+        /// 重新联网拉取；0 = 每次打开都刷新。默认 24。拉取失败始终回退本地缓存兜底。
+        /// </summary>
+        [JsonPropertyName("pluginAutoRefreshHours")]
+        public int PluginAutoRefreshHours { get; set; } = 24;
+
+        /// <summary>按环境取新建实例默认工作区：环境字段优先，回退旧字段（向后兼容）。</summary>
+        public string EffectiveNewInstanceWorkspaceFor(bool wsl)
+        {
+            string v = wsl ? NewInstanceWorkspaceWsl : NewInstanceWorkspaceWin;
+            if (!string.IsNullOrWhiteSpace(v)) return v;
+            return NewInstanceWorkspace ?? "";
+        }
 
         /// <summary>
         /// WSL 实例停止后的关闭策略（v0.5.0：在 WSL 标签页的"环境设置"中单独配置）：
