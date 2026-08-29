@@ -8,6 +8,7 @@
 // ============================================================================
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Text.Json.Serialization;
 
@@ -42,9 +43,16 @@ namespace DshController.Core
         [JsonPropertyName("wslShutdownPolicy")]
         public string WslShutdownPolicy { get; set; } = "smart";
 
-        /// <summary>插件市场目录源 URL（v0.6.0）；空 = 官方默认 awesome-dsh-plugin 快照，可填兼容镜像。</summary>
+        /// <summary>自定义插件市场源 URL（v0.6.0）；空 = 不使用自定义源。内置来源在「插件市场 → 数据源」选择。</summary>
         [JsonPropertyName("pluginRegistryUrl")]
         public string PluginRegistryUrl { get; set; } = "";
+
+        /// <summary>
+        /// 启用的内置市场来源 ID 列表（v0.6.1：official / curated / github-live，可多选，
+        /// 多选时合并去重）；null/空 = 默认 official + curated。自定义 URL 恒在（填了才生效）。
+        /// </summary>
+        [JsonPropertyName("pluginSources")]
+        public List<string> PluginSources { get; set; }
 
         /// <summary>解析后的实例目录根（配置值优先，否则默认目录）。</summary>
         [JsonIgnore]

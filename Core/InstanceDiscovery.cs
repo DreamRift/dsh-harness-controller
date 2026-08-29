@@ -234,6 +234,87 @@ namespace DshController.Core
             return rows;
         }
 
+        // ==================== 已安装未运行的发行版探测（v0.6.1） ====================
+
+        /// <summary>"已安装 dsh 但当前没有运行中后端"的发行版（主实例不开机也能被「扫描」发现）。</summary>
+        public sealed class DistroInstallInfo
+        {
+            public string Distro { get; set; } = "";
+            /// <summary>发行版内 dsh 版本（探测失败为空）。</summary>
+            public string DshVersion { get; set; } = "";
+            /// <summary>默认 ~/.dsh 是否已初始化（有 web profile）。</summary>
+            public bool HomeInitialized { get; set; }
+        }
+
+        /// <summary>
+        /// 枚举运行中发行版，找出"已安装 dsh 但没有运行中后端"的发行版。
+        /// 只探测当前运行中的发行版（不为扫描而拉起发行版）；distrosWithBackend
+        /// 中的发行版（已有运行中后端，走运行中发现）跳过。
+        /// </summary>
+        public static List<DistroInstallInfo> ScanInstalledDistros(ICollection<string> distrosWithBackend)
+        {
+            var result = new List<DistroInstallInfo>();
+            try
+            {
+                if (!WslTools.IsInstalledAsync().GetAwaiter().GetResult()) return result;
+                List<string> distros = WslTools.ListRunningDistrosAsync().GetAwaiter().GetResult();
+                foreach (string distro in distros)
+                {
+                    if (distrosWithBackend != null && distrosWithBackend.Contains(distro)) continue;
+                    DistroInstallInfo info = ProbeInstalledDistro(distro);
+                    if (info != null) result.Add(info);
+                }
+            }
+            catch { /* 发现失败不阻断扫描 */ }
+            return result;
+        }
+
+        /// <summary>
+        /// 单次 bash 探测一个发行版是否安装了 dsh：PATH（登录 shell）→ npm 全局根兜底。
+        /// 输出 DSHINST|&lt;--version 输出&gt;|&lt;yes|no&gt;|&lt;dsh路径&gt;；未安装无输出。
+        /// </summary>
+        private static DistroInstallInfo ProbeInstalledDistro(string distro)
+        {
+            try
+            {
+                string script =
+                    "p=$(command -v dsh 2>/dev/null || true); " +
+                    "if [ -z \"$p\" ]; then " +
+                      "nr=$(npm root -g 2>/dev/null || true); " +
+                      "if [ -n \"$nr\" ] && [ -f \"$nr/@deepseek-ai/dsh/package.json\" ]; then p=\"$nr/@deepseek-ai/dsh\"; fi; " +
+                    "fi; " +
+                    "if [ -n \"$p\" ]; then " +
+                      "v=$(dsh --version 2>/dev/null | head -n1); " +
+                      "h=no; [ -f \"$HOME/.dsh/profiles/web/cordis.yml\" ] && h=yes; " +
+                      "echo \"DSHINST|$v|$h|$p\"; " +
+                    "fi";
+                var r = WslTools.RunInDistroAsync(distro, script, 60000).GetAwaiter().GetResult();
+                return ParseInstallProbeOutput(distro, r.Output);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>解析 DSHINST|... 探测输出（自检共用）；未安装/解析失败返回 null。</summary>
+        public static DistroInstallInfo ParseInstallProbeOutput(string distro, string output)
+        {
+            foreach (string line in WslTools.SplitLines(output ?? ""))
+            {
+                if (!line.StartsWith("DSHINST|", StringComparison.Ordinal)) continue;
+                string[] seg = line.Split(new[] { '|' }, 4);
+                if (seg.Length < 4) continue;
+                return new DistroInstallInfo
+                {
+                    Distro = distro ?? "",
+                    DshVersion = HarnessVersion.Parse(seg[1]),
+                    HomeInitialized = seg[2].Trim() == "yes"
+                };
+            }
+            return null;
+        }
+
         // ==================== 既有辅助 ====================
 
         /// <summary>命令行是否像 Windows 侧的 dsh web 进程（dsh 字样 + web 子命令 + 该端口）。</summary>

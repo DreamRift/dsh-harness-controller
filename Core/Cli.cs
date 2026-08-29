@@ -13,6 +13,7 @@
 // ============================================================================
 
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -57,7 +58,62 @@ namespace DshController.Core
                 exitCode = PluginSelfTest.Run(args);
                 return true;
             }
+            if (a == "--catalog-check")
+            {
+                AttachConsoleOutput();
+                exitCode = CatalogCheck(args);
+                return true;
+            }
             return false; // 未知参数 → 继续启动 GUI（与 v0.1.0 行为一致）
+        }
+
+        /// <summary>
+        /// --catalog-check：联网拉取全部内置市场来源并解析合并（v0.6.1），
+        /// 打印各来源状态与合并结果，用于验证数据源可达性与解析正确性。
+        /// </summary>
+        private static int CatalogCheck(string[] args)
+        {
+            var transcript = new StringBuilder();
+            Action<string> Out = line => { transcript.AppendLine(line); try { Console.WriteLine(line); } catch { } };
+            try
+            {
+                Out("== 插件市场目录来源检查（--catalog-check）==");
+                var settings = new AppSettings();
+                for (int i = 1; i < args.Length; i++)
+                    if (args[i] == "--all")
+                        settings.PluginSources = new List<string> { "official", "curated", "github-live" };
+                foreach (MarketSource s in PluginCatalog.SelectSources(settings))
+                    Out("启用来源: " + s.Name + "（" + s.Urls[0] + "）");
+                MarketLoadResult r = PluginCatalog.LoadAllAsync(settings, force: true).GetAwaiter().GetResult();
+                Out("");
+                foreach (SourceStatus st in r.Statuses)
+                    Out(string.Format("  [{0}] {1}: {2}{3}",
+                        st.Ok ? "OK " : "FAIL", st.Name,
+                        st.Ok ? st.Count + " 条" + (st.FromCache ? "（过期缓存兜底）" : "") : st.Error,
+                        st.FromCache && st.Error.Length > 0 ? "（" + st.Error + "）" : ""));
+                Out("  合并去重后: " + r.Catalog.Plugins.Count + " 个插件");
+                if (r.Catalog.Plugins.Count > 0)
+                {
+                    CatalogEntry top = r.Catalog.Plugins[0];
+                    Out("  样例条目: " + top.Name +
+                        "（pkg=" + (top.Pkg.Length > 0 ? top.Pkg : "无") +
+                        " repo=" + (top.Repo.Length > 0 ? top.Repo : "无") +
+                        " 分类=" + PluginCatalog.CategoryLabel(top.Category) +
+                        " ★" + top.Stars + " 来源=" + string.Join("+", top.Sources ?? new List<string>()) + "）");
+                }
+                bool anyOk = r.Statuses.Any(s => s.Ok);
+                Out(anyOk ? "== 检查通过 ==" : "== 全部来源不可达 ==");
+                return anyOk ? 0 : 1;
+            }
+            catch (Exception ex)
+            {
+                Out("检查异常: " + ex.Message);
+                return 1;
+            }
+            finally
+            {
+                WriteCliLog(transcript);
+            }
         }
 
         /// <summary>版本号展示：空 → (未检测到)，否则加 v 前缀。</summary>

@@ -1,15 +1,18 @@
 // ============================================================================
-//  PluginMarketPanel — 插件市场交互（v0.6.0，code-behind，无 MVVM）
+//  PluginMarketPanel — 插件市场交互（v0.6.1，code-behind，无 MVVM）
 //
 //  与 InstancePanel 同一套面板模式：MainWindow 构造后 Init 注入依赖，页面切换
 //  只改可见性（OnShown 惰性加载目录）；控制台输出经回调汇入主窗口共享控制台。
+//
+//  v0.6.1 多来源：内置 官方全量 / GitHub精选（jsDelivr 镜像）/ GitHub实时 三个
+//  来源可多选（「数据源」按钮），多选时按 npm 包名或 owner/repo 合并去重，
+//  详情里可指定"从哪个源的条目安装"；自定义源 URL 保留（全局设置）。
+//  分类标签全部中文（来源官方中文分类 + 内置映射，未知代码原样显示不编造）。
 //
 //  安装严格走 DSH 官方命令（Core/PluginInstaller）：dsh plugin --profile <p> add，
 //  装到所选实例自己的 DSH_HOME（实例隔离）；安装成功后：
 //    - 对比安装前后实例 HOME 的包集合，把新增包写入市场安装记录（PluginRecords）；
 //    - bundle 插件提示重启，可一键重启（InstanceManager.RestartAsync）。
-//
-//  卡片数据类 MarketItem 配合 x:Bind 一次性绑定；安装态/已装标记通过重建列表刷新。
 // ============================================================================
 
 using System;
@@ -64,13 +67,33 @@ namespace DshController
                 var parts = new List<string>();
                 if (Entry == null) return "";
                 if (Entry.Stars > 0) parts.Add("★ " + Entry.Stars.ToString("N0"));
-                string cat = (Entry.Category ?? "").Trim();
+                string cat = string.IsNullOrWhiteSpace(Entry.CategoryLabel)
+                    ? (Entry.Category ?? "").Trim()
+                    : Entry.CategoryLabel;
                 if (cat.Length > 0) parts.Add(cat);
+                if (Entry.Downloads > 0) parts.Add("↓ " + Entry.Downloads.ToString("N0"));
                 string up = (Entry.UpdatedAt ?? "").Trim();
                 if (up.Length >= 10) parts.Add("更新 " + up.Substring(0, 10));
                 return string.Join(" · ", parts);
             }
         }
+
+        /// <summary>来源徽标（仅多来源合并时显示，如"官方全量+GitHub精选"）。</summary>
+        public string SourceText
+        {
+            get
+            {
+                var src = Entry?.Sources;
+                if (src == null || src.Count < 2) return "";
+                return "来源 " + src.Count + " 源";
+            }
+        }
+
+        public Visibility MultiSourceVis =>
+            Entry?.Sources != null && Entry.Sources.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
+
+        public Visibility UnverifiedVis =>
+            Entry != null && Entry.Unverified ? Visibility.Visible : Visibility.Collapsed;
 
         public string PkgText
         {
@@ -104,7 +127,9 @@ namespace DshController
             {
                 if (Entry == null) return "";
                 if (!Entry.Installable)
-                    return Entry.DshBundle ? "未确定安装来源（无 npm 包名且无仓库）" : "插件未声明 dsh.bundle，目录只作浏览";
+                    return "未确定安装来源（无 npm 包名且无仓库），仅可浏览";
+                if (Entry.Unverified)
+                    return "dsh plugin add " + Entry.InstallTarget + "（未审核条目，安装前会再确认）";
                 return "dsh plugin add " + Entry.InstallTarget + "（官方方式，装到所选实例）";
             }
         }
@@ -121,7 +146,8 @@ namespace DshController
         private bool _busy;
         private bool _catalogStarted;
         private bool _loadingInstances;
-        private CatalogFile _catalog;                       // 已加载的目录数据
+        private bool _loadingCategory;
+        private CatalogFile _catalog;                       // 已加载（合并去重）的目录数据
         private string _instanceId = "";
         private string _instanceVersion = "";               // 所选实例的 harness 版本
         private List<InstalledPlugin> _installed = new List<InstalledPlugin>();
@@ -170,29 +196,140 @@ namespace DshController
         private async Task LoadCatalogAsync(bool force)
         {
             SetBusy(true, force ? "正在刷新插件目录…" : "正在加载插件目录…");
-            CatalogLoadResult r = await PluginCatalog.LoadAsync(_registry.Settings.PluginRegistryUrl, force);
+            MarketLoadResult r = await PluginCatalog.LoadAllAsync(_registry.Settings, force);
             SetBusy(false, "");
             _catalog = r.Catalog;
-            TxtFreshness.Text = r.FreshnessText + " · 源 " + SourceLabel(r.SourceUrl);
+            TxtFreshness.Text = r.SummaryText;
+            UpdateSourcesLabel();
+            PushLog("[市场] " + r.SummaryText);
             if (_catalog == null || _catalog.Plugins.Count == 0)
             {
-                PushLog("[市场] 插件目录加载失败" + (r.Error.Length > 0 ? "：" + r.Error : "") +
-                        "。可在全局设置中更换「插件市场源」后重试。");
-                ShowEmpty("插件目录加载失败（" + (r.Error.Length > 0 ? r.Error : "无数据") +
-                          "）。请点击「刷新目录」重试，或在全局设置中更换插件市场源。");
+                ShowEmpty("插件目录加载失败：所有启用来源都不可用。请点「数据源」检查来源选择、" +
+                          "点「刷新目录」重试，或在全局设置中更换自定义源。");
                 return;
             }
-            PushLog("[市场] 插件目录已加载：" + _catalog.Plugins.Count + " 条（" + r.FreshnessText + "）");
+            if (_catalog.Plugins.Count > 0)
+                PushLog("[市场] 合并去重后共 " + _catalog.Plugins.Count + " 个插件");
+            RebuildCategoryCombo();
             if (SelectedDef() == null) _instanceVersion = "";
             RebuildList();
         }
 
-        private static string SourceLabel(string url)
+        /// <summary>分类下拉重建：合并数据里出现过的分类，中文标签展示，按条目数排序。</summary>
+        private void RebuildCategoryCombo()
         {
-            string u = url ?? "";
-            if (u.Contains("awesome-dsh-plugin.com")) return "awesome-dsh-plugin 官方目录";
-            if (u.Contains("githubusercontent.com")) return "GitHub 精选快照";
-            return u.Length > 40 ? u.Substring(0, 40) + "…" : u;
+            string selected = SelectedCategory();
+            var items = new List<object> { new ComboBoxItem { Content = "全部分类", Tag = "" } };
+            foreach (KeyValuePair<string, int> kv in PluginCatalog.DistinctCategories(_catalog))
+            {
+                var item = new ComboBoxItem
+                {
+                    Content = PluginCatalog.CategoryLabel(kv.Key),
+                    Tag = kv.Key
+                };
+                ToolTipService.SetToolTip(item, kv.Key + " · " + kv.Value + " 个插件");
+                items.Add(item);
+            }
+            _loadingCategory = true;
+            try
+            {
+                CmbCategory.ItemsSource = items;
+                ComboBoxItem match = items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => string.Equals(i.Tag as string, selected, StringComparison.OrdinalIgnoreCase));
+                if (match != null) CmbCategory.SelectedItem = match;
+                else CmbCategory.SelectedIndex = 0;
+            }
+            finally { _loadingCategory = false; }
+        }
+
+        // ==================== 数据源选择 ====================
+
+        private async void BtnSources_Click(object sender, RoutedEventArgs e)
+        {
+            List<string> current = _registry.Settings.PluginSources;
+            var selected = new HashSet<string>((current == null || current.Count == 0)
+                ? new[] { "official", "curated" } : current, StringComparer.OrdinalIgnoreCase);
+
+            var panel = new StackPanel { Spacing = 10, MinWidth = 460, MaxWidth = 560 };
+            var boxes = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase);
+            foreach (MarketSource s in MarketSources.BuiltIn)
+            {
+                var box = new CheckBox
+                {
+                    IsChecked = selected.Contains(s.Id),
+                    Content = BuildSourceCaption(s.Name, s.Note)
+                };
+                panel.Children.Add(box);
+                boxes[s.Id] = box;
+            }
+            panel.Children.Add(new TextBlock
+            {
+                Text = "多选时按 npm 包名 / GitHub 仓库合并去重，详情里可选择从哪个源的条目安装。",
+                FontSize = 11.5,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Application.Current.Resources["LabelTertiaryBrush"] as Brush
+            });
+
+            var txtCustom = new TextBox
+            {
+                Text = _registry.Settings.PluginRegistryUrl ?? "",
+                PlaceholderText = "留空 = 不使用自定义源",
+                Style = (Style)Application.Current.Resources["InputBox"]
+            };
+            panel.Children.Add(new TextBlock
+            {
+                Text = "自定义源 URL（可选，兼容官方快照同构 JSON 或旧接口规范）：",
+                FontSize = 12,
+                Foreground = Application.Current.Resources["LabelSecondaryBrush"] as Brush
+            });
+            panel.Children.Add(txtCustom);
+
+            var dlg = new ContentDialog
+            {
+                Title = "目录数据源",
+                Content = panel,
+                PrimaryButtonText = "保存并重新加载",
+                CloseButtonText = "取消",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot
+            };
+            if (await dlg.ShowAsync() != ContentDialogResult.Primary) return;
+
+            var ids = boxes.Where(kv => kv.Value.IsChecked == true).Select(kv => kv.Key).ToList();
+            _registry.Settings.PluginSources = ids;
+            _registry.Settings.PluginRegistryUrl = txtCustom.Text.Trim();
+            try { _registry.Save(); } catch { }
+            UpdateSourcesLabel();
+            PushLog("[市场] 数据源已更新：" +
+                    (ids.Count > 0 ? string.Join("、", ids) : "（无内置来源）") +
+                    (_registry.Settings.PluginRegistryUrl.Length > 0 ? " + 自定义源" : ""));
+            await LoadCatalogAsync(force: true);
+        }
+
+        private static StackPanel BuildSourceCaption(string name, string note)
+        {
+            var sp = new StackPanel { Spacing = 1 };
+            sp.Children.Add(new TextBlock
+            {
+                Text = name,
+                FontSize = 13,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                Foreground = Application.Current.Resources["LabelPrimaryBrush"] as Brush
+            });
+            sp.Children.Add(new TextBlock
+            {
+                Text = note,
+                FontSize = 11.5,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Application.Current.Resources["LabelTertiaryBrush"] as Brush
+            });
+            return sp;
+        }
+
+        private void UpdateSourcesLabel()
+        {
+            List<MarketSource> chosen = PluginCatalog.SelectSources(_registry.Settings);
+            TxtSourcesLabel.Text = "数据源(" + chosen.Count + ")";
         }
 
         // ==================== 实例选择 ====================
@@ -299,7 +436,11 @@ namespace DshController
 
         private void TxtSearch_TextChanged(object sender, TextChangedEventArgs e) => RebuildList();
 
-        private void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e) => RebuildList();
+        private void Filter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loadingCategory) return;
+            RebuildList();
+        }
 
         private void Filter_Toggled(object sender, RoutedEventArgs e) => RebuildList();
 
@@ -415,6 +556,8 @@ namespace DshController
                 msg.AppendLine().AppendLine("⚠ 该实例未配置独立 HOME，插件将装入默认 ~/.dsh，与其他默认实例共享、无法隔离。");
             if (!initialized)
                 msg.AppendLine().AppendLine("⚠ 该实例 HOME 尚未初始化（还没启动过 dsh），建议先在实例页启动一次再安装。");
+            if (item.Entry.Unverified)
+                msg.AppendLine().AppendLine("⚠ 该条目来自 GitHub 实时搜索，未经人工审核，请确认插件来源可信后再安装。");
             msg.AppendLine().AppendLine("bundle 插件安装后需重启实例才会生效。确认安装？");
             if (!await ConfirmAsync(msg.ToString(), "安装插件到「" + def.Name + "」")) return;
 
@@ -532,10 +675,13 @@ namespace DshController
                 });
             panel.Children.Add(new TextBlock
             {
-                Text = "分类 " + (string.IsNullOrWhiteSpace(en.Category) ? "未分类" : en.Category) +
+                Text = "分类 " + (string.IsNullOrWhiteSpace(en.CategoryLabel) && string.IsNullOrWhiteSpace(en.Category)
+                           ? "未分类"
+                           : PluginCatalog.CategoryLabel(en.Category)) +
                        " · ★ " + en.Stars.ToString("N0") +
                        (en.UpdatedAt.Length >= 10 ? " · 更新 " + en.UpdatedAt.Substring(0, 10) : "") +
-                       (en.Verified ? " · 已人工复核" : ""),
+                       (en.Verified ? " · 已人工复核" : "") +
+                       (en.Unverified ? " · 未审核" : ""),
                 FontSize = 12,
                 Foreground = Application.Current.Resources["LabelTertiaryBrush"] as Brush
             });
@@ -584,6 +730,44 @@ namespace DshController
                 XamlRoot = XamlRoot
             };
             if (en.Installable && !_busy) dlg.PrimaryButtonText = "安装到所选实例";
+
+            // 多来源合并：列出各源变体，可选择"从哪个源的条目安装"
+            List<CatalogEntry> variants = en.Variants;
+            if (variants != null && variants.Count > 1)
+            {
+                panel.Children.Add(new TextBlock
+                {
+                    Text = "该插件在 " + variants.Count + " 个来源中都有收录，选择要使用的条目：",
+                    FontSize = 12,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = Application.Current.Resources["LabelSecondaryBrush"] as Brush
+                });
+                foreach (CatalogEntry v in variants)
+                {
+                    var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+                    row.Children.Add(new TextBlock
+                    {
+                        Text = (v.SourceName ?? v.SourceId) + " · ★ " + v.Stars.ToString("N0") +
+                               (v.Unverified ? " · 未审核" : "") +
+                               (v.MinHost.Trim().Length > 0 ? " · 支持 DSH ≥ " + PluginCompat.FloorOfRange(v.MinHost) : ""),
+                        FontSize = 12,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Foreground = Application.Current.Resources["LabelSecondaryBrush"] as Brush
+                    });
+                    var btn = new Button
+                    {
+                        Content = "从此源安装",
+                        Style = (Style)Application.Current.Resources["BtnCompact"]
+                    };
+                    btn.Click += (s, ev) =>
+                    {
+                        dlg.Hide();
+                        if (!_busy) _ = InstallEntryAsync(new MarketItem { Entry = v });
+                    };
+                    row.Children.Add(btn);
+                    panel.Children.Add(row);
+                }
+            }
 
             // 兼容信息兜底查询（minHost 缺失 → npm registry 包元数据）
             if (en.MinHost.Trim().Length == 0)
@@ -659,6 +843,7 @@ namespace DshController
             BusyRing.IsActive = busy;
             TxtStatus.Text = text ?? "";
             BtnRefreshCatalog.IsEnabled = !busy;
+            BtnSources.IsEnabled = !busy;
             CmbInstance.IsEnabled = !busy;
         }
 

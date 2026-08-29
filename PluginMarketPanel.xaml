@@ -37,6 +37,7 @@
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                 <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="15"
@@ -47,10 +48,18 @@
                            VerticalAlignment="Center" Margin="4,1,0,0" />
             </StackPanel>
             <TextBlock Grid.Column="2" x:Name="TxtFreshness" Style="{StaticResource FooterText}"
-                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420"
-                       ToolTipService.ToolTip="目录数据来源与抓取时间（24 小时内复用缓存）" />
-            <Button Grid.Column="3" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnCompact}"
-                    Click="BtnRefreshCatalog_Click" ToolTipService.ToolTip="忽略缓存，重新从目录源拉取">
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="380"
+                       ToolTipService.ToolTip="各来源加载状态与数据时间（24 小时内复用缓存）" />
+            <Button Grid.Column="3" x:Name="BtnSources" Style="{StaticResource BtnCompact}"
+                    Click="BtnSources_Click"
+                    ToolTipService.ToolTip="选择启用的目录来源（可多选，多选时合并去重），并设置自定义源 URL">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;" FontSize="12" />
+                    <TextBlock x:Name="TxtSourcesLabel" Text="数据源" />
+                </StackPanel>
+            </Button>
+            <Button Grid.Column="4" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnCompact}"
+                    Click="BtnRefreshCatalog_Click" ToolTipService.ToolTip="忽略缓存，重新从全部启用来源拉取">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
                     <TextBlock Text="刷新目录" />
@@ -101,16 +110,9 @@
             </Grid.ColumnDefinitions>
             <TextBox Grid.Column="0" x:Name="TxtSearch" Style="{StaticResource InputBox}" PlaceholderText="搜索插件：名称 / 简介 / 包名 / 标签（支持中文与英文）"
                      TextChanged="TxtSearch_TextChanged" />
-            <ComboBox Grid.Column="1" x:Name="CmbCategory" MinWidth="120" MinHeight="34" SelectionChanged="Filter_SelectionChanged"
-                      ToolTipService.ToolTip="按目录分类过滤">
+            <ComboBox Grid.Column="1" x:Name="CmbCategory" MinWidth="130" MinHeight="34" SelectionChanged="Filter_SelectionChanged"
+                      ToolTipService.ToolTip="按分类过滤（中文标签，取自各来源的官方分类）">
                 <ComboBoxItem Content="全部分类" IsSelected="True" Tag="" />
-                <ComboBoxItem Content="tool" Tag="tool" />
-                <ComboBoxItem Content="ui" Tag="ui" />
-                <ComboBoxItem Content="dev" Tag="dev" />
-                <ComboBoxItem Content="agent" Tag="agent" />
-                <ComboBoxItem Content="data" Tag="data" />
-                <ComboBoxItem Content="session" Tag="session" />
-                <ComboBoxItem Content="other" Tag="other" />
             </ComboBox>
             <ComboBox Grid.Column="2" x:Name="CmbSort" MinWidth="104" MinHeight="34" SelectionChanged="Filter_SelectionChanged"
                       ToolTipService.ToolTip="排序方式">
@@ -141,11 +143,17 @@
                                         <Border Style="{StaticResource Chip}" Visibility="{x:Bind VerifiedVis}">
                                             <TextBlock Text="✓ 人工复核" Style="{StaticResource ChipText}" />
                                         </Border>
+                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind UnverifiedVis}">
+                                            <TextBlock Text="未审核" Style="{StaticResource ChipText}" />
+                                        </Border>
                                         <Border Style="{StaticResource Chip}" Visibility="{x:Bind InstalledVis}">
                                             <TextBlock Text="已安装" Style="{StaticResource ChipText}" />
                                         </Border>
+                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind MultiSourceVis}">
+                                            <TextBlock Text="{x:Bind SourceText}" Style="{StaticResource ChipText}" />
+                                        </Border>
                                         <Border Style="{StaticResource Chip}" Visibility="{x:Bind BrowseVis}">
-                                            <TextBlock Text="未提供 dsh.bundle · 仅浏览" Style="{StaticResource ChipText}" />
+                                            <TextBlock Text="未提供安装来源 · 仅浏览" Style="{StaticResource ChipText}" />
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="{x:Bind MetaText}" Style="{StaticResource FooterText}" />

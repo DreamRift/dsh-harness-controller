@@ -31,36 +31,101 @@ namespace DshController.Core
             string tmpRecords = Path.Combine(Path.GetTempPath(), "dsh-plugin-records-selftest");
             try { if (Directory.Exists(tmpRecords)) Directory.Delete(tmpRecords, true); } catch { }
 
-            // ---------- 1) 目录解析 ----------
-            Console.WriteLine("[1] 目录 JSON 解析");
+            // ---------- 1) 目录解析（真实来源 schema 自适应） ----------
+            Console.WriteLine("[1] 目录 JSON 解析（四种真实形态）");
             {
-                string json = @"{
-  ""version"": 1,
-  ""updatedAt"": ""2026-08-29T03:00:00Z"",
-  ""source"": ""awesome-dsh-plugin"",
+                // ① 官方全量快照（awesome-dsh-plugin.com/plugins.json 实测结构）
+                string officialJson = @"{
+  ""name"": ""awesome-dsh-plugin"", ""updated"": ""2026-08-28"", ""count"": 2,
+  ""categories"": { ""ui"": { ""en"": ""UI Enhancements"", ""zh"": ""UI 增强"" } },
   ""plugins"": [
-    { ""name"": ""示例插件"", ""pkg"": ""@scope/dsh-demo"", ""repo"": ""scope/dsh-demo"",
-      ""desc"": ""演示用插件"", ""category"": ""tool"", ""stars"": 120,
-      ""verified"": true, ""dshBundle"": true, ""minHost"": "">=0.4.2"",
-      ""tags"": [""demo""], ""brandNewField"": {""x"": 1} },
-    { ""name"": ""浏览专用"", ""pkg"": """", ""repo"": ""scope/browse-only"",
-      ""desc"": ""没有 bundle"", ""category"": ""ui"", ""stars"": 50, ""dshBundle"": false },
-    { ""name"": ""坏数据无名称"", ""stars"": 1 }
+    { ""name"": ""dsh-status-rotator"", ""owner"": ""01Virex"",
+      ""url"": ""https://github.com/01Virex/dsh-status-rotator"",
+      ""category"": ""ui"",
+      ""description"": { ""en"": ""Rotating status phrases."", ""zh"": ""把回合状态替换成轮换文案。"" },
+      ""npm"": ""dsh-status-rotator"", ""stars"": 55, ""downloads"": 2436,
+      ""install"": ""dsh plugin --profile web add dsh-status-rotator"" },
+    { ""name"": ""no-npm-plugin"", ""owner"": ""o"",
+      ""url"": ""https://github.com/o/no-npm-plugin"", ""category"": ""tools"",
+      ""description"": ""plain string desc"", ""stars"": 3 }
   ]
 }";
-                CatalogFile file = PluginCatalog.Parse(json);
-                Check(file != null && file.Plugins.Count == 3, "根对象形态解析", file == null ? "null" : file.Plugins.Count + " 条");
-                Check(file.Plugins[0].Extra != null && file.Plugins[0].Extra.ContainsKey("brandNewField"),
-                    "未知字段经 JsonExtensionData 保留");
-                Check(file.Plugins[0].InstallTarget == "@scope/dsh-demo" && file.Plugins[0].Installable,
-                    "npm 包名优先的安装目标");
-                Check(!file.Plugins[1].Installable && file.Plugins[1].InstallTarget == "github:scope/browse-only",
-                    "pkg 空时退回 github: 来源，dshBundle=false 不可装");
+                List<CatalogEntry> official = PluginCatalog.ParseSourceJson(
+                    officialJson, MarketSourceKind.JsonCatalog, out string err1);
+                Check(official != null && official.Count == 2, "官方快照解析", official == null ? err1 : official.Count + " 条");
+                Check(official[0].Pkg == "dsh-status-rotator" && official[0].Repo == "01Virex/dsh-status-rotator",
+                    "官方快照: npm 包名 + 从 url 提取 owner/repo");
+                Check(official[0].Desc == "把回合状态替换成轮换文案。" && official[0].DescEn.Length > 0,
+                    "官方快照: 中英双语简介");
+                Check(official[0].Installable && official[0].Verified && official[0].DshBundle,
+                    "官方快照: 有 npm 即可安装且已审核");
+                Check(official[0].UpdatedAt == "2026-08-28", "官方快照: 顶层 updated 透传");
+                Check(PluginCatalog.CategoryLabel("ui") == "UI 增强",
+                    "分类动态映射: 官方 categories.zh 进动态表", PluginCatalog.CategoryLabel("ui"));
+                Check(PluginCatalog.CategoryLabel("tools") == "工具", "分类内置映射: tools→工具");
+                Check(PluginCatalog.CategoryLabel("totally-new-cat") == "totally-new-cat",
+                    "分类未知代码原样显示不编造");
 
-                CatalogFile arr = PluginCatalog.Parse(
-                    @"[{""name"":""条目A"",""pkg"":""a""},{""name"":""条目B"",""pkg"":""b""}]");
-                Check(arr != null && arr.Plugins.Count == 2, "根数组形态解析");
-                Check(PluginCatalog.Parse("not json at all") == null, "坏数据返回 null 不抛异常");
+                // ② 精选快照（market.json 实测结构）
+                string curatedJson = @"{
+  ""schema_version"": 1, ""generated_at"": ""2026-08-29T02:00:43Z"",
+  ""entries"": [
+    { ""id"": 1, ""full_name"": ""yjh051108/dsh-routing-suite"",
+      ""description"": ""injector + router kit"",
+      ""stargazers_count"": 6929, ""pushed_at"": ""2026-08-28T19:03:44Z"",
+      ""category"": ""developer-tools"", ""category_zh"": ""开发者工具"" }
+  ]
+}";
+                List<CatalogEntry> curated = PluginCatalog.ParseSourceJson(
+                    curatedJson, MarketSourceKind.JsonCatalog, out _);
+                Check(curated != null && curated.Count == 1 && curated[0].Repo == "yjh051108/dsh-routing-suite",
+                    "精选快照: full_name 入库");
+                Check(curated[0].InstallTarget == "github:yjh051108/dsh-routing-suite" && curated[0].Installable,
+                    "精选快照: github: 安装目标");
+                Check(curated[0].CategoryLabel == "开发者工具", "精选快照: category_zh 中文分类");
+
+                // ③ GitHub 实时搜索（items）
+                string githubJson = @"{ ""total_count"": 1, ""items"": [
+    { ""full_name"": ""someone/dsh-brand-new"", ""html_url"": ""https://github.com/someone/dsh-brand-new"",
+      ""description"": ""new plugin"", ""stargazers_count"": 7,
+      ""pushed_at"": ""2026-08-29T00:00:00Z"" } ] }";
+                List<CatalogEntry> gh = PluginCatalog.ParseSourceJson(
+                    githubJson, MarketSourceKind.GithubTopic, out _);
+                Check(gh != null && gh.Count == 1 && gh[0].Unverified && !gh[0].Verified && gh[0].Installable,
+                    "GitHub 搜索: 未审核标记 + 可安装（装前确认）");
+
+                // ④ 旧接口规范（自定义源兼容）
+                string specJson = @"{ ""plugins"": [
+    { ""name"": ""示例"", ""pkg"": ""@scope/dsh-demo"", ""repo"": ""scope/dsh-demo"",
+      ""desc"": ""演示"", ""category"": ""tool"", ""stars"": 120, ""verified"": true,
+      ""dshBundle"": true, ""minHost"": "">=0.4.2"" } ] }";
+                List<CatalogEntry> spec = PluginCatalog.ParseSourceJson(
+                    specJson, MarketSourceKind.JsonCatalog, out _);
+                Check(spec != null && spec.Count == 1 && spec[0].Pkg == "@scope/dsh-demo" &&
+                    spec[0].MinHost == ">=0.4.2" && spec[0].Verified,
+                    "旧接口规范（自定义源）解析");
+                Check(PluginCatalog.ParseSourceJson("not json at all", MarketSourceKind.JsonCatalog, out _) == null,
+                    "坏数据返回 null 不抛异常");
+
+                // 合并去重：官方（npm 包名）与精选（仓库）收同一插件 → 合并为一条
+                var srcA = new List<CatalogEntry>
+                {
+                    new CatalogEntry { Name = "demo", Pkg = "dsh-demo", Repo = "a/dsh-demo",
+                        Stars = 100, Verified = true, Desc = "", SourceName = "官方全量" }
+                };
+                var srcB = new List<CatalogEntry>
+                {
+                    new CatalogEntry { Name = "a/dsh-demo", Repo = "a/dsh-demo",
+                        Stars = 90, Verified = true, Desc = "中文简介", SourceName = "GitHub精选" }
+                };
+                List<CatalogEntry> merged = PluginCatalog.Merge(new[] { srcA, srcB });
+                Check(merged.Count == 1 && merged[0].Sources.Count == 2 && merged[0].Variants.Count == 2,
+                    "合并去重: 同一插件（pkg 与 repo 同指）只留一条", "来源=" + string.Join("+", merged[0].Sources));
+                Check(merged[0].Pkg == "dsh-demo" && merged[0].Stars == 100,
+                    "合并取最优变体（npm 包名优先保留，其次 star）");
+
+                var srcC = new List<CatalogEntry> { new CatalogEntry { Name = "b/other", Repo = "b/other" } };
+                Check(PluginCatalog.Merge(new[] { srcA, srcC }).Count == 2, "不同插件不合并且不丢条目");
             }
 
             // ---------- 2) 过滤与排序 ----------
@@ -85,10 +150,28 @@ namespace DshController.Core
                 Check(cat.Count == 2, "分类过滤");
 
                 var installable = PluginCatalog.Filter(file, new PluginCatalog.FilterOptions { OnlyInstallable = true });
-                Check(installable.Count == 2 && installable.All(p => p.Installable), "仅可安装过滤");
+                Check(installable.Count == 3 && installable.All(p => p.Installable),
+                    "仅可安装过滤（v0.6.1: 有 npm 或仓库来源即可装）");
 
                 var verified = PluginCatalog.Filter(file, new PluginCatalog.FilterOptions { OnlyVerified = true });
                 Check(verified.Count == 1 && verified[0].Name == "Beta", "仅 verified 过滤");
+
+                var cats = PluginCatalog.DistinctCategories(file);
+                Check(cats.Count == 2 && cats[0].Key == "tool", "分类统计（下拉构建用）按数量降序");
+            }
+
+            // ---------- 2.5) GitHub 仓库 URL 提取与 WSL 安装探测解析 ----------
+            Console.WriteLine("[2.5] RepoFromUrl 与安装探测解析");
+            {
+                Check(PluginCatalog.RepoFromUrl("https://github.com/o/r") == "o/r", "RepoFromUrl: 标准 URL");
+                Check(PluginCatalog.RepoFromUrl("https://github.com/o/r.git/") == "o/r", "RepoFromUrl: .git 与尾斜杠");
+                Check(PluginCatalog.RepoFromUrl("https://gitlab.com/o/r") == "", "RepoFromUrl: 非 GitHub 返回空");
+
+                var info = InstanceDiscovery.ParseInstallProbeOutput("Ubuntu-26.04",
+                    "DSHINST|dsh 版本 0.1.1-rc.2 (x64)|yes|/home/x/bin/dsh");
+                Check(info != null && info.Distro == "Ubuntu-26.04" && info.DshVersion == "0.1.1-rc.2" && info.HomeInitialized,
+                    "安装探测输出解析: 版本 + HOME 状态");
+                Check(InstanceDiscovery.ParseInstallProbeOutput("D", "") == null, "安装探测: 未安装（无输出）返回 null");
             }
 
             // ---------- 3) 版本兼容判定 ----------

@@ -196,11 +196,11 @@
                                             <ColumnDefinition Width="Auto" />
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="插件市场源" Style="{StaticResource FieldLabel}"
+                                        <TextBlock Grid.Column="0" Text="自定义市场源" Style="{StaticResource FieldLabel}"
                                                    Width="{StaticResource SettingsLabelWidth}"
-                                                   ToolTipService.ToolTip="插件市场目录数据源 URL（需兼容 awesome-dsh-plugin 目录规范）；留空 = 官方默认源，可填镜像或自建源" />
+                                                   ToolTipService.ToolTip="追加的自定义目录源 URL（可选，兼容官方快照同构 JSON 或旧接口规范）；内置来源在「插件市场 → 数据源」里勾选" />
                                         <TextBox Grid.Column="1" x:Name="TxtRegistry" Style="{StaticResource InputBox}"
-                                                 PlaceholderText="留空 = https://awesome-dsh-plugin.com/plugins.json" />
+                                                 PlaceholderText="留空 = 不使用自定义源" />
                                     </Grid>
 
                                     <!-- 保存 / 取消 -->

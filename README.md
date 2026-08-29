@@ -360,7 +360,8 @@ DshController.exe --check                        # 打印 dsh 解析结果与端
 DshController.exe --spawn-test --port 3137       # 真实启动/停止一个 dsh web 实例（不开浏览器）
 DshController.exe --spawn-test-node --port 3137  # 仅验证进程管线（微型 node 服务，不涉及 dsh）
 DshController.exe --selftest-core --port 3185     # 核心链路无头自检（启动/重启/停止/报告）
-DshController.exe --selftest-plugins             # 插件市场核心自检（目录/兼容/记录/命令拼装，全离线）
+DshController.exe --selftest-plugins             # 插件市场核心自检（解析/合并/兼容/记录/命令拼装，全离线）
+DshController.exe --catalog-check [--all]        # 联网拉取市场来源并解析合并（验证数据源可达性）
 DshController.exe --version                      # 打印版本
 ```
 
@@ -390,18 +391,30 @@ cmd /s /c ""<npm 全局目录>\dsh.cmd" web --host 127.0.0.1 --port 3080"
 实例指定了 harness 版本时改为：`npx --yes @deepseek-ai/dsh@<版本> web --host ... --port ...`
 （WSL 实例在发行版内执行同语义脚本）。
 
-## 插件市场与插件管理（v0.6.0）
+## 插件市场与插件管理（v0.6.0，v0.6.1 多来源）
 
-**数据来源**：[awesome-dsh-plugin](https://github.com/bruc3van/awesome-dsh-plugin)
-社区目录——脚本每日抓取 GitHub `dsh-plugin` topic 并逐个人工复核，提供下游市场
-数据接口（字段契约含 `pkg`/`repo`/`dshBundle`/`minHost`/`verified` 等）。默认源
-`https://awesome-dsh-plugin.com/plugins.json`，可在全局设置「插件市场源」更换为
-兼容镜像/自建源；数据本地缓存 24 小时，网络失败自动回退过期缓存兜底。
+**数据来源（v0.6.1 多选）**：「插件市场 → 数据源」可勾选多个内置来源，多选时
+按 npm 包名 / GitHub 仓库**合并去重**（详情里可选择从哪个源的条目安装）：
+
+| 来源 | 内容 | 说明 |
+|---|---|---|
+| 官方全量 | [awesome-dsh-plugin](https://github.com/bruc3van/awesome-dsh-plugin) 每日构建 `plugins.json`（2400+） | 人工复核收录 · 全量中文简介 · npm 包名 · 官方中文分类 |
+| GitHub精选 | 同项目 `market.json`（600 精选） | GitHub 仓库数据，**经 jsDelivr CDN 镜像**（直连 GitHub 不可达也可用），raw 兜底 |
+| GitHub实时 | `api.github.com` 搜索 `topic:dsh-plugin` | 最新 · 未审核（卡片带徽标，安装前额外确认）；部分网络不可达，失败不影响其他来源 |
+| 自定义源 | 全局设置「自定义市场源」URL | 兼容官方快照同构 JSON 或旧接口规范 `{name,pkg,repo,dshBundle,minHost}` |
+
+各来源独立缓存 24 小时、独立回退（某来源失败自动用其过期缓存，状态栏显示每个
+来源的成功/失败/缓存兜底）。解析器按线上真实 schema 自适应（官方快照/精选快照/
+GitHub 搜索/旧规范四种形态），可用 `DshController.exe --catalog-check [--all]`
+联网验证各来源可达性与合并结果。
 
 **支持版本展示原则**：插件仓库明确声明了支持的 DSH 版本时原样展示，不做推测——
 ① 目录条目 `minHost`（标注"仓库声明"）；② 缺失时兜底查 npm registry 包元数据的
 `peerDependencies`/`engines`（标注"包元数据"）；③ 都没有则显示"未声明"。
 声明会与所选实例的 harness 版本比对，给出 兼容 / 低于要求 / 未检测 三态。
+
+**分类中文**：分类下拉按数据动态构建，标签取来源官方中文分类（`categories.zh` /
+`category_zh`）+ 内置映射，未知代码原样显示不编造。
 
 **安装方式（严格官方）**：
 

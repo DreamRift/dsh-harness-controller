@@ -104,7 +104,7 @@ namespace DshController
             RowWslPolicy.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             EnvBadgeText.Text = IsWslPanel ? "WSL2" : "WINDOWS";
             EmptyHintText.Text = IsWslPanel
-                ? "本环境暂无 WSL 实例。点击「新建实例」创建；若发行版内已有正在运行的 dsh web（含终端手动启动），点「扫描」即可加入列表"
+                ? "本环境暂无 WSL 实例。点击「新建实例」创建；点「扫描」可发现发行版内正在运行的 dsh web（含终端手动启动），以及已安装 dsh 但未运行的发行版（询问后添加）"
                 : "本环境暂无 Windows 实例。点击「新建实例」创建；若本机已有运行中的 dsh web，点「扫描」即可加入列表";
             TxtWorkspaceHint.Text = IsWslPanel
                 ? "填 ~/xxx 或 /xxx = 发行版内原生路径（完全隔离）；填 Windows 路径（C:\\…）= 经 /mnt/c 按需共享"
@@ -1294,8 +1294,10 @@ namespace DshController
                 var known = new HashSet<(bool Wsl, int Port)>(
                     _registry.Instances.Select(d => (d.IsWsl, d.Port)));
                 int added = 0;
+                var backendDistros = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (InstanceDef d in found)
                 {
+                    if (d.IsWsl) backendDistros.Add(d.WslDistro ?? "");
                     if (known.Contains((d.IsWsl, d.Port))) continue; // 已注册（含本次扫描刚加入的）
                     known.Add((d.IsWsl, d.Port));
                     if (d.IsWsl != IsWslPanel) continue;            // 只收本环境的实例
@@ -1311,17 +1313,26 @@ namespace DshController
                     }
                     catch { /* id 冲突等：跳过该条 */ }
                 }
-                if (added > 0)
+
+                // v0.6.1：WSL 面板追加"已安装 dsh 但未运行"的发行版——主实例不开机也能被扫描发现
+                int installedAdded = 0;
+                if (IsWslPanel)
+                {
+                    installedAdded = await OfferInstalledDistrosAsync(backendDistros);
+                }
+
+                if (added > 0 || installedAdded > 0)
                 {
                     RefreshInstanceList();
                     NotifyInstancesChanged();
-                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：新增 " + added + " 个实例");
+                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：新增 " + added +
+                        " 个运行中实例" + (installedAdded > 0 ? "、" + installedAdded + " 个已安装实例" : ""));
                 }
                 else
                 {
-                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：未发现新的运行中实例" +
+                    PushLog("[" + (IsWslPanel ? "WSL" : "WIN") + "] 扫描完成：未发现新的运行中实例，也没有检测到已安装 dsh 的发行版" +
                         (IsWslPanel
-                            ? "（请确认实例进程仍在运行——WSL 发行版闲置被系统回收时，其中的实例会一并停止；重新启动后再次扫描即可）"
+                            ? "（运行中发现：请确认实例进程仍在运行——WSL 发行版闲置被系统回收时，其中的实例会一并停止；已安装发现：需发行版处于运行状态，且发行版内已安装 dsh）"
                             : "（请确认实例进程仍在运行）"));
                 }
             }
@@ -1335,6 +1346,81 @@ namespace DshController
                 BtnScan.IsEnabled = true;
                 TxtScanLabel.Text = "扫描";
             }
+        }
+
+        /// <summary>
+        /// WSL 专用（v0.6.1）：扫描"已安装 dsh 但没有运行中后端"的发行版，弹窗询问是否
+        /// 添加为（未运行的）实例。已注册同发行版实例的自动跳过。返回添加数量。
+        /// </summary>
+        private async Task<int> OfferInstalledDistrosAsync(HashSet<string> backendDistros)
+        {
+            List<InstanceDiscovery.DistroInstallInfo> installed =
+                await Task.Run(() => InstanceDiscovery.ScanInstalledDistros(backendDistros)).ConfigureAwait(true);
+            // 过滤：注册表里已有同发行版实例的不再建议（无论是否运行过）
+            installed = installed.Where(i => !_registry.Instances.Any(d =>
+                d.IsWsl && string.Equals(d.WslDistro, i.Distro, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (installed.Count == 0) return 0;
+
+            var msg = new StringBuilder();
+            msg.AppendLine("检测到以下发行版已安装 dsh（当前未运行）：");
+            msg.AppendLine();
+            foreach (InstanceDiscovery.DistroInstallInfo info in installed)
+            {
+                msg.AppendLine("· " + info.Distro +
+                    (info.DshVersion.Length > 0 ? "（dsh v" + info.DshVersion + "）" : "") +
+                    (info.HomeInitialized ? " · 默认 ~/.dsh 已初始化" : ""));
+            }
+            msg.AppendLine();
+            msg.AppendLine("是否把它们添加为实例？（默认 ~/.dsh，端口自动分配；启动后由该实例自己的 HOME 隔离）");
+
+            try
+            {
+                var dlg = new ContentDialog
+                {
+                    Title = "发现已安装的 dsh 发行版",
+                    Content = msg.ToString(),
+                    PrimaryButtonText = "全部添加",
+                    CloseButtonText = "不添加",
+                    DefaultButton = ContentDialogButton.Primary,
+                    XamlRoot = XamlRoot
+                };
+                if (await dlg.ShowAsync() != ContentDialogResult.Primary) return 0;
+            }
+            catch { return 0; }
+
+            int added = 0;
+            foreach (InstanceDiscovery.DistroInstallInfo info in installed)
+            {
+                string id = "auto-wslinst-" + info.Distro;
+                // 发行版名只含字母/数字/./-/_，与实例 ID 规则一致；防御性净化一次
+                id = new string(id.Select(c => char.IsLetterOrDigit(c) || c == '-' || c == '_' || c == '.' ? c : '_').ToArray());
+                int port = await PortAllocatorSuggestAsync(3081).ConfigureAwait(true);
+                var def = new InstanceDef
+                {
+                    Id = id,
+                    Name = "WSL " + info.Distro + "（默认安装）",
+                    Host = "127.0.0.1",
+                    Port = port > 0 ? port : 3081,
+                    Workspace = "~/dsh-workspaces",
+                    Runtime = "wsl",
+                    WslDistro = info.Distro,
+                    WslHome = "",                    // 空 = 发行版默认 ~/.dsh（与手动默认安装一致）
+                    AutoOpenBrowser = true,
+                    StopOnExit = true,
+                    CreatedAt = DateTime.UtcNow
+                };
+                try
+                {
+                    _registry.Add(def);
+                    WireInstance(def);
+                    added++;
+                    PushLog("[WSL] 发现已安装 dsh 的发行版: " + info.Distro +
+                        (info.DshVersion.Length > 0 ? "（dsh v" + info.DshVersion + "）" : "") +
+                        " → 已添加为实例（端口 " + def.Port + "，未运行）");
+                }
+                catch { /* id 冲突等：跳过该条 */ }
+            }
+            return added;
         }
 
         private CloneLevel SelectedCloneLevel(ComboBox cmbLevel)
