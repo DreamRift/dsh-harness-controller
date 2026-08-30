@@ -193,7 +193,19 @@ namespace DshController
         private async Task LoadCatalogAsync(bool force)
         {
             SetBusy(true, force ? "正在刷新插件目录…" : "正在加载插件目录…");
-            MarketLoadResult r = await PluginCatalog.LoadAllAsync(_registry.Settings, force);
+            MarketLoadResult r;
+            try
+            {
+                r = await PluginCatalog.LoadAllAsync(_registry.Settings, force);
+            }
+            catch (Exception ex)
+            {
+                SetBusy(false, "");
+                TxtFreshness.Text = "目录加载失败";
+                ShowEmpty("插件目录暂时无法加载。请检查网络或数据源设置，然后点击「刷新」重试。\n\n" + ex.Message);
+                PushLog("[市场] 目录加载失败：" + ex.Message);
+                return;
+            }
             SetBusy(false, "");
             _catalog = r.Catalog;
             TxtFreshness.Text = r.SummaryText;
@@ -352,8 +364,17 @@ namespace DshController
                 InstanceDef target = string.IsNullOrEmpty(_instanceId)
                     ? list.FirstOrDefault()
                     : list.FirstOrDefault(d => string.Equals(d.Id, _instanceId, StringComparison.OrdinalIgnoreCase));
-                if (target != null) CmbInstance.SelectedItem = target;
-                else _instanceId = "";
+                // 初始化期间 SelectionChanged 会被 _loadingInstances 屏蔽，
+                // 同步保存默认实例，保证首次加载时安装目标已就绪。
+                if (target != null)
+                {
+                    _instanceId = target.Id;
+                    CmbInstance.SelectedItem = target;
+                }
+                else
+                {
+                    _instanceId = "";
+                }
                 UpdateInstanceMeta();
             }
             finally { _loadingInstances = false; }

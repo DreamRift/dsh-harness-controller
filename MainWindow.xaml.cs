@@ -15,10 +15,13 @@
 // ============================================================================
 
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using DshController.Core;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -30,9 +33,16 @@ namespace DshController
     public sealed partial class MainWindow : Window
     {
         private const int LogMaxChars = 200000;
+        private const int LogTrimChars = 150000;
+        private const int PendingLogMaxChars = 500000;
 
         private readonly InstanceRegistry _registry;
         private readonly InstanceManager _instanceMgr;
+        private readonly ConcurrentQueue<string> _pendingLog = new ConcurrentQueue<string>();
+        private readonly StringBuilder _logTranscript = new StringBuilder();
+        private DispatcherQueueTimer _logFlushTimer;
+        private int _pendingLogChars;
+        private int _droppedLogLines;
         private bool _autoScroll = true;
         private bool _closing;
         private bool _closeCleanupDone;
@@ -75,6 +85,12 @@ namespace DshController
             // 多实例管理器：所有实例（Windows + WSL）共享同一个 InstanceManager，
             // 面板只按运行环境过滤实例列表。
             _instanceMgr = new InstanceManager(Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread(), _registry);
+
+            // 高密度 stdout/stderr 不再逐行触发 TextBox 重排；统一在 UI 线程批量提交。
+            _logFlushTimer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
+            _logFlushTimer.Interval = TimeSpan.FromMilliseconds(100);
+            _logFlushTimer.Tick += (s, e) => FlushPendingLogs();
+            _logFlushTimer.Start();
 
             // 两个独立面板（各自持有实例列表 / 状态 / 设置）
             PanelWin.Init(_registry, _instanceMgr, "windows", AppendLog, UpdateFooter);
@@ -198,7 +214,9 @@ namespace DshController
         private void ApplyConsoleVisibility()
         {
             // 收起 = 只藏日志区；标题与按钮条常驻（高度压到按钮本身大小）
-            TxtLog.Visibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
+            Visibility logVisibility = _consoleVisible ? Visibility.Visible : Visibility.Collapsed;
+            TxtLog.Visibility = logVisibility;
+            ConsoleFrame.Visibility = logVisibility;
             TxtConsoleToggle.Text = _consoleVisible ? "收起" : "展开";
             IconConsoleToggle.Glyph = _consoleVisible ? "\uE70D" : "\uE70E";   // 收起▼ / 展开▲
             if (_consoleVisible) ScrollLogToEnd();
@@ -290,22 +308,45 @@ namespace DshController
         private void AppendLog(string line)
         {
             if (_closing) return;
-            AppendText(DateTime.Now.ToString("HH:mm:ss") + "  " + line + Environment.NewLine);
+            string entry = DateTime.Now.ToString("HH:mm:ss") + "  " + line + Environment.NewLine;
+            int pending = System.Threading.Interlocked.Add(ref _pendingLogChars, entry.Length);
+            if (pending > PendingLogMaxChars)
+            {
+                System.Threading.Interlocked.Add(ref _pendingLogChars, -entry.Length);
+                System.Threading.Interlocked.Increment(ref _droppedLogLines);
+                return;
+            }
+            _pendingLog.Enqueue(entry);
         }
 
-        private void AppendText(string text)
+        /// <summary>
+        /// 在 UI 线程以批次更新日志，降低高频输出下的布局、绑定和滚动开销。
+        /// 每次最多提交约 32KB，避免单次刷新阻塞交互；总长度仍受上限保护。
+        /// </summary>
+        private void FlushPendingLogs()
         {
-            DispatcherQueue.TryEnqueue(() =>
+            if (_closing || TxtLog == null) return;
+            try
             {
-                try
+                var batch = new StringBuilder();
+                int dropped = System.Threading.Interlocked.Exchange(ref _droppedLogLines, 0);
+                if (dropped > 0)
+                    batch.Append(DateTime.Now.ToString("HH:mm:ss") + "  [系统] 日志过于密集，已暂存上限外丢弃 " + dropped + " 行。" + Environment.NewLine);
+                string line;
+                while (batch.Length < 32768 && _pendingLog.TryDequeue(out line))
                 {
-                    TxtLog.Text += text;
-                    if (TxtLog.Text.Length > LogMaxChars)
-                        TxtLog.Text = TxtLog.Text.Substring(TxtLog.Text.Length - 150000);
-                    if (_autoScroll) ScrollLogToEnd();
+                    System.Threading.Interlocked.Add(ref _pendingLogChars, -line.Length);
+                    batch.Append(line);
                 }
-                catch { }
-            });
+                if (batch.Length == 0) return;
+
+                _logTranscript.Append(batch);
+                if (_logTranscript.Length > LogMaxChars)
+                    _logTranscript.Remove(0, _logTranscript.Length - LogTrimChars);
+                TxtLog.Text = _logTranscript.ToString();
+                if (_autoScroll) ScrollLogToEnd();
+            }
+            catch { }
         }
 
         /// <summary>把日志区滚动到底部（TextBox 无 ScrollToEnd，找内嵌 ScrollViewer 调 ChangeView）。</summary>
@@ -330,6 +371,10 @@ namespace DshController
 
         private void BtnClearLog_Click(object sender, RoutedEventArgs e)
         {
+            while (_pendingLog.TryDequeue(out _)) { }
+            System.Threading.Interlocked.Exchange(ref _pendingLogChars, 0);
+            System.Threading.Interlocked.Exchange(ref _droppedLogLines, 0);
+            _logTranscript.Clear();
             TxtLog.Text = "";
         }
 
@@ -337,6 +382,8 @@ namespace DshController
         {
             try
             {
+                // 复制前先提交队列，避免用户在 100ms 批处理窗口内点击时漏掉最新输出。
+                FlushPendingLogs();
                 if (string.IsNullOrEmpty(TxtLog.Text))
                 {
                     AppendLog("控制台为空，没有可复制的日志。");
@@ -415,6 +462,7 @@ namespace DshController
         private void OnWindowClosed(object sender, WindowEventArgs args)
         {
             _closing = true;
+            try { if (_logFlushTimer != null) _logFlushTimer.Stop(); } catch { }
             try { PanelWin.Shutdown(); } catch { }
             try { PanelWsl.Shutdown(); } catch { }
             try { PanelMarket.Shutdown(); } catch { }

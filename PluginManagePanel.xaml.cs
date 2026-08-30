@@ -143,8 +143,17 @@ namespace DshController
                 InstanceDef target = string.IsNullOrEmpty(_instanceId)
                     ? list.FirstOrDefault()
                     : list.FirstOrDefault(d => string.Equals(d.Id, _instanceId, StringComparison.OrdinalIgnoreCase));
-                if (target != null) CmbInstance.SelectedItem = target;
-                else _instanceId = "";
+                // 初始化期间 SelectionChanged 会被 _loadingInstances 屏蔽，
+                // 这里必须同步写入 ID，否则首次进入页面时扫描不到默认实例。
+                if (target != null)
+                {
+                    _instanceId = target.Id;
+                    CmbInstance.SelectedItem = target;
+                }
+                else
+                {
+                    _instanceId = "";
+                }
             }
             finally { _loadingInstances = false; }
         }

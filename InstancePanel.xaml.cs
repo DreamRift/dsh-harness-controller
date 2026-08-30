@@ -98,6 +98,11 @@ namespace DshController
             _dq = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
             // 环境专属字段可见性（Windows / WSL 两个界面分别设置）
+            TxtPageEyebrow.Text = IsWslPanel ? "WSL RUNTIME WORKSPACE" : "WINDOWS RUNTIME WORKSPACE";
+            TxtPageTitle.Text = IsWslPanel ? "WSL 实例" : "Windows 实例";
+            TxtPageSubtitle.Text = IsWslPanel
+                ? "选择一个实例，查看 WSL2 发行版内的 harness 后端状态。"
+                : "选择一个实例，查看本机 Windows 环境的 harness 后端状态。";
             RowWinHome.Visibility = IsWslPanel ? Visibility.Collapsed : Visibility.Visible;
             RowWslDistro.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             RowWslHome.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
@@ -114,7 +119,7 @@ namespace DshController
             WireAll();
             RefreshInstanceList();
             _selectedId = InstancesOfEnv().FirstOrDefault()?.Id ?? "";
-            SelectInstance(_selectedId, refreshLog: false);
+            SelectInstance(_selectedId);
 
             _timer = _dq.CreateTimer();
             _timer.Interval = TimeSpan.FromSeconds(1);
@@ -204,16 +209,17 @@ namespace DshController
 
         private void RefreshInstanceList()
         {
+            List<InstanceDef> instances = InstancesOfEnv().ToList();
             _loadingList = true;
             try
             {
-                CmbInstance.ItemsSource = InstancesOfEnv().ToList();
+                CmbInstance.ItemsSource = instances;
                 string ver = _detectedVersion.Length > 0
                     ? " · 当前环境 harness v" + _detectedVersion
                     : (_versionDetectDone ? " · 当前环境未检测到 harness" : "");
                 TxtInstanceHint.Text = (IsWslPanel
-                    ? "共 " + InstancesOfEnv().Count() + " 个 WSL 实例 · 在发行版内运行"
-                    : "共 " + InstancesOfEnv().Count() + " 个 Windows 实例 · 本机直接运行") + ver;
+                    ? "共 " + instances.Count + " 个 WSL 实例 · 在发行版内运行"
+                    : "共 " + instances.Count + " 个 Windows 实例 · 本机直接运行") + ver;
             }
             finally { _loadingList = false; }
         }
@@ -223,10 +229,10 @@ namespace DshController
             if (_loadingList || _loadingSettings || _closing) return;
             InstanceDef def = CmbInstance.SelectedItem as InstanceDef;
             if (def != null && !string.Equals(def.Id, _selectedId, StringComparison.OrdinalIgnoreCase))
-                SelectInstance(def.Id, refreshLog: true);
+                SelectInstance(def.Id);
         }
 
-        private void SelectInstance(string id, bool refreshLog)
+        private void SelectInstance(string id)
         {
             if (string.IsNullOrEmpty(id) || !_registry.TryGet(id, out InstanceDef def) || def.IsWsl != IsWslPanel)
                 _selectedId = "";
@@ -995,7 +1001,11 @@ namespace DshController
                     inheritedWs = IsWslPanel
                         ? "~/dsh-workspaces"
                         : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-                var txtWorkspace = new TextBox { Text = inheritedWs };
+                var txtWorkspace = new TextBox
+                {
+                    Text = inheritedWs,
+                    Style = (Style)Application.Current.Resources["InputBox"]
+                };
                 var btnBrowseWs = new Button
                 {
                     Content = "浏览…",
@@ -1035,15 +1045,25 @@ namespace DshController
                     txtWslDistro = new TextBox
                     {
                         PlaceholderText = "如 Ubuntu-26.04",
-                        Text = CurrentDistro()
+                        Text = CurrentDistro(),
+                        Style = (Style)Application.Current.Resources["InputBox"]
                     };
-                    txtWslHome = new TextBox { PlaceholderText = "留空 = ~/.dsh；建议 ~/dsh-instances/<名称>" };
+                    txtWslHome = new TextBox
+                    {
+                        PlaceholderText = "留空 = ~/.dsh；建议 ~/dsh-instances/<名称>",
+                        Style = (Style)Application.Current.Resources["InputBox"]
+                    };
                     layout.Children.Add(LabelledField("WSL 发行版", txtWslDistro));
                     layout.Children.Add(LabelledField("WSL DSH_HOME", txtWslHome));
                 }
 
                 // harness 版本：默认跟随当前环境主实例版本（可改为任意指定版本）
-                var cmbVersion = new ComboBox { Width = 320, IsEditable = true };
+                var cmbVersion = new ComboBox
+                {
+                    Width = 320,
+                    IsEditable = true,
+                    Style = (Style)Application.Current.Resources["InputCombo"]
+                };
                 var verDefault = new ComboBoxItem
                 {
                     Content = _detectedVersion.Length > 0
@@ -1258,7 +1278,7 @@ namespace DshController
                 _registry.Save();
                 WireInstance(def);
                 RefreshInstanceList();
-                SelectInstance(def.Id, refreshLog: true);
+                SelectInstance(def.Id);
                 PushLog("已创建" + (IsWslPanel ? " WSL" : " Windows") + "实例: " + def.Name +
                     "（" + def.Id + "，端口 " + def.Port + "，" +
                     (pinnedVersion.Length > 0 ? "harness 指定 v" + pinnedVersion : "harness 跟随当前环境") + "）");
@@ -1427,7 +1447,7 @@ namespace DshController
             }
             if (firstAdded != null)
             {
-                try { SelectInstance(firstAdded.Id, refreshLog: false); } catch { }
+                try { SelectInstance(firstAdded.Id); } catch { }
             }
             return added;
         }
@@ -1496,7 +1516,7 @@ namespace DshController
                 _registry.Save();
                 RefreshInstanceList();
                 _selectedId = InstancesOfEnv().FirstOrDefault()?.Id ?? "";
-                SelectInstance(_selectedId, refreshLog: true);
+                SelectInstance(_selectedId);
 
                 if (!def.IsWsl && !string.IsNullOrEmpty(def.Home))
                 {
@@ -1519,6 +1539,11 @@ namespace DshController
 
         private StackPanel LabelledField(string label, UIElement input)
         {
+            if (input is TextBox textBox && textBox.Style == null)
+                textBox.Style = (Style)Application.Current.Resources["InputBox"];
+            else if (input is ComboBox comboBox && comboBox.Style == null)
+                comboBox.Style = (Style)Application.Current.Resources["InputCombo"];
+
             var sp = new StackPanel { Spacing = 4 };
             sp.Children.Add(new TextBlock
             {

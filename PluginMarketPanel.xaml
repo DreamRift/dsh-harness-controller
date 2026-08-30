@@ -1,17 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- ============================================================================
-  PluginMarketPanel — 插件市场（v0.6.0）
-
-  数据源：awesome-dsh-plugin 社区目录（每日刷新 + 人工复核，字段规范见
-  Core/PluginCatalog.cs 头注释）。布局自上而下：
-    ① 标题行：页面标题 + 目录源新鲜度 + 手动刷新
-    ② 选择行：实例（全部 Windows + WSL 实例，含运行状态）+ 生效 profile
-    ③ 过滤行：搜索（中英文）/ 分类 / 排序 / 仅可安装 / 仅复核
-    ④ 目录列表：卡片（名称 / 复核徽标 / 元信息 / 简介 / 包名 / 支持版本行）+
-       安装（官方 dsh plugin add，装到所选实例的 DSH_HOME，实例间天然隔离）
-    ⑤ 状态行：加载/安装进度与结果
-  安装完成后提示"bundle 插件需重启实例生效"，可一键重启。
-  ============================================================================ -->
+<!-- Community catalogue: choose a target, search the catalogue, install with confidence. -->
 <UserControl
     x:Class="DshController.PluginMarketPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -21,7 +9,7 @@
     xmlns:local="using:DshController"
     mc:Ignorable="d">
 
-    <Grid Margin="16,12,16,10" RowSpacing="10">
+    <Grid Background="{ThemeResource BgBaseBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -30,36 +18,30 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- ==================== ① 标题行 ==================== -->
-        <Grid Grid.Row="0" ColumnSpacing="10">
+        <Grid Grid.Row="0" Margin="34,28,34,18" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="15"
-                          Foreground="{ThemeResource LabelSecondaryBrush}" VerticalAlignment="Center" />
-                <TextBlock Text="插件市场" FontSize="18" FontWeight="SemiBold"
-                           Foreground="{ThemeResource LabelPrimaryBrush}" VerticalAlignment="Center" />
-                <TextBlock Text="搜索社区插件，按 DSH 官方方式装到指定实例" Style="{StaticResource FooterText}"
-                           VerticalAlignment="Center" Margin="4,1,0,0" />
+            <StackPanel Grid.Column="0" Spacing="5">
+                <TextBlock Text="EXTENSIONS" Style="{StaticResource PageEyebrow}" />
+                <TextBlock Text="插件市场" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="搜索社区插件，并按 DSH 官方方式安装到指定实例。" Style="{StaticResource PageSubtitle}" />
             </StackPanel>
-            <TextBlock Grid.Column="2" x:Name="TxtFreshness" Style="{StaticResource FooterText}"
-                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="380"
-                       ToolTipService.ToolTip="各来源加载状态与数据时间（24 小时内复用缓存）" />
-            <Button Grid.Column="3" x:Name="BtnSources" Style="{StaticResource BtnCompact}"
-                    Click="BtnSources_Click"
-                    ToolTipService.ToolTip="选择启用的目录来源（可多选，多选时合并去重），并设置自定义源 URL">
+            <TextBlock Grid.Column="1" x:Name="TxtFreshness" Style="{StaticResource FooterText}"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320"
+                       ToolTipService.ToolTip="各来源加载状态与数据时间" />
+            <Button Grid.Column="2" x:Name="BtnSources" Style="{StaticResource BtnCompact}" Click="BtnSources_Click"
+                    ToolTipService.ToolTip="选择启用的目录来源">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;" FontSize="12" />
                     <TextBlock x:Name="TxtSourcesLabel" Text="数据源" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="4" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnCompact}"
-                    Click="BtnRefreshCatalog_Click" ToolTipService.ToolTip="重新拉取全部启用来源的目录，并刷新当前实例的已装插件状态">
+            <Button Grid.Column="3" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnCompact}" Click="BtnRefreshCatalog_Click"
+                    ToolTipService.ToolTip="重新拉取全部启用来源的目录">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
                     <TextBlock Text="刷新" />
@@ -67,76 +49,73 @@
             </Button>
         </Grid>
 
-        <!-- ==================== ② 实例选择行 ==================== -->
-        <Grid Grid.Row="1" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="150" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <Border Grid.Row="1" Style="{StaticResource DshToolbarCard}" Margin="34,0,34,10">
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="120" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="安装到实例" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                <ComboBox Grid.Column="1" x:Name="CmbInstance" Style="{StaticResource InputCombo}" HorizontalAlignment="Stretch"
+                          SelectionChanged="CmbInstance_SelectionChanged"
+                          ToolTipService.ToolTip="Windows 与 WSL 实例都在此列表">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding PickerLabel}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <TextBlock Grid.Column="2" Text="profile" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                <TextBox Grid.Column="3" x:Name="TxtProfile" Style="{StaticResource InputBox}" Text="web" />
+                <TextBlock Grid.Column="4" x:Name="TxtInstanceMeta" Style="{StaticResource FooterText}"
+                           VerticalAlignment="Center" Margin="6,0,0,0" />
+                <Button Grid.Column="5" x:Name="BtnOpenHome" Style="{StaticResource BtnCompact}" Click="BtnOpenHome_Click"
+                        Content="打开 HOME" ToolTipService.ToolTip="打开所选实例的 DSH_HOME 目录" />
+            </Grid>
+        </Border>
 
-            <TextBlock Grid.Column="0" Text="安装到实例" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
-                       ToolTipService.ToolTip="插件装入该实例自己的 DSH_HOME，各实例互相隔离" />
-            <ComboBox Grid.Column="1" x:Name="CmbInstance" MinHeight="34" HorizontalAlignment="Stretch"
-                      SelectionChanged="CmbInstance_SelectionChanged"
-                      ToolTipService.ToolTip="Windows 与 WSL 实例都在此列表（运行中带 ● 标记）">
-                <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding PickerLabel}" />
-                    </DataTemplate>
-                </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock Grid.Column="2" Text="profile" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
-                       ToolTipService.ToolTip="dsh plugin --profile；dsh web 使用 web profile，一般无需修改" />
-            <TextBox Grid.Column="3" x:Name="TxtProfile" Style="{StaticResource InputBox}" Text="web"
-                     ToolTipService.ToolTip="插件生效的 profile（默认 web）" />
-            <TextBlock Grid.Column="4" x:Name="TxtInstanceMeta" Style="{StaticResource FooterText}"
-                       VerticalAlignment="Center" Margin="6,0,0,0" />
-            <Button Grid.Column="5" x:Name="BtnOpenHome" Style="{StaticResource BtnCompact}" Click="BtnOpenHome_Click"
-                    Content="打开 HOME" ToolTipService.ToolTip="在资源管理器中打开所选实例的 DSH_HOME 目录（WSL 实例提示发行版路径）" />
-        </Grid>
+        <Border Grid.Row="2" Style="{StaticResource DshCardTight}" Margin="34,0,34,14">
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" x:Name="TxtSearch" Style="{StaticResource InputBox}"
+                         PlaceholderText="搜索名称、简介、包名或标签" TextChanged="TxtSearch_TextChanged" />
+                <ComboBox Grid.Column="1" x:Name="CmbCategory" Style="{StaticResource InputCombo}" MinWidth="130"
+                          SelectionChanged="Filter_SelectionChanged" ToolTipService.ToolTip="按分类过滤">
+                    <ComboBoxItem Content="全部分类" IsSelected="True" Tag="" />
+                </ComboBox>
+                <ComboBox Grid.Column="2" x:Name="CmbSort" Style="{StaticResource InputCombo}" MinWidth="104"
+                          SelectionChanged="Filter_SelectionChanged" ToolTipService.ToolTip="排序方式">
+                    <ComboBoxItem Content="按热度" IsSelected="True" Tag="stars" />
+                    <ComboBoxItem Content="最近更新" Tag="updated" />
+                </ComboBox>
+                <CheckBox Grid.Column="3" x:Name="ChkInstallable" Content="仅可安装" MinHeight="40"
+                          Checked="Filter_Toggled" Unchecked="Filter_Toggled" />
+                <CheckBox Grid.Column="4" x:Name="ChkVerified" Content="仅人工复核" MinHeight="40"
+                          Checked="Filter_Toggled" Unchecked="Filter_Toggled" />
+            </Grid>
+        </Border>
 
-        <!-- ==================== ③ 过滤行 ==================== -->
-        <Grid Grid.Row="2" ColumnSpacing="8">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBox Grid.Column="0" x:Name="TxtSearch" Style="{StaticResource InputBox}" PlaceholderText="搜索插件：名称 / 简介 / 包名 / 标签（支持中文与英文）"
-                     TextChanged="TxtSearch_TextChanged" />
-            <ComboBox Grid.Column="1" x:Name="CmbCategory" MinWidth="130" MinHeight="34" SelectionChanged="Filter_SelectionChanged"
-                      ToolTipService.ToolTip="按分类过滤（中文标签，取自各来源的官方分类）">
-                <ComboBoxItem Content="全部分类" IsSelected="True" Tag="" />
-            </ComboBox>
-            <ComboBox Grid.Column="2" x:Name="CmbSort" MinWidth="104" MinHeight="34" SelectionChanged="Filter_SelectionChanged"
-                      ToolTipService.ToolTip="排序方式">
-                <ComboBoxItem Content="按热度" IsSelected="True" Tag="stars" />
-                <ComboBoxItem Content="最近更新" Tag="updated" />
-            </ComboBox>
-            <CheckBox Grid.Column="3" x:Name="ChkInstallable" Content="仅可安装" MinHeight="34" Checked="Filter_Toggled" Unchecked="Filter_Toggled"
-                      ToolTipService.ToolTip="只显示声明了有效 dsh.bundle、可一键安装的插件" />
-            <CheckBox Grid.Column="4" x:Name="ChkVerified" Content="仅人工复核" MinHeight="34" Checked="Filter_Toggled" Unchecked="Filter_Toggled"
-                      ToolTipService.ToolTip="只显示目录维护者逐个核实过的插件" />
-        </Grid>
-
-        <!-- ==================== ④ 目录列表 ==================== -->
-        <Grid Grid.Row="3">
+        <Grid Grid.Row="3" Margin="34,0,30,0">
             <ListView x:Name="ListPlugins" SelectionMode="None" Padding="0,0,6,0">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="local:MarketItem">
-                        <Border Style="{StaticResource DshCard}" Margin="0,0,0,10" Padding="16,12">
-                            <Grid ColumnSpacing="14">
+                        <Border Style="{StaticResource DshCardTight}" Margin="0,0,0,10">
+                            <Grid ColumnSpacing="18">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Spacing="5">
+                                <StackPanel Grid.Column="0" Spacing="6">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <TextBlock Text="{x:Bind Title}" FontSize="14" FontWeight="SemiBold"
                                                    Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" />
@@ -153,25 +132,22 @@
                                             <TextBlock Text="{x:Bind SourceText}" Style="{StaticResource ChipText}" />
                                         </Border>
                                         <Border Style="{StaticResource Chip}" Visibility="{x:Bind BrowseVis}">
-                                            <TextBlock Text="未提供安装来源 · 仅浏览" Style="{StaticResource ChipText}" />
+                                            <TextBlock Text="仅浏览" Style="{StaticResource ChipText}" />
                                         </Border>
                                     </StackPanel>
                                     <TextBlock Text="{x:Bind MetaText}" Style="{StaticResource FooterText}" />
-                                    <TextBlock Text="{x:Bind DescText}" FontSize="13"
-                                               Foreground="{ThemeResource LabelSecondaryBrush}"
+                                    <TextBlock Text="{x:Bind DescText}" FontSize="13" Foreground="{ThemeResource LabelSecondaryBrush}"
                                                TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind PkgText}" FontSize="11.5" FontFamily="Consolas"
-                                               Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind CompatText}" FontSize="11.5"
-                                               Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis"
+                                    <TextBlock Text="{x:Bind PkgText}" Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind CompatText}" Style="{StaticResource HelperText}" TextTrimming="CharacterEllipsis"
                                                Visibility="{x:Bind CompatVis}" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top">
+                                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top">
                                     <Button Style="{StaticResource BtnPrimary}" Content="{x:Bind InstallLabel}"
                                             IsEnabled="{x:Bind InstallEnabled}" Click="BtnInstall_Click" Tag="{x:Bind}"
                                             Visibility="{x:Bind InstallVis}" ToolTipService.ToolTip="{x:Bind InstallTip}" />
                                     <Button Style="{StaticResource BtnCompact}" Content="详情" Click="BtnDetail_Click" Tag="{x:Bind}"
-                                            ToolTipService.ToolTip="查看简介、来源仓库、安装命令与支持版本声明" />
+                                            ToolTipService.ToolTip="查看简介、来源和安装命令" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -179,26 +155,26 @@
                 </ListView.ItemTemplate>
             </ListView>
 
-            <!-- 空态提示（无实例 / 无结果 / 加载失败） -->
             <StackPanel x:Name="EmptyState" Visibility="Collapsed" VerticalAlignment="Center"
-                        HorizontalAlignment="Center" Spacing="8" MaxWidth="460">
-                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="28"
-                          Foreground="{ThemeResource LabelTertiaryBrush}" HorizontalAlignment="Center" />
+                        HorizontalAlignment="Center" Spacing="10" MaxWidth="460">
+                <Border Width="52" Height="52" CornerRadius="16" Background="{ThemeResource BrandSoftBrush}"
+                        HorizontalAlignment="Center">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="22"
+                              Foreground="{ThemeResource BrandPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
                 <TextBlock x:Name="TxtEmpty" Text="" TextWrapping="Wrap" TextAlignment="Center"
                            Foreground="{ThemeResource LabelSecondaryBrush}" HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
 
-        <!-- ==================== ⑤ 状态行 ==================== -->
-        <Grid Grid.Row="4" ColumnSpacing="8" Margin="2,0,2,2">
+        <Grid Grid.Row="4" Margin="34,10,34,12" ColumnSpacing="8">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <ProgressRing Grid.Column="0" x:Name="BusyRing" Width="18" Height="18" IsActive="False"
-                          VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" x:Name="TxtStatus" Style="{StaticResource FooterText}"
-                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            <ProgressRing Grid.Column="0" x:Name="BusyRing" Width="18" Height="18" IsActive="False" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" x:Name="TxtStatus" Style="{StaticResource FooterText}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
         </Grid>
     </Grid>
 </UserControl>

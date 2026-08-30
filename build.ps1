@@ -1,5 +1,5 @@
 ﻿# ============================================================================
-#  Build DshController v0.6.1 (WinUI 3) with the dotnet SDK.
+#  Build DshController v1.0.0 (WinUI 3) with the dotnet SDK.
 #  Requires: .NET SDK >= 6.0, NuGet connectivity (first build restores
 #  Microsoft.WindowsAppSDK). No Visual Studio needed.
 #
@@ -72,14 +72,15 @@ $exe = Join-Path $outDir 'DshController.exe'
 if (-not (Test-Path $exe)) { throw 'publish finished but DshController.exe not found' }
 
 # zip for distribution（排除本机 launcher.json、日志与报告）
-$zip = Join-Path $outDir 'DshController-0.6.1-win-x64.zip'
+$zip = Join-Path $outDir 'DshController-1.0.0-win-x64.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 $zipItems = Get-ChildItem $outDir -Force | Where-Object {
     $n = $_.Name
     # 排除本机运行时文件（launcher.json / instances.json / 日志 / 报告）
     $n -notin @('launcher.json', 'instances.json', 'instances.json.tmp', 'cli.log', 'crash.log', 'reports') -and
     -not $n.StartsWith('launcher.json.') -and
-    -not $n.EndsWith('.log')
+    -not $n.EndsWith('.log') -and
+    -not $n.EndsWith('.zip')
 }
 Compress-Archive -Path $zipItems.FullName -DestinationPath $zip -Force
 

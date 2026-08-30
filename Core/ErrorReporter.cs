@@ -36,7 +36,7 @@ namespace DshController.Core
 
     public static class ErrorReporter
     {
-        public const string AppVersion = "0.6.1";
+        public const string AppVersion = "1.0.0";
 
         /// <summary>
         /// 启动失败报告。文件名 = DshController-fail_&lt;实例ID&gt;_&lt;时间戳&gt;.md
