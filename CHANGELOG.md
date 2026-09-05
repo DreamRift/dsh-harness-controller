@@ -3,7 +3,7 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-## [2.0.0] - 开发中（重构 1.0，进行中）
+## [2.0.0] - 2026-09-05
 
 > 计划全文见 `docs/REFACTOR-2.0-PLAN.md`。目标：实例档案子系统 + 代码精简 + 便于迭代的界面架构。
 
@@ -109,16 +109,39 @@
 - **发布 2.0.0**：`build.ps1` 现在先跑约定机检与离线单测再发布；产物
   `publish-fixed\DshController-2.0.0-win-x64.zip`，版本号由 csproj 单源提供。
 
+### 2026-09 整改轮（六项，收口对账见 `docs/closing-report-2026-09.md`）
+
+- **重启绝不拉浏览器**：根因是子进程 `dsh web` 自开窗口、控制器侧抑制拦不住；现对 Windows/WSL
+  三条启动分支统一注入 `web --no-open`，重启后只开控制器自己的控制台页（`RestartNoBrowserTests` 7 条）。
+- **用量页按定稿方案改版**（D1-A/D2-A/D3-A/D4-A）：日聚合合并（`MergeDaily`/`DayComposition`）、
+  钻取行选中联动与清除闭环、范围切换经 `IArchiveFacade.IsRunning` 闭环；`UsageView` 整页重写。
+- **全局中度精简**：四页头与面板 11 处静态长文删除，说明改 tooltip 承接。
+- **按钮遮挡治理**：10 处缩字 + 抖动消除；主题新增 `BtnInline`/`SettingHint` 令牌；960/1280/1600
+  三档宽度走查（见 `docs/audit-button-trim.md`）。
+- **设置两区分节卡片化**：应用设置页 2 卡 → 3 卡 13 行，实例设置折叠区 1 卡 → 5 卡 13 行
+  （纯 XAML 改版，读写逻辑零改动）。
+- **质量欠账清还**：裸 catch 103 处清零（3 处改日志承接、其余写明理由）；`BackendManager`/
+  `PluginCatalog`/`PluginMarketPanel` 拆为 ≤400 行 partial；例外台账 R3 25→0、R1 9→5、R4 2→0。
+- 离线单测 153 → **176**；`--selftest-core` **89/0**、`--selftest-plugins` **61/0**。
+
+### 2026-09-04 顶栏四页改版轮（档案页 + API 预设页）
+
+- **顶栏四页壳**：`MainWindow.PageHost` / `SplitPageShell` 改版，实例页、插件页左栏、升级治理接续回填。
+- **新增档案页**：退役实例列表、元信息一览、用量看板并入（红队 pass）、跨实例总计行、
+  档案改名（`AliasStore` 别名支路，改名实时生效）。
+- **新增 API 预设页**：`ProviderPresetStore` 持久化、供应商编辑页、同步预览窗（取消零写）、
+  写入生效（行级合并 + 原子备份，红队 pass）、新建实例页"同步预设"勾选。
+- **供应商同步配置格式对齐**：`ProviderConfigMapper`，字段对照表见 `docs/provider-sync-alignment.md`。
+- **验证基建**：`verify/` 收录 12 个 GUI 探针脚本（纯 ASCII、自恢复）；`docs/evidence/` 收录 141 张
+  目检截图；`docs/TEST-RESULTS.md` 建立测试账、探针表与开放票去向。
+- 离线单测 220 → **275**；约定机检 **142 文件 PASS**；GUI 探针 12/12 全量回归。
+
 ### 修复
 
 - **自检 `[7] 迁移生成 default 实例` 的环境依赖红条**：`--selftest-core` 此前在 bin 目录借用真实
   `instances.json` 做 fixture，且 `InstanceRegistry.Load()` 会把本机正在运行的后端自动发现进清单，
   导致"迁移应只生成 1 个实例"的断言随环境漂移。现在自检全程跑在临时状态沙箱里，
   并新增 `InstanceRegistry.Load(discoverRunningInstances:false)` 保证确定性——本机结果由 84/1 变为 **85/0**。
-
-## [未发布]
-
-### 修复
 
 - **插件管理 / 插件市场首次进入不显示实例 harness 版本**：版本探测此前只挂在
   目标实例下拉框的 `SelectionChanged` 上，而首次进入页面时的默认实例是在
