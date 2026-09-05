@@ -21,7 +21,7 @@
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools\check-conventions.ps1     # PASS
-dotnet test tests\DshController.Tests\DshController.Tests.csproj         # 全绿（当前 176 条）
+dotnet test tests\DshController.Tests\DshController.Tests.csproj         # 全绿（当前 275 条）
 dotnet build DshController.slnx -nologo                                  # 0 警告 0 错误
 ```
 
