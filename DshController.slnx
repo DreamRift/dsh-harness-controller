@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DshController.App/DshController.App.csproj" />
+    <Project Path="src/DshController.Core/DshController.Core.csproj" />
+    <Project Path="src/DshController.ViewModels/DshController.ViewModels.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DshController.Tests/DshController.Tests.csproj" />
+  </Folder>
+</Solution>

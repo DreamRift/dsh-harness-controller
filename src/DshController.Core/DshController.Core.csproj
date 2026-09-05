@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 纯逻辑层：不引用 WinUI / Windows App SDK，可被 xUnit 直接引用做离线测试。
+       约束由 tools\check-conventions.ps1 机检（禁止出现 Microsoft.UI / Windows.UI）。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DshController.Core</RootNamespace>
+    <AssemblyName>DshController.Core</AssemblyName>
+    <!-- App 以 x64 构建并把 Platform 传递给引用工程，这里必须声明可用平台 -->
+    <Platforms>AnyCPU;x64</Platforms>
+    <LangVersion>10</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 用量统计：解压实例 HOME 的 sessions/**/session.jsonl.zstd（纯托管 zstd 实现） -->
+    <PackageReference Include="ZstdSharp.Port" Version="0.8.8" />
+  </ItemGroup>
+
+</Project>

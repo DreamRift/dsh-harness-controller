@@ -347,6 +347,11 @@ powershell -ExecutionPolicy Bypass -File build.ps1 -Portable   # 连 .NET 一并
 powershell -ExecutionPolicy Bypass -File build.ps1 -Clean      # 清理构建产物
 ```
 
+> **改界面的流程（v2.0）**：WinUI 3 的 XAML 热重载依赖 Visual Studio，命令行构建下没有。
+> 因此用 `DshController.exe --dev` 启动会多出侧边栏「设计台（dev）」——所有颜色令牌、
+> 控件样式、状态分支（运行/启动中/停止/失败、空态、忙态、档案新鲜度徽标）都用假数据摆在一页，
+> 改样式只看这一页即可，不必制造真实运行条件；界面逻辑则由视图模型单测覆盖（毫秒级）。
+
 > 体积说明：WinUI 3 + 自包含 Windows App SDK 的发布目录约 120 MB（v0.1.0 单 exe
 > 36 KB 的时代一去不返），`build.ps1` 会同时产出 zip 便于分发。首次构建需联网还原
 > NuGet 包。
@@ -362,8 +367,14 @@ DshController.exe --spawn-test-node --port 3137  # 仅验证进程管线（微�
 DshController.exe --selftest-core --port 3185     # 核心链路无头自检（启动/重启/停止/报告）
 DshController.exe --selftest-plugins             # 插件市场核心自检（解析/合并/兼容/记录/命令拼装，全离线）
 DshController.exe --catalog-check [--all]        # 联网拉取市场来源并解析合并（验证数据源可达性）
+DshController.exe --archive-check                # 实例档案体检：各分面状态/新鲜度/耗时，并补采未采过的分面
+DshController.exe --archive-check --force        # 强制重采全部分面（也可加 --instance <id> / --facet <名>）
+DshController.exe --import-usage [<备份路径>]     # 导入用量原型的 usage-backup.json（含已删除实例的历史用量）
 DshController.exe --version                      # 打印版本
 ```
+
+> 离线断言（路径/版本解析/档案 TTL 与并发/迁移边界等 74 条）已迁到解决方案的测试工程，
+> 用 `dotnet test` 跑，秒级完成；上面这些自检负责"在真实机器上验证真实链路"。
 
 - `--spawn-test` 会完整走一遍：解析 dsh 命令 → 隐藏启动 → 等待就绪 → 停止进程树 →
   验证端口释放，任何一步失败都会以非零退出码结束；
@@ -463,45 +474,69 @@ dsh plugin --profile web remove <包名>     # 卸载
 
 ```
 dsh-harness-controller/
-├── DshController.csproj       # WinUI 3 工程配置
-├── app.manifest               # DPI (PerMonitorV2) 等声明
-├── Program.cs                 # 自定义入口：CLI 自检在 WinUI 引导前执行
-├── App.xaml / App.xaml.cs     # 应用入口 + 全局异常兜底
-├── MainWindow.xaml / .cs      # 主窗口（侧边栏导航 + 页面切换 + 共享控制台坞）
-├── InstancePanel.xaml / .cs   # 单环境实例面板（Windows / WSL 各一份实例）
-├── PluginMarketPanel.xaml/.cs # 插件市场（目录搜索/支持版本比对/官方方式安装）
-├── PluginManagePanel.xaml/.cs # 插件管理（真实已装状态/升级/卸载/一键重启）
-├── PluginUiHelper.cs          # 插件页共享辅助（实例版本缓存/HOME 解析/初始化检查）
-├── Styles/DshTheme.xaml       # DSH 设计令牌 → Light/Dark 资源字典
-├── Core/                      # 纯逻辑层（无 UI 依赖）
-│   ├── Config.cs              # launcher.json（System.Text.Json + 旧值净化迁移）
-│   ├── DshResolver.cs         # dsh/node 4 级解析 + 缓存 + 轨迹
-│   ├── PortTools.cs           # 端口探测 / netstat / 进程树终止（全异步）
-│   ├── BackendManager.cs      # 后端状态机 + 输出 Channel + 重启抑制浏览器（含 WSL 分支）
-│   ├── WslTools.cs            # WSL2 互操作（wsl.exe 调用/UTF-16LE 解码/路径转换/文件上传）
-│   ├── WslLaunch.cs           # WSL 启动脚本生成 + 发行版内停止 + 智能关闭
-│   ├── InstanceDef.cs         # 实例定义（runtime/wslDistro/wslHome 等字段）
-│   ├── InstanceManager.cs     # N 个实例的路由 + HOME 锁
-│   ├── HarnessVersion.cs      # harness 版本探测 / npx 解析 / 版本列表拉取
-│   ├── HttpFetch.cs           # 轻量 HTTP GET（插件目录/npm 元数据；系统代理+独立超时）
-│   ├── PluginCatalog.cs       # 插件目录：拉取/双源回退/24h 缓存/过滤排序
-│   ├── PluginCompat.cs        # 支持版本声明提取与 semver 比较（仓库声明优先）
-│   ├── PluginInstaller.cs     # 官方插件命令封装（add/remove/update，Win+WSL）
-│   ├── InstalledPlugins.cs    # 实例 HOME 已装插件黑盒读取（package.json+bundles）
-│   ├── PluginRecords.cs       # 市场安装记录（按实例分文件，来源标注用）
-│   ├── ErrorReporter.cs       # 失败/崩溃 Markdown 报告（控制台转录 + 启动诊断）
-│   ├── Cli.cs                 # --check / --spawn-test / --selftest-* 自检
-│   ├── CoreSelfTest.cs        # 核心链路无头自检（启动/重启/停止/报告/配置迁移）
-│   ├── PluginSelfTest.cs      # 插件市场核心自检（44 项断言，全离线）
-│   └── NativeMethods.cs       # Win32 P/Invoke（AttachConsole 等）
-├── Assets/                    # app.ico（鲸鱼九尺寸）、whale.svg(-white)
-├── legacy/DshController.cs    # v0.1.0 WinForms 源码留档
-├── docs/                      # 重构方案、调研笔记、测试记录
-├── test-server.js             # 自检辅助（--spawn-test-node）
-├── build.ps1                  # 构建/发布脚本
+├── DshController.slnx             # 解决方案（Core / App / Tests 三工程）
+├── src/
+│   ├── DshController.Core/        # 纯逻辑层（net10.0，无任何 UI 依赖，可离线单测）
+│   │   ├── Abstractions/
+│   │   │   └── IUiDispatcher.cs   # UI 线程投递抽象（App 用 DispatcherQueue，CLI/测试就地执行）
+│   │   ├── Diagnostics/
+│   │   │   └── AppVersion.cs      # 版本单一事实来源（读程序集，csproj <Version> 唯一源）
+│   │   ├── Storage/
+│   │   │   ├── AppPaths.cs        # 所有落盘位置单源 + 便携模式 + 首次运行状态迁移
+│   │   │   └── JsonStore.cs       # 原子写 + 损坏兜底的通用 JSON 落盘
+│   │   ├── Archive/               # 实例档案：界面取数的唯一来源
+│   │   │   ├── InstanceArchive.cs # 档案模型（分面快照 / 代际 / 退役标记）
+│   │   │   ├── ArchiveStore.cs    # 每实例一个 JSON 文件的仓库
+│   │   │   ├── ArchiveService.cs  # 单飞 / 失败不覆盖 / 去抖落盘 / 变更事件
+│   │   │   ├── RefreshScheduler.cs# 全应用唯一调度循环（TTL + 优先级 + 并发预算）
+│   │   │   └── Collectors/        # liveness / harness / plugins / home / wslEnv
+│   │   ├── Model/RefreshPolicy.cs # 各分面的刷新间隔（设置页「数据刷新」）
+│   │   ├── Usage/                 # token 用量：解析 / 扫描 / 范围查询 / 原型备份导入
+│   │   ├── Config.cs              # launcher.json（旧格式，仅迁移用）+ 路径净化
+│   │   ├── InstanceDef.cs / AppSettings.cs / InstanceRegistry.cs   # 实例清单与全局设置
+│   │   ├── BackendManager.cs      # 后端状态机 + 输出 Channel + 重启抑制浏览器（含 WSL 分支）
+│   │   ├── InstanceManager.cs     # N 个实例的路由 + HOME 锁
+│   │   ├── InstanceDiscovery.cs   # 运行中未注册实例 / 已装发行版发现
+│   │   ├── DshResolver.cs / PortTools.cs / PortAllocator.cs / HarnessVersion.cs
+│   │   ├── WslTools.cs / WslLaunch.cs        # WSL2 互操作与发行版内启停
+│   │   ├── HomeManager.cs         # 实例 HOME 创建/克隆/健康检查/删除
+│   │   ├── PluginCatalog.cs / PluginCompat.cs / PluginInstaller.cs
+│   │   ├── InstalledPlugins.cs / PluginRecords.cs
+│   │   ├── HttpFetch.cs           # 轻量 HTTP GET（系统代理 + 独立超时）
+│   │   └── ErrorReporter.cs       # 失败/崩溃 Markdown 报告
+│   ├── DshController.ViewModels/  # 视图模型层（net10.0，不依赖 WinUI，可离线单测）
+│   └── DshController.App/         # WinUI 3 可执行（产物仍是 DshController.exe）
+│       ├── Program.cs             # 自定义入口：CLI 自检在 WinUI 引导前执行
+│       ├── App.xaml / .cs         # 应用入口 + 全局异常兜底
+│       ├── MainWindow.xaml / .cs  # 主窗口（侧边栏导航 + 页面切换 + 共享控制台坞）
+│       ├── InstancePanel.xaml/.cs # 单环境实例面板（Windows / WSL 各一份实例）
+│       ├── PluginMarketPanel.*    # 插件市场（目录搜索/版本比对/官方方式安装）
+│       ├── PluginManagePanel.*    # 插件管理（真实已装状态/升级/卸载/一键重启）
+│       ├── PluginUiHelper.cs      # 插件页共享辅助（版本探测/HOME 解析）
+│       ├── Shell/UiDispatcher.cs  # IUiDispatcher 的 DispatcherQueue 实现
+│       ├── Shell/ArchiveHub.cs    # 界面访问实例档案的唯一入口（实现 IArchiveFacade）
+│       ├── Views/UsageView.xaml   # 用量统计页（View + ViewModel + x:Bind 样板）
+│       ├── CommandLine/           # CLI 与集成自检（--check / --spawn-test / --selftest-*）
+│       ├── Styles/DshTheme.xaml   # DSH 设计令牌 → Light/Dark 资源字典
+│       ├── Assets/                # app.ico（鲸鱼九尺寸）、whale.svg(-white)
+│       └── test-server.js         # 自检辅助（--spawn-test-node）
+├── tests/DshController.Tests/     # 离线单测（xUnit，只引用 Core，不起进程不联网）
+├── tools/
+│   ├── check-conventions.ps1      # 反屎山守则机检（构建前执行，违规即失败）
+│   └── conventions-allow.txt      # 历史欠账例外清单（只减不增）
+├── docs/ARCHITECTURE.md           # 架构说明（分层/数据流/落盘/门禁/UI 迭代方式）
+├── docs/adr/                      # 架构决策记录（一页一决策）
+├── legacy/DshController.cs        # v0.1.0 WinForms 源码留档
+├── docs/                          # 重构方案（含 REFACTOR-2.0-PLAN.md）、调研笔记、测试记录
+├── build.ps1                      # 构建/发布脚本（内置约定机检 + 单测门禁）
 ├── README.md / CHANGELOG.md / LICENSE
 └── .gitignore
 ```
+
+> **状态文件位置（v2.0 起）**：`instances.json` 等运行时状态统一存放在
+> `%LOCALAPPDATA%\DshController\`，不再跟随 exe 目录——换构建产物/换安装目录都能沿用同一份实例清单。
+> 首次运行会自动把 exe 旁的旧 `instances.json` 复制过去（只复制不删除）。
+> 如需便携模式（状态跟着 exe 走），在 exe 旁放一个空文件 `portable.marker` 即可。
 
 ## 常见问题 (FAQ)
 

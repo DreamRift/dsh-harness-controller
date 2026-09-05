@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 视图模型层：只依赖 Core，不引用 WinUI —— 因此可以被 xUnit 直接实例化测试。
+       界面（App）通过接口把档案服务注入进来，测试用假实现。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DshController.ViewModels</RootNamespace>
+    <AssemblyName>DshController.ViewModels</AssemblyName>
+    <Platforms>AnyCPU;x64</Platforms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DshController.Core\DshController.Core.csproj" />
+  </ItemGroup>
+
+</Project>

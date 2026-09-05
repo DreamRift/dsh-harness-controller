@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- 离线单元测试：只引用 Core（纯逻辑），不触碰 WinUI，不起真实进程、不联网。
+       需要真实环境的集成自检仍在 App 的 CLI 入口（selftest-core / check 等）。 -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DshController.Tests</RootNamespace>
+    <Platforms>AnyCPU;x64</Platforms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\DshController.Core\DshController.Core.csproj" />
+    <ProjectReference Include="..\..\src\DshController.ViewModels\DshController.ViewModels.csproj" />
+  </ItemGroup>
+
+</Project>

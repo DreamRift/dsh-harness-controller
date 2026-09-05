@@ -1,0 +1,38 @@
+# 约定检查的例外清单（重构 2.0）
+# 格式：<规则ID> <相对路径> # 理由
+# 规则：R1=文件 400 行上限  R2=Core 禁 UI  R3=裸 catch  R4=async void  R5=App 同步阻塞
+#
+# 本清单是"历史欠账台账"，随各阶段完成逐条删除；新代码不得新增例外。
+# 当前状态（2026-09，质量欠账清还）：
+#   · R3 已全面清零：25 个挂账文件逐条补具体理由注释/日志承接，台账 R3 行全部删除；
+#     三处用户可见吞错改接日志（MainWindow 主题保存 / 应用设置保存、
+#     PluginMarketPanel 数据源保存），控制流不变。
+#   · R1 已随拆分清除：BackendManager(→5 partial)、PluginCatalog(→5 partial)、
+#     PluginMarketPanel(→4 partial)、PluginManagePanel(≤400 后摘除过期条目)；
+#     剩余 5 条 R1（MainWindow/HomeManager/InstanceDiscovery/Cli/CoreSelfTest，
+#     437~571 行）经用户裁决「收益<风险，留台账另开工单」（2026-09 组收官）。
+#   · R4 保留的均为事件处理器的 async void（WinUI 惯用法）。
+
+# --- P3 已完成：InstancePanel 拆成 7 个 ≤400 行的 partial 文件，纯逻辑抽到 ViewModels 层 ---
+# （R1/R3 欠账已清；仅保留事件处理器的 async void 例外）
+R4 src\DshController.App\InstancePanel.xaml.cs
+R4 src\DshController.App\Instances\InstancePanel.Version.cs
+R4 src\DshController.App\Instances\InstancePanel.Status.cs
+R4 src\DshController.App\Instances\InstancePanel.Reports.cs
+R4 src\DshController.App\Instances\InstancePanel.Create.cs
+R4 src\DshController.App\Instances\InstancePanel.Scan.cs
+R4 src\DshController.App\Instances\InstancePanel.Settings.cs
+
+# --- 两个插件面板合并为一个可复用组件 ---
+R4 src\DshController.App\PluginManagePanel.xaml.cs
+
+# --- Shell/ViewModel ---
+R1 src\DshController.App\MainWindow.xaml.cs
+
+# --- Core 历史大文件（拆分时逐条删除） ---
+R1 src\DshController.Core\HomeManager.cs
+R1 src\DshController.Core\InstanceDiscovery.cs
+
+# --- CLI ---
+R1 src\DshController.App\CommandLine\Cli.cs
+R1 src\DshController.App\CommandLine\CoreSelfTest.cs

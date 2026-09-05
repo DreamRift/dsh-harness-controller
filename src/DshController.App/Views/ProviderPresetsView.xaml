@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ============================================================================
+     ProviderPresetsView — API 页供应商预设编辑（改版·API 预设页 / 供应商编辑页）
+     列表+新建/编辑/删除；弹窗在 App 层 DialogService；页面零直读/直写实例。
+     ============================================================================ -->
+<UserControl
+    x:Class="DshController.Views.ProviderPresetsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:DshController.ViewModels"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource BgBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="34,28,34,12" Spacing="4">
+            <TextBlock Text="PROVIDER PRESETS" Style="{StaticResource PageEyebrow}" />
+            <TextBlock Text="供应商预设" Style="{StaticResource PageTitle}" AutomationProperties.AutomationId="PresetsHost" />
+            <TextBlock Text="全局预设（非实例级）：编辑后经「供应商同步」按预览确认写入实例。" Style="{StaticResource PageSubtitle}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource DshToolbarCard}" Margin="34,0,34,12" Padding="10,6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="BtnPresetAdd" Content="新建预设" Style="{StaticResource BtnCompact}"
+                        Click="BtnPresetAdd_Click" AutomationProperties.AutomationId="BtnPresetAdd" />
+                <Button x:Name="BtnPresetEdit" Content="编辑" Style="{StaticResource BtnCompact}"
+                        Click="BtnPresetEdit_Click" AutomationProperties.AutomationId="BtnPresetEdit" IsEnabled="False" />
+                <Button x:Name="BtnPresetDelete" Content="删除" Style="{StaticResource BtnCompact}"
+                        Click="BtnPresetDelete_Click" AutomationProperties.AutomationId="BtnPresetDelete" IsEnabled="False" />
+                <Button x:Name="BtnPresetSync" Content="同步到实例…" Style="{StaticResource BtnCompact}"
+                        Click="BtnPresetSync_Click" AutomationProperties.AutomationId="BtnPresetSync" IsEnabled="False" />
+            </StackPanel>
+        </Border>
+
+        <ListView x:Name="PresetList" Grid.Row="2" Margin="34,0,34,24" SelectionMode="Single"
+                  SelectionChanged="PresetList_SelectionChanged"
+                  AutomationProperties.AutomationId="PresetList">
+            <ListView.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemForegroundSelected" Color="{ThemeResource BrandPrimaryColor}" />
+            </ListView.Resources>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Padding" Value="10,6" />
+                    <Setter Property="Margin" Value="0,2" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProviderPresetRow">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" VerticalAlignment="Center" CornerRadius="4" Padding="6,1"
+                                Background="{ThemeResource BrandSoftBrush}">
+                            <TextBlock Text="{x:Bind Kind}" FontSize="10.5" Foreground="{ThemeResource LabelSecondaryBrush}" />
+                        </Border>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind Name}" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind MetaText}" FontSize="10.5"
+                                       Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</UserControl>

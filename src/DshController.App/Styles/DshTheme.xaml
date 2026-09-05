@@ -1,0 +1,663 @@
+<!--
+  DSH Controller design system
+
+  Direction: a quiet runtime workbench. The canvas stays neutral, the DSH blue
+  is reserved for primary actions and selected navigation, while the terminal
+  remains intentionally dark so operational output is easy to scan.
+-->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:DshController.Views">
+
+  <ResourceDictionary.ThemeDictionaries>
+    <ResourceDictionary x:Key="Light">
+      <Color x:Key="BgBaseColor">#F4F6FA</Color>
+      <Color x:Key="ShellColor">#F8FAFD</Color>
+      <Color x:Key="BgCardColor">#FFFFFF</Color>
+      <Color x:Key="BgSubtleColor">#F8FAFD</Color>
+      <Color x:Key="BgCodeColor">#0D1726</Color>
+      <Color x:Key="LabelPrimaryColor">#101828</Color>
+      <Color x:Key="LabelSecondaryColor">#526071</Color>
+      <Color x:Key="LabelTertiaryColor">#6B7788</Color>
+      <Color x:Key="BorderColor">#1A101828</Color>
+      <Color x:Key="BorderStrongColor">#2B101828</Color>
+      <Color x:Key="BrandPrimaryColor">#3964FE</Color>
+      <Color x:Key="BrandPrimaryHoverColor">#2F56E8</Color>
+      <Color x:Key="BrandPrimaryPressedColor">#2445C4</Color>
+      <Color x:Key="BrandSoftColor">#E9EEFF</Color>
+      <Color x:Key="ControlHoverColor">#EEF2F7</Color>
+      <Color x:Key="ControlPressedColor">#E2E8F0</Color>
+      <Color x:Key="OnBrandColor">#FFFFFF</Color>
+      <Color x:Key="StateRunColor">#138A63</Color>
+      <Color x:Key="StateRunSoftColor">#DDF6EB</Color>
+      <Color x:Key="StateStartingColor">#B86E00</Color>
+      <Color x:Key="StateStartingSoftColor">#FFF0D3</Color>
+      <Color x:Key="StateStopColor">#6B7788</Color>
+      <Color x:Key="StateStopSoftColor">#EEF1F5</Color>
+      <Color x:Key="DangerColor">#B42318</Color>
+      <Color x:Key="DangerSoftColor">#FDE9E7</Color>
+      <Color x:Key="ConsoleTextColor">#D7E2F0</Color>
+      <Color x:Key="ConsoleMutedColor">#91A3B8</Color>
+      <Color x:Key="ConsoleControlColor">#22344C</Color>
+      <Color x:Key="ConsoleControlHoverColor">#2B4563</Color>
+      <Color x:Key="ConsoleControlPressedColor">#365675</Color>
+    </ResourceDictionary>
+
+    <ResourceDictionary x:Key="Dark">
+      <Color x:Key="BgBaseColor">#101827</Color>
+      <Color x:Key="ShellColor">#141E2E</Color>
+      <Color x:Key="BgCardColor">#1A2638</Color>
+      <Color x:Key="BgSubtleColor">#202D40</Color>
+      <Color x:Key="BgCodeColor">#09111D</Color>
+      <Color x:Key="LabelPrimaryColor">#F3F6FA</Color>
+      <Color x:Key="LabelSecondaryColor">#A9B6C7</Color>
+      <Color x:Key="LabelTertiaryColor">#8493A8</Color>
+      <Color x:Key="BorderColor">#26FFFFFF</Color>
+      <Color x:Key="BorderStrongColor">#3AFFFFFF</Color>
+      <Color x:Key="BrandPrimaryColor">#6686FF</Color>
+      <Color x:Key="BrandPrimaryHoverColor">#7B98FF</Color>
+      <Color x:Key="BrandPrimaryPressedColor">#4F6FE4</Color>
+      <Color x:Key="BrandSoftColor">#23345F</Color>
+      <Color x:Key="ControlHoverColor">#253448</Color>
+      <Color x:Key="ControlPressedColor">#2D3C51</Color>
+      <Color x:Key="OnBrandColor">#FFFFFF</Color>
+      <Color x:Key="StateRunColor">#43D19C</Color>
+      <Color x:Key="StateRunSoftColor">#153B31</Color>
+      <Color x:Key="StateStartingColor">#F4B94F</Color>
+      <Color x:Key="StateStartingSoftColor">#4A3514</Color>
+      <Color x:Key="StateStopColor">#93A1B3</Color>
+      <Color x:Key="StateStopSoftColor">#263244</Color>
+      <Color x:Key="DangerColor">#FF8278</Color>
+      <Color x:Key="DangerSoftColor">#4A2426</Color>
+      <Color x:Key="ConsoleTextColor">#D9E6F5</Color>
+      <Color x:Key="ConsoleMutedColor">#8CA3BD</Color>
+      <Color x:Key="ConsoleControlColor">#1F334C</Color>
+      <Color x:Key="ConsoleControlHoverColor">#294564</Color>
+      <Color x:Key="ConsoleControlPressedColor">#355673</Color>
+    </ResourceDictionary>
+  </ResourceDictionary.ThemeDictionaries>
+
+  <!-- 显示名单源适配器（ViewModels\InstanceDisplayName 的形状桥；见 改版·环境端口命名） -->
+  <conv:DisplayLabelConverter x:Key="DisplayLabel" />
+  <conv:DisplayTooltipConverter x:Key="DisplayTooltip" />
+
+  <!-- ========================= semantic brushes ========================= -->
+  <SolidColorBrush x:Key="BgBaseBrush" Color="{ThemeResource BgBaseColor}" />
+  <SolidColorBrush x:Key="ShellBrush" Color="{ThemeResource ShellColor}" />
+  <SolidColorBrush x:Key="BgCardBrush" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="BgSubtleBrush" Color="{ThemeResource BgSubtleColor}" />
+  <SolidColorBrush x:Key="BgCodeBrush" Color="{ThemeResource BgCodeColor}" />
+  <SolidColorBrush x:Key="LabelPrimaryBrush" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="LabelSecondaryBrush" Color="{ThemeResource LabelSecondaryColor}" />
+  <SolidColorBrush x:Key="LabelTertiaryBrush" Color="{ThemeResource LabelTertiaryColor}" />
+  <SolidColorBrush x:Key="BorderBrushToken" Color="{ThemeResource BorderColor}" />
+  <SolidColorBrush x:Key="BorderStrongBrush" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="BrandPrimaryBrush" Color="{ThemeResource BrandPrimaryColor}" />
+  <SolidColorBrush x:Key="BrandPrimaryHoverBrush" Color="{ThemeResource BrandPrimaryHoverColor}" />
+  <SolidColorBrush x:Key="BrandPrimaryPressedBrush" Color="{ThemeResource BrandPrimaryPressedColor}" />
+  <SolidColorBrush x:Key="BrandSoftBrush" Color="{ThemeResource BrandSoftColor}" />
+  <SolidColorBrush x:Key="ControlHoverBrush" Color="{ThemeResource ControlHoverColor}" />
+  <SolidColorBrush x:Key="ControlPressedBrush" Color="{ThemeResource ControlPressedColor}" />
+  <SolidColorBrush x:Key="OnBrandBrush" Color="{ThemeResource OnBrandColor}" />
+  <SolidColorBrush x:Key="StateRunBrush" Color="{ThemeResource StateRunColor}" />
+  <SolidColorBrush x:Key="StateRunSoftBrush" Color="{ThemeResource StateRunSoftColor}" />
+  <SolidColorBrush x:Key="StateStartingBrush" Color="{ThemeResource StateStartingColor}" />
+  <SolidColorBrush x:Key="StateStartingSoftBrush" Color="{ThemeResource StateStartingSoftColor}" />
+  <SolidColorBrush x:Key="StateStopBrush" Color="{ThemeResource StateStopColor}" />
+  <SolidColorBrush x:Key="StateStopSoftBrush" Color="{ThemeResource StateStopSoftColor}" />
+  <SolidColorBrush x:Key="DangerBrush" Color="{ThemeResource DangerColor}" />
+  <SolidColorBrush x:Key="DangerSoftBrush" Color="{ThemeResource DangerSoftColor}" />
+  <SolidColorBrush x:Key="ConsoleTextBrush" Color="{ThemeResource ConsoleTextColor}" />
+  <SolidColorBrush x:Key="ConsoleMutedBrush" Color="{ThemeResource ConsoleMutedColor}" />
+  <SolidColorBrush x:Key="ConsoleControlBrush" Color="{ThemeResource ConsoleControlColor}" />
+  <SolidColorBrush x:Key="ConsoleControlHoverBrush" Color="{ThemeResource ConsoleControlHoverColor}" />
+  <SolidColorBrush x:Key="ConsoleControlPressedBrush" Color="{ThemeResource ConsoleControlPressedColor}" />
+
+  <!-- Default-state fallbacks used by WinUI templates. Component styles below
+       override these where a surface needs a different contrast pair. -->
+  <SolidColorBrush x:Key="ButtonBackground" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource ControlHoverColor}" />
+  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource ControlPressedColor}" />
+  <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="{ThemeResource BgSubtleColor}" />
+  <SolidColorBrush x:Key="ButtonForeground" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{ThemeResource LabelTertiaryColor}" />
+  <SolidColorBrush x:Key="ButtonBorderBrush" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushDisabled" Color="{ThemeResource BorderColor}" />
+
+  <!-- Text and ComboBox states are explicit too, so WinUI's templates never
+       fall back to a system black/white value on hover or focus. -->
+  <SolidColorBrush x:Key="TextControlForeground" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{ThemeResource LabelTertiaryColor}" />
+  <SolidColorBrush x:Key="TextControlBackground" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{ThemeResource BgSubtleColor}" />
+  <SolidColorBrush x:Key="TextControlBorderBrush" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="{ThemeResource BorderStrongColor}" />
+  <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{ThemeResource BrandPrimaryColor}" />
+  <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{ThemeResource BorderColor}" />
+
+  <SolidColorBrush x:Key="ComboBoxForeground" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxForegroundPointerOver" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxForegroundPressed" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxForegroundFocused" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxForegroundFocusedPressed" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxForegroundDisabled" Color="{ThemeResource LabelTertiaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxBackground" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="ComboBoxBackgroundPointerOver" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="ComboBoxBackgroundPressed" Color="{ThemeResource ControlPressedColor}" />
+  <SolidColorBrush x:Key="ComboBoxBackgroundDisabled" Color="{ThemeResource BgSubtleColor}" />
+  <SolidColorBrush x:Key="ComboBoxBackgroundUnfocused" Color="{ThemeResource BgCardColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForeground" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundPressed" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPointerOver" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundSelectedPressed" Color="{ThemeResource LabelPrimaryColor}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundDisabled" Color="{ThemeResource LabelTertiaryColor}" />
+
+  <SolidColorBrush x:Key="HyperlinkButtonForeground" Color="{ThemeResource BrandPrimaryColor}" />
+  <SolidColorBrush x:Key="HyperlinkButtonForegroundPointerOver" Color="{ThemeResource BrandPrimaryHoverColor}" />
+  <SolidColorBrush x:Key="HyperlinkButtonForegroundPressed" Color="{ThemeResource BrandPrimaryPressedColor}" />
+
+  <!-- ========================= typography ========================= -->
+  <Style x:Key="Wordmark" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI Semibold" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="CharacterSpacing" Value="100" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+  </Style>
+
+  <Style x:Key="PageEyebrow" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CharacterSpacing" Value="120" />
+    <Setter Property="Foreground" Value="{ThemeResource BrandPrimaryBrush}" />
+  </Style>
+
+  <Style x:Key="PageTitle" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Segoe UI Semibold" />
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+  </Style>
+
+  <Style x:Key="PageSubtitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style x:Key="CardTitle" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+  </Style>
+
+  <!-- 设置项行形专用说明小字（标题+说明+编辑器 的“说明”位；实例/应用两设置区共用） -->
+  <Style x:Key="SettingHint" TargetType="TextBlock" BasedOn="{StaticResource HelperText}">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style x:Key="FieldLabel" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style x:Key="HelperText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelTertiaryBrush}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <Style x:Key="FooterText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelTertiaryBrush}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+
+  <Style x:Key="MonoText" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+  </Style>
+
+  <Style x:Key="SectionHeader" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CharacterSpacing" Value="80" />
+    <Setter Property="Foreground" Value="{ThemeResource BrandPrimaryBrush}" />
+    <Setter Property="Margin" Value="0,8,0,0" />
+  </Style>
+
+  <Style x:Key="NavCaption" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="CharacterSpacing" Value="80" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelTertiaryBrush}" />
+  </Style>
+
+  <!-- ========================= surfaces ========================= -->
+  <Style x:Key="DshCard" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BgCardBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderBrushToken}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="20,18" />
+  </Style>
+
+  <Style x:Key="DshCardTight" TargetType="Border" BasedOn="{StaticResource DshCard}">
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+
+  <Style x:Key="DshToolbarCard" TargetType="Border" BasedOn="{StaticResource DshCardTight}">
+    <Setter Property="Background" Value="{ThemeResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderBrushToken}" />
+  </Style>
+
+  <Style x:Key="DshHeroCard" TargetType="Border" BasedOn="{StaticResource DshCard}">
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="22,20" />
+  </Style>
+
+  <Style x:Key="DshInfoCard" TargetType="Border" BasedOn="{StaticResource DshCardTight}">
+    <Setter Property="Background" Value="{ThemeResource BrandSoftBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BrandSoftBrush}" />
+  </Style>
+
+  <Style x:Key="DshSidebarCard" TargetType="Border" BasedOn="{StaticResource DshCardTight}">
+    <Setter Property="Background" Value="{ThemeResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderBrushToken}" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="CornerRadius" Value="10" />
+  </Style>
+
+  <Style x:Key="DshConsoleHeader" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="12,12,0,0" />
+    <Setter Property="Padding" Value="14,8" />
+  </Style>
+
+  <Style x:Key="DshConsoleFrame" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="0,0,12,12" />
+  </Style>
+
+  <!-- ========================= stable button templates ========================= -->
+  <!-- These templates deliberately animate only the surface. Foreground is
+       always TemplateBound, so a hover can never turn readable text black. -->
+  <ControlTemplate x:Key="DshPrimaryButtonTemplate" TargetType="Button">
+    <ContentPresenter x:Name="ContentPresenter" Background="{TemplateBinding Background}"
+                      Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BrandPrimaryHoverBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource BrandPrimaryPressedBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <Storyboard>
+              <DoubleAnimation Duration="0" To="0.45" Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" />
+            </Storyboard>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+    </ContentPresenter>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key="DshSecondaryButtonTemplate" TargetType="Button">
+    <ContentPresenter x:Name="ContentPresenter" Background="{TemplateBinding Background}"
+                      Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlHoverBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlPressedBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <Storyboard>
+              <DoubleAnimation Duration="0" To="0.45" Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" />
+            </Storyboard>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+    </ContentPresenter>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key="DshDangerButtonTemplate" TargetType="Button">
+    <ContentPresenter x:Name="ContentPresenter" Background="{TemplateBinding Background}"
+                      Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource DangerSoftBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource DangerSoftBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <Storyboard>
+              <DoubleAnimation Duration="0" To="0.45" Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" />
+            </Storyboard>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+    </ContentPresenter>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key="DshIconButtonTemplate" TargetType="Button">
+    <ContentPresenter x:Name="ContentPresenter" Background="{TemplateBinding Background}"
+                      Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlHoverBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ControlPressedBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <Storyboard>
+              <DoubleAnimation Duration="0" To="0.45" Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" />
+            </Storyboard>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+    </ContentPresenter>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key="DshConsoleButtonTemplate" TargetType="Button">
+    <ContentPresenter x:Name="ContentPresenter" Background="{TemplateBinding Background}"
+                      Foreground="{TemplateBinding Foreground}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" Content="{TemplateBinding Content}"
+                      ContentTemplate="{TemplateBinding ContentTemplate}" Padding="{TemplateBinding Padding}"
+                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                      VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                      CornerRadius="{TemplateBinding CornerRadius}">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ConsoleControlHoverBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <Storyboard>
+              <ObjectAnimationUsingKeyFrames Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Background">
+                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource ConsoleControlPressedBrush}" />
+              </ObjectAnimationUsingKeyFrames>
+            </Storyboard>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <Storyboard>
+              <DoubleAnimation Duration="0" To="0.45" Storyboard.TargetName="ContentPresenter" Storyboard.TargetProperty="Opacity" />
+            </Storyboard>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+    </ContentPresenter>
+  </ControlTemplate>
+
+  <!-- ========================= controls ========================= -->
+  <Style x:Key="BtnPrimary" TargetType="Button">
+    <Setter Property="Template" Value="{StaticResource DshPrimaryButtonTemplate}" />
+    <Setter Property="Background" Value="{ThemeResource BrandPrimaryBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource OnBrandBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="16,10" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="MinWidth" Value="108" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="UseLayoutRounding" Value="True" />
+  </Style>
+
+  <Style x:Key="BtnSecondary" TargetType="Button">
+    <Setter Property="Template" Value="{StaticResource DshSecondaryButtonTemplate}" />
+    <Setter Property="Background" Value="{ThemeResource BgCardBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="15,10" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderStrongBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="MinWidth" Value="100" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="UseLayoutRounding" Value="True" />
+  </Style>
+
+  <Style x:Key="BtnDangerGhost" TargetType="Button" BasedOn="{StaticResource BtnSecondary}">
+    <Setter Property="Template" Value="{StaticResource DshDangerButtonTemplate}" />
+    <Setter Property="Foreground" Value="{ThemeResource DangerBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource DangerBrush}" />
+  </Style>
+
+  <!-- 行内动作钮（升级/卸载/刷新这类）：统一 padding 与最小尺寸，禁止逐处硬编码 -->
+  <Style x:Key="BtnInline" TargetType="Button" BasedOn="{StaticResource BtnSecondary}">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Padding" Value="13,8" />
+    <Setter Property="MinHeight" Value="34" />
+  </Style>
+
+  <Style x:Key="BtnCompact" TargetType="Button" BasedOn="{StaticResource BtnSecondary}">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <!-- 顶栏页按钮（改版·顶栏四页）：常态=透明底+次级字色；选中态=品牌底+品牌字色+半粗。
+       两态成对切换（代码换 Style），主题切换由 ThemeResource 自动跟随。 -->
+  <Style x:Key="BtnPage" TargetType="Button" BasedOn="{StaticResource BtnSecondary}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Normal" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="Padding" Value="15,7" />
+    <Setter Property="CornerRadius" Value="9" />
+  </Style>
+
+  <Style x:Key="BtnPageActive" TargetType="Button" BasedOn="{StaticResource BtnPage}">
+    <Setter Property="Background" Value="{ThemeResource BrandSoftBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource BrandPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <!-- 左边栏竖排行（两栏页面壳）：占满栏宽、文字左对齐；成对切换同顶栏钮 -->
+  <Style x:Key="BtnRail" TargetType="Button" BasedOn="{StaticResource BtnPage}">
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Padding" Value="13,8" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+
+  <Style x:Key="BtnRailActive" TargetType="Button" BasedOn="{StaticResource BtnRail}">
+    <Setter Property="Background" Value="{ThemeResource BrandSoftBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource BrandPrimaryBrush}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+
+  <!-- 顶栏右侧工具区钮（工具区与日志底栏）：图标+小字成组、幽灵底；成对切换同 BtnPage -->
+  <Style x:Key="BtnTool" TargetType="Button" BasedOn="{StaticResource BtnIcon}">
+    <Setter Property="Padding" Value="11,6" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="CornerRadius" Value="9" />
+  </Style>
+
+  <Style x:Key="BtnToolActive" TargetType="Button" BasedOn="{StaticResource BtnTool}">
+    <Setter Property="Background" Value="{ThemeResource BrandSoftBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource BrandPrimaryBrush}" />
+  </Style>
+
+  <Style x:Key="BtnIcon" TargetType="Button">
+    <Setter Property="Template" Value="{StaticResource DshIconButtonTemplate}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="MinWidth" Value="40" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+
+  <Style x:Key="BtnConsole" TargetType="Button">
+    <Setter Property="Template" Value="{StaticResource DshConsoleButtonTemplate}" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{ThemeResource ConsoleMutedBrush}" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Padding" Value="8,4" />
+    <Setter Property="MinHeight" Value="28" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <Style x:Key="BtnConsoleToggle" TargetType="Button" BasedOn="{StaticResource BtnConsole}">
+    <Setter Property="Foreground" Value="{ThemeResource ConsoleTextBrush}" />
+    <Setter Property="Background" Value="{ThemeResource ConsoleControlBrush}" />
+    <Setter Property="Padding" Value="9,4" />
+  </Style>
+
+  <Style x:Key="InputBox" TargetType="TextBox">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="Padding" Value="11,8" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Background" Value="{ThemeResource BgCardBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderStrongBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style x:Key="InputCombo" TargetType="ComboBox">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelPrimaryBrush}" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Background" Value="{ThemeResource BgCardBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderStrongBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+
+  <Style x:Key="LogBox" TargetType="TextBox">
+    <Setter Property="IsReadOnly" Value="True" />
+    <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Background" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BgCodeBrush}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="0,0,12,12" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="TextWrapping" Value="NoWrap" />
+    <Setter Property="AcceptsReturn" Value="True" />
+    <Setter Property="Foreground" Value="{ThemeResource ConsoleTextBrush}" />
+  </Style>
+
+  <Style x:Key="Chip" TargetType="Border">
+    <Setter Property="Background" Value="{ThemeResource BgSubtleBrush}" />
+    <Setter Property="BorderBrush" Value="{ThemeResource BorderBrushToken}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="9,4" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <Style x:Key="ChipText" TargetType="TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{ThemeResource LabelSecondaryBrush}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <GridLength x:Key="SettingsLabelWidth">110</GridLength>
+</ResourceDictionary>

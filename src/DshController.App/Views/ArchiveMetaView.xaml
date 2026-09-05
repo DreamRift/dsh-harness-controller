@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ============================================================================
+     ArchiveMetaView — 档案页主区的「元信息一览」（改版·元信息一览）
+     随左栏选中呈现单份档案的镜像字段（代际/runtime/退役时间…）；
+     数据只经视图模型读档案（AllUsage 内存快照），页面零取数。
+     独立成 UserControl 是 x:Bind 的形状要求（UsageView/InstancesRailView 同型）。
+     ============================================================================ -->
+<UserControl
+    x:Class="DshController.Views.ArchiveMetaView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:vm="using:DshController.ViewModels"
+    mc:Ignorable="d">
+
+    <ScrollViewer Background="{ThemeResource BgBaseBrush}" VerticalScrollBarVisibility="Auto"
+                  AutomationProperties.AutomationId="ArchiveMetaPanel">
+        <StackPanel MaxWidth="760" HorizontalAlignment="Left" Margin="34,28,34,30" Spacing="14">
+            <StackPanel Spacing="5">
+                <TextBlock Text="档案元信息" Style="{StaticResource PageEyebrow}" />
+                <TextBlock x:Name="MetaTitle" AutomationProperties.AutomationId="MetaTitle" Text="{x:Bind ViewModel.Title}"
+                           Style="{StaticResource PageTitle}" />
+                <TextBlock Text="{x:Bind ViewModel.Subtitle}" Style="{StaticResource PageSubtitle}" />
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                    <Border CornerRadius="4" Padding="8,3" Background="{ThemeResource BrandSoftBrush}">
+                        <TextBlock x:Name="MetaState" AutomationProperties.AutomationId="MetaState" Text="{x:Bind ViewModel.StateLine}"
+                                   FontSize="11.5" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                    </Border>
+                    <Button x:Name="BtnRename" Content="改名" Style="{StaticResource BtnCompact}"
+                            Click="BtnRename_Click" AutomationProperties.AutomationId="BtnRename" />
+                </StackPanel>
+            </StackPanel>
+
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="档案镜像字段" Style="{StaticResource CardTitle}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Rows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ArchiveMetaRow">
+                                <Grid ColumnSpacing="14" Padding="0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="130" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Bind Label}" Style="{StaticResource HelperText}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Value}" FontSize="12.5"
+                                               Foreground="{ThemeResource LabelPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

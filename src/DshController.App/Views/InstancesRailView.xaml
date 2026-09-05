@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ============================================================================
+     InstancesRailView — 实例页左边栏的「启动序列表」（改版·启动序列表）
+     行=状态点+名称+端口+运行态；数据只经视图模型读档案（清单+liveness 结论）。
+     独立成 UserControl 是 x:Bind ItemTemplate 的形状要求（UsageView 同型）。
+     ============================================================================ -->
+<UserControl
+    x:Class="DshController.Views.InstancesRailView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:DshController.Views"
+    xmlns:vm="using:DshController.ViewModels"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <!-- 与 UsageView 同型：x:Bind 的 Converter 必须在模板可及的资源域（UserControl 级）声明 -->
+        <views:BoolToVisibilityConverter x:Key="RailBoolToVis" />
+        <views:InverseBoolToVisibilityConverter x:Key="RailInverseBoolToVis" />
+    </UserControl.Resources>
+
+    <StackPanel>
+        <TextBlock x:Name="TxtRailHeader" Text="实例 · 按最近启动" Style="{StaticResource NavCaption}" Margin="4,2,0,2" />
+        <ListView x:Name="RailList" SelectionMode="Single" BorderThickness="0" Background="Transparent"
+                  Padding="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                  SelectionChanged="RailList_SelectionChanged">
+            <ListView.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemForegroundSelected" Color="{ThemeResource BrandPrimaryColor}" />
+            </ListView.Resources>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Padding" Value="6,4" />
+                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:InstanceRailRow">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0" Width="10" VerticalAlignment="Center">
+                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Fill="{ThemeResource StateRunBrush}" Visibility="{x:Bind Running, Converter={StaticResource RailBoolToVis}}" />
+                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Fill="{ThemeResource StateStopBrush}" Visibility="{x:Bind Running, Converter={StaticResource RailInverseBoolToVis}}" />
+                        </Grid>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="{x:Bind TooltipText}">
+                            <TextBlock Text="{x:Bind Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock Text="{x:Bind SubText}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                       Foreground="{ThemeResource LabelTertiaryBrush}" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Text="{x:Bind StateText}" FontSize="10.5" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource LabelTertiaryBrush}" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </StackPanel>
+</UserControl>

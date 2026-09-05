@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dev design surface: every token, control style and page state on one screen. -->
+<UserControl
+    x:Class="DshController.Views.GalleryView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <ScrollViewer Background="{ThemeResource BgBaseBrush}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="34,28,34,30" Spacing="18" MaxWidth="1000" HorizontalAlignment="Left">
+
+            <StackPanel Spacing="5">
+                <TextBlock Text="DEV GALLERY" Style="{StaticResource PageEyebrow}" />
+                <TextBlock Text="设计台" Style="{StaticResource PageTitle}" />
+                <TextBlock Style="{StaticResource PageSubtitle}"
+                           Text="改样式只看这一页：所有设计令牌、控件样式与状态分支都用假数据渲染在这里，不需要制造真实运行条件。用 --dev 启动即可见。" />
+            </StackPanel>
+
+            <!-- 颜色令牌 -->
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="颜色令牌" Style="{StaticResource CardTitle}" />
+                    <TextBlock Style="{StaticResource HelperText}"
+                               Text="切换标题栏的主题按钮可同时检查浅色/深色两套值。" />
+                    <ItemsControl x:Name="SwatchHost">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- 排版 -->
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="排版" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="PAGE EYEBROW" Style="{StaticResource PageEyebrow}" />
+                    <TextBlock Text="页面标题 PageTitle" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="页面副标题 PageSubtitle：说明这一页在做什么。" Style="{StaticResource PageSubtitle}" />
+                    <TextBlock Text="卡片标题 CardTitle" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="字段标签 FieldLabel" Style="{StaticResource FieldLabel}" />
+                    <TextBlock Text="辅助说明 HelperText：解释规则与后果。" Style="{StaticResource HelperText}" />
+                    <TextBlock Text="等宽文本 MonoText: C:\Users\me\.dsh\profiles\web" Style="{StaticResource MonoText}" />
+                    <TextBlock Text="页脚 FooterText" Style="{StaticResource FooterText}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 按钮与输入 -->
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="按钮与输入" Style="{StaticResource CardTitle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Style="{StaticResource BtnPrimary}" Content="主操作" />
+                        <Button Style="{StaticResource BtnSecondary}" Content="次操作" />
+                        <Button Style="{StaticResource BtnDangerGhost}" Content="危险操作" />
+                        <Button Style="{StaticResource BtnCompact}" Content="紧凑" />
+                        <Button Style="{StaticResource BtnPrimary}" Content="禁用态" IsEnabled="False" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBox Style="{StaticResource InputBox}" Width="200" Text="输入框" />
+                        <TextBox Style="{StaticResource InputBox}" Width="140" PlaceholderText="占位文本" />
+                        <ComboBox Style="{StaticResource InputCombo}" Width="160" SelectedIndex="0">
+                            <ComboBoxItem Content="下拉选项 A" />
+                            <ComboBoxItem Content="下拉选项 B" />
+                        </ComboBox>
+                        <ToggleSwitch OnContent="开" OffContent="关" IsOn="True" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 状态与徽标 -->
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="状态与徽标" Style="{StaticResource CardTitle}" />
+                    <StackPanel x:Name="StateHost" Orientation="Horizontal" Spacing="14" />
+                    <StackPanel x:Name="FacetHost" Orientation="Horizontal" Spacing="10" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Style="{StaticResource Chip}"><TextBlock Text="bundle 生效" Style="{StaticResource ChipText}" /></Border>
+                        <Border Style="{StaticResource Chip}"><TextBlock Text="来自插件市场" Style="{StaticResource ChipText}" /></Border>
+                        <Border Style="{StaticResource Chip}"><TextBlock Text="官方基础包" Style="{StaticResource ChipText}" /></Border>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 卡片与空态 -->
+            <Border Style="{StaticResource DshCard}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="卡片与空态" Style="{StaticResource CardTitle}" />
+                    <Border Style="{StaticResource DshCardTight}">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="紧凑卡 DshCardTight" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock Text="用于列表项与 KPI。" Style="{StaticResource HelperText}" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource DshInfoCard}">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE946;" FontSize="15"
+                                      Foreground="{ThemeResource BrandPrimaryBrush}" />
+                            <TextBlock Style="{StaticResource HelperText}" Text="信息卡 DshInfoCard：解释性提示。" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource DshToolbarCard}">
+                        <TextBlock Text="工具条卡 DshToolbarCard" Style="{StaticResource HelperText}" />
+                    </Border>
+                    <StackPanel Spacing="10" HorizontalAlignment="Center" MaxWidth="420" Margin="0,8,0,0">
+                        <Border Width="52" Height="52" CornerRadius="16" Background="{ThemeResource BrandSoftBrush}"
+                                HorizontalAlignment="Center">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE71D;" FontSize="22"
+                                      Foreground="{ThemeResource BrandPrimaryBrush}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <TextBlock TextWrapping="Wrap" TextAlignment="Center"
+                                   Foreground="{ThemeResource LabelSecondaryBrush}"
+                                   Text="空态：说明为什么空，并给出下一步动作。" />
+                        <ProgressRing IsActive="True" Width="20" Height="20" HorizontalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

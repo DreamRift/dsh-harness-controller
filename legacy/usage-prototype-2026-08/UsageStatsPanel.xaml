@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Usage analytics (ZCode/Codex style): whole page scrolls; KPI strip + full-width heatmap +
+     time-filtered total trend (crosshair profile) + model donut + session list. -->
+<UserControl
+    x:Class="DshController.UsageStatsPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:local="using:DshController"
+    mc:Ignorable="d">
+
+    <Grid Background="{ThemeResource BgBaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================== 整页滚动容器 ==================== -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+            <StackPanel Margin="30,26,24,12" Spacing="10">
+
+                <!-- header -->
+                <StackPanel Spacing="5" Margin="0,0,0,4">
+                    <TextBlock Text="USAGE ANALYTICS" Style="{StaticResource PageEyebrow}" />
+                    <TextBlock x:Name="TxtPageTitle" Text="用量统计" Style="{StaticResource PageTitle}" />
+                    <TextBlock x:Name="TxtPageSub" Text="汇总各实例 harness 会话的 token 消耗；平时读取应用目录本地备份。"
+                               Style="{StaticResource PageSubtitle}" />
+                </StackPanel>
+
+                <!-- toolbar -->
+                <Border Style="{StaticResource DshToolbarCard}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="240" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" x:Name="LblScope" Text="统计范围" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" x:Name="CmbScope" Style="{StaticResource InputCombo}" HorizontalAlignment="Stretch"
+                                  SelectionChanged="CmbScope_SelectionChanged"
+                                  ToolTipService.ToolTip="选择全部实例汇总或单个实例">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="2" x:Name="BtnRefresh" Style="{StaticResource BtnCompact}" Click="BtnRefresh_Click"
+                                ToolTipService.ToolTip="从实例 HOME 读取最新数据并立即更新应用目录本地备份">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
+                                <TextBlock x:Name="TxtBtnRefresh" Text="刷新" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="3" x:Name="BtnWake" Style="{StaticResource BtnCompact}" Click="BtnWake_Click"
+                                Visibility="Collapsed"
+                                ToolTipService.ToolTip="读取 WSL 实例数据需要发行版运行；点击唤醒发行版后自动重新读取">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE7E8;" FontSize="12" />
+                                <TextBlock x:Name="TxtBtnWake" Text="唤醒并读取" />
+                            </StackPanel>
+                        </Button>
+                        <Button Grid.Column="5" x:Name="BtnViewOverview" Content="总览" Click="BtnView_Click" Tag="overview" Padding="15,6" />
+                        <Button Grid.Column="6" x:Name="BtnViewSessions" Content="会话明细" Click="BtnView_Click" Tag="sessions" Padding="15,6" />
+                    </Grid>
+                </Border>
+
+                <!-- ==================== 时间范围（全局筛选，Token 活动除外） ==================== -->
+                <Border Style="{StaticResource DshToolbarCard}" Padding="14,10">
+                    <Grid RowSpacing="8">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 快捷范围单独一行，避免自定义日期挤压按钮和标签。 -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                            <TextBlock x:Name="LblRange" Text="时间范围" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="0,0,2,0" />
+                            <Button x:Name="BtnRange7" Content="近 7 日" Click="BtnRange_Click" Tag="7" Padding="10,3" FontSize="12" />
+                            <Button x:Name="BtnRange30" Content="近 30 日" Click="BtnRange_Click" Tag="30" Padding="10,3" FontSize="12" />
+                            <Button x:Name="BtnRangeAll" Content="全部" Click="BtnRange_Click" Tag="all" Padding="10,3" FontSize="12" />
+                            <Button x:Name="BtnRangeCustom" Content="自定义" Click="BtnRange_Click" Tag="custom" Padding="10,3" FontSize="12" />
+                        </StackPanel>
+
+                        <!-- CalendarDatePicker 是单框输入，日期格式固定且有足够宽度显示完整。 -->
+                        <StackPanel x:Name="RangeCustomRow" Grid.Row="1" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                            <TextBlock x:Name="LblRangeStart" Text="开始" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                                       Visibility="Collapsed" Margin="0,0,2,0" />
+                            <CalendarDatePicker x:Name="PickStart" DateChanged="PickRange_DateChanged" Width="154" MinWidth="154"
+                                                MinHeight="34" FontSize="12" DateFormat="{}{year.full}-{month.integer(2)}-{day.integer(2)}"
+                                                PlaceholderText="选择日期" IsGroupLabelVisible="False"
+                                                Background="{ThemeResource BgCardBrush}"
+                                                BorderBrush="{ThemeResource BorderStrongBrush}" BorderThickness="1"
+                                                Visibility="Collapsed" />
+                            <TextBlock x:Name="LblRangeSep" Text="—" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                                       Visibility="Collapsed" />
+                            <TextBlock x:Name="LblRangeEnd" Text="结束" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                                       Visibility="Collapsed" Margin="2,0,0,0" />
+                            <CalendarDatePicker x:Name="PickEnd" DateChanged="PickRange_DateChanged" Width="154" MinWidth="154"
+                                                MinHeight="34" FontSize="12" DateFormat="{}{year.full}-{month.integer(2)}-{day.integer(2)}"
+                                                PlaceholderText="选择日期" IsGroupLabelVisible="False"
+                                                Background="{ThemeResource BgCardBrush}"
+                                                BorderBrush="{ThemeResource BorderStrongBrush}" BorderThickness="1"
+                                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ==================== KPI strip（Codex 风格卡片：主值 + 明细副行） ==================== -->
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Style="{StaticResource DshCardTight}" Padding="16,12">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="KpiLblTotal" Text="总 Token 数" Style="{StaticResource HelperText}" FontSize="11" />
+                            <TextBlock x:Name="KpiTotal" Text="—" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource BrandPrimaryBrush}" />
+                            <TextBlock x:Name="KpiTotalSub" Text="" Style="{StaticResource HelperText}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="1" Style="{StaticResource DshCardTight}" Padding="16,12">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="KpiLblRequests" Text="总请求数" Style="{StaticResource HelperText}" FontSize="11" />
+                            <TextBlock x:Name="KpiRequests" Text="—" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock x:Name="KpiRequestsSub" Text="" Style="{StaticResource HelperText}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="2" Style="{StaticResource DshCardTight}" Padding="16,12">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="KpiLblSessions" Text="会话" Style="{StaticResource HelperText}" FontSize="11" />
+                            <TextBlock x:Name="KpiSessions" Text="—" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock x:Name="KpiSessionsSub" Text="" Style="{StaticResource HelperText}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="3" Style="{StaticResource DshCardTight}" Padding="16,12"
+                            ToolTipService.ToolTip="输入侧缓存命中率 = 缓存读取 / (未缓存输入 + 缓存读取)">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="KpiLblHit" Text="缓存命中率" Style="{StaticResource HelperText}" FontSize="11" />
+                            <TextBlock x:Name="KpiHitRate" Text="—" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock x:Name="KpiHitRateSub" Text="" Style="{StaticResource HelperText}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                    <Border Grid.Column="4" Style="{StaticResource DshCardTight}" Padding="16,12"
+                            ToolTipService.ToolTip="有 token 记录的本地日期数（按天数据来自会话日志解析）">
+                        <StackPanel Spacing="3">
+                            <TextBlock x:Name="KpiLblActive" Text="活跃天数" Style="{StaticResource HelperText}" FontSize="11" />
+                            <TextBlock x:Name="KpiActiveDays" Text="—" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            <TextBlock x:Name="KpiActiveDaysSub" Text="" Style="{StaticResource HelperText}" FontSize="10.5"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ==================== 总览视图 ==================== -->
+                <StackPanel x:Name="ViewOverview" Spacing="10" Visibility="Collapsed">
+
+                    <!-- Token 活动（GitHub 风格热力图，铺满整栏，不随时间范围筛选） -->
+                    <Border Style="{StaticResource DshCard}" Padding="18,14">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock x:Name="TxtHeatTitle" Text="Token 活动" Style="{StaticResource CardTitle}" />
+                                <TextBlock x:Name="TxtHeatHint" Text="每日 Token 总量 · 悬停查看当天明细 · 不受时间范围影响" Style="{StaticResource HelperText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Grid x:Name="HeatMapHost" HorizontalAlignment="Stretch" />
+                            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+                                <TextBlock x:Name="TxtHeatMin" Text="少" Style="{StaticResource HelperText}" Margin="0,0,2,0" />
+                                <Border x:Name="Swatch0" Width="11" Height="11" CornerRadius="3" />
+                                <Border x:Name="Swatch1" Width="11" Height="11" CornerRadius="3" />
+                                <Border x:Name="Swatch2" Width="11" Height="11" CornerRadius="3" />
+                                <Border x:Name="Swatch3" Width="11" Height="11" CornerRadius="3" />
+                                <Border x:Name="Swatch4" Width="11" Height="11" CornerRadius="3" />
+                                <TextBlock x:Name="TxtHeatMax" Text="多" Style="{StaticResource HelperText}" Margin="2,0,0,0" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 每日 Token 趋势（总消耗平滑曲线 + 悬停剖面） -->
+                    <Border Style="{StaticResource DshCard}" Padding="18,14">
+                        <StackPanel Spacing="10">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock x:Name="TxtTrendTitle" Text="每日 Token 趋势" Style="{StaticResource CardTitle}" />
+                                <TextBlock x:Name="TxtTrendHint" Text="悬停查看逐日剖面" Style="{StaticResource HelperText}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Canvas x:Name="TrendHost" Height="300" Background="Transparent"
+                                    PointerMoved="TrendHost_PointerMoved" PointerExited="TrendHost_PointerExited" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 模型用量（环形占比 + 图例明细） -->
+                    <Border Style="{StaticResource DshCard}" Padding="18,14">
+                        <StackPanel Spacing="10">
+                            <TextBlock x:Name="TxtModelTitle" Text="模型用量" Style="{StaticResource CardTitle}" />
+                            <Grid ColumnSpacing="20">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0" Width="220" Height="220">
+                                    <Canvas x:Name="DonutHost" />
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="0">
+                                        <TextBlock x:Name="DonutTotal" Text="—" FontSize="21" FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center"
+                                                   Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                        <TextBlock x:Name="TxtDonutUnit" Text="tokens" FontSize="11" HorizontalAlignment="Center"
+                                                   Foreground="{ThemeResource LabelSecondaryBrush}" />
+                                    </StackPanel>
+                                </Grid>
+                                <ScrollViewer Grid.Column="1" MaxHeight="300" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                                    <StackPanel x:Name="ModelLegendHost" Spacing="6" />
+                                </ScrollViewer>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ==================== 会话明细视图 ==================== -->
+                <StackPanel x:Name="TableSessions" Spacing="8" Visibility="Collapsed">
+                    <Border Background="Transparent" BorderBrush="{ThemeResource BorderBrushToken}"
+                            BorderThickness="0,0,0,1" Padding="14,0,14,6">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="110" />
+                                <ColumnDefinition Width="56" />
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="112" />
+                                <ColumnDefinition Width="120" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" x:Name="HdrSession" Text="会话" Style="{StaticResource FieldLabel}" />
+                            <TextBlock Grid.Column="1" x:Name="HdrInstance" Text="实例" Style="{StaticResource FieldLabel}" />
+                            <TextBlock Grid.Column="2" x:Name="HdrCreated" Text="创建时间" Style="{StaticResource FieldLabel}" />
+                            <TextBlock Grid.Column="3" x:Name="HdrTurns" Text="轮次" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                            <TextBlock Grid.Column="4" x:Name="HdrIn" Text="未缓存输入" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                            <TextBlock Grid.Column="5" x:Name="HdrCacheRead" Text="缓存读取" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                            <TextBlock Grid.Column="6" x:Name="HdrCacheWrite" Text="缓存写入" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                            <TextBlock Grid.Column="7" x:Name="HdrOut" Text="输出" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                            <TextBlock Grid.Column="8" x:Name="HdrTotal" Text="总计" Style="{StaticResource FieldLabel}" TextAlignment="Right" />
+                        </Grid>
+                    </Border>
+                    <ListView x:Name="ListSessions" SelectionMode="None" Padding="0,0,6,10">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:UsageSessionRow">
+                                <Border Style="{StaticResource DshCardTight}" Margin="0,0,0,8" Padding="14,12"
+                                        ToolTipService.ToolTip="{x:Bind ToolTip}">
+                                    <Grid ColumnSpacing="14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="130" />
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="56" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="120" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Bind Title}" FontSize="13"
+                                                   Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind InstanceText}" FontSize="12"
+                                                   Foreground="{ThemeResource LabelSecondaryBrush}" TextTrimming="CharacterEllipsis"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind CreatedText}" Style="{StaticResource HelperText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{x:Bind TurnsText}" FontSize="12" TextAlignment="Right"
+                                                   Foreground="{ThemeResource LabelSecondaryBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="4" Text="{x:Bind InText}" Style="{StaticResource MonoText}" TextAlignment="Right" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="5" Text="{x:Bind CacheReadText}" Style="{StaticResource MonoText}" TextAlignment="Right" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="6" Text="{x:Bind CacheWriteText}" Style="{StaticResource MonoText}" TextAlignment="Right" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="7" Text="{x:Bind OutText}" Style="{StaticResource MonoText}" TextAlignment="Right" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="8" Text="{x:Bind TotalText}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right"
+                                                   VerticalAlignment="Center" Foreground="{ThemeResource BrandPrimaryBrush}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+
+                <!-- 空状态 -->
+                <StackPanel x:Name="EmptyState" Visibility="Collapsed" VerticalAlignment="Center"
+                            HorizontalAlignment="Center" Spacing="10" MaxWidth="480" Margin="0,40">
+                    <Border Width="52" Height="52" CornerRadius="16" Background="{ThemeResource BrandSoftBrush}"
+                            HorizontalAlignment="Center">
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE9D2;" FontSize="22"
+                                  Foreground="{ThemeResource BrandPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <TextBlock x:Name="TxtEmpty" Text="" TextWrapping="Wrap" TextAlignment="Center"
+                               Foreground="{ThemeResource LabelSecondaryBrush}" HorizontalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ==================== status ==================== -->
+        <Grid Grid.Row="1" Margin="30,8,30,10" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ProgressRing Grid.Column="0" x:Name="BusyRing" Width="18" Height="18" IsActive="False" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" x:Name="TxtStatus" Style="{StaticResource FooterText}" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="2" x:Name="TxtUpdated" Style="{StaticResource FooterText}" VerticalAlignment="Center" />
+        </Grid>
+    </Grid>
+</UserControl>

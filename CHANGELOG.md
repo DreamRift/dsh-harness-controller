@@ -3,6 +3,137 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [2.0.0] - 开发中（重构 1.0，进行中）
+
+> 计划全文见 `docs/REFACTOR-2.0-PLAN.md`。目标：实例档案子系统 + 代码精简 + 便于迭代的界面架构。
+
+### P0 地基（已完成）
+
+- **工程拆分**：单工程 → `DshController.slnx` 三工程（`src/DshController.Core` 纯逻辑类库、
+  `src/DshController.App` WinUI 3 可执行、`tests/DshController.Tests` 离线单测）。
+  产物名与 CLI 参数不变，仍是 `DshController.exe`。
+- **Core 与 UI 解耦**：新增 `IUiDispatcher` 抽象取代 Core 里的 `DispatcherQueue` 依赖，
+  Core 现为 `net10.0` 纯托管库（零 WinUI 引用），xUnit 可直接引用做毫秒级离线测试。
+- **状态目录统一**：`instances.json` 等状态从 exe 旁迁到 `%LOCALAPPDATA%\DshController\`
+  （本机此前存在 5 份互不相通的副本）；首次运行自动从 exe 旁导入（只复制不删除），
+  `portable.marker` 可切回便携模式；目标为空清单而源非空时会接管并备份，避免"先跑新构建再部署"丢清单。
+- **单源化**：新增 `AppPaths`（全部落盘位置）与 `AppVersion`（版本号读程序集），
+  消除报告目录、HOME 根、`~/.dsh`、版本号等 6+ 处重复定义；`build.ps1` 的 zip 版本号也从 csproj 解析。
+- **质量门禁**：新增 `tools/check-conventions.ps1`（文件行数上限 / Core 禁 UI 引用 / 裸 catch 必须写理由 /
+  async void 限事件处理器 / App 层禁同步阻塞），构建前执行、违规即失败，历史欠账登记在
+  `tools/conventions-allow.txt` 并随阶段清零；`build.ps1` 现在会先跑机检与离线单测再构建。
+- **测试**：首批 36 条离线断言（路径净化、版本解析与规范化、实例配置归一、市场记录读写、
+  状态目录与迁移边界），`dotnet test` < 1s。
+
+### P1 实例档案子系统（已完成）
+
+- **实例档案（Instance Archive）**：每个实例一份 `%LOCALAPPDATA%\DshController\archives\<id>.json`，
+  界面上关于实例的信息**统一从档案读取**，不再各页面现场扫描。四条不变量：
+  单飞（同一实例同一分面并发只采一次）、失败不覆盖成功数据、删除只标记退役（档案永久保留）、落盘去抖。
+- **分面（facet）与各自的刷新间隔**：`identity`（清单镜像，零成本）、`liveness`（前台 2s / 后台 20s）、
+  `harness`（24h）、`plugins`（6h）、`home`（24h）、`wslEnv`（1h）、`usage`（预留给 P2：运行中 30min / 停止 6h）。
+  全部可在「应用设置 → 数据刷新」调整，0 = 只在手动刷新或相关操作后更新；带总开关。
+- **统一调度器**：全应用一个 1 秒评估循环取代原来两个面板各自常驻的轮询定时器；
+  当前可见实例优先、全局并发上限 2、WSL 类采集串行（wsl.exe 往返昂贵）、全程可取消。
+- **事件驱动失效**：实例启动成功 → 版本/HOME/插件/WSL 环境失效；插件装卸升级 → 插件分面失效；
+  实例设置变更、实例删除同理。界面在新数据到达前继续显示旧值 + "上次成功于"。
+- **插件市场 / 插件管理两页改为读档案**：冷启动即有版本与已装列表（此前每次进入页面都要重扫 HOME、
+  每次重启应用都要重探版本）；"刷新"按钮改为强制重采。
+- **新增 CLI `--archive-check [--instance <id>] [--facet <名>] [--force]`**：打印各实例各分面的
+  状态/新鲜度/耗时/来源/错误，并补采从未采集过的分面；同时列出已退役档案。
+- **测试**：档案子系统 38 条新断言（仓库读写与损坏兜底、TTL 三态、失败不覆盖、空结果覆盖、
+  跳过记原因、单飞合并、去抖落盘、代际与退役、调度优先级与 WSL 并发预算、策略映射），
+  累计 **74 条离线断言**，`dotnet test` < 0.3s。
+- **过程中修掉两个真实缺陷**（由新测试发现）：① 单飞字典在"采集同步完成"时清理早于登记，
+  导致完成态 Task 永久驻留、后续请求全部拿到陈旧快照；② 刷新间隔按分面名匹配时先 `ToLowerInvariant`
+  再比常量，`wslEnv` 永远匹配不上（该分面从不自动刷新）。
+
+### P2 用量统计并入档案（已完成）
+
+- **token 用量成为档案的一个分面**：原型分支（`test-usage-stats`）的统计核心移植进 Core 并拆成
+  `Usage/UsageModels|UsageParser|UsageScanner|UsageQuery`；口径与官方 token-meter 一致
+  （四分桶、(turn,step) 去重、`uncachedInputTokens` 缺失回退 `inputTokens`、模型名取最近一次 request/header）。
+  数据源：`storages/session_projcache.json`（权威总账）+ `sessions/**/session.jsonl.zstd`（按模型/按天）。
+- **合并时做掉的三处欠账**：① 原型里"按范围聚合"复制了 4 份 → 收敛为唯一的 `UsageQuery.Summarize`；
+  ② 内存/持久化两套 DTO 逐字段镜像 → 合成一套（少一层拷贝也少一处漂移）；
+  ③ 会话样本缓存无上限 → 加容量上限与最久未用淘汰。
+- **WSL 扫描改两段式**：先一次往返只列出 (size, mtime, path)（输出极小），再只对变化过的文件分批取内容；
+  没有变化时第二次往返都不发——原型是每次把整个 sessions 目录 base64 搬一遍。
+- **历史用量不丢**：新增 `--import-usage [路径]` 导入原型的 `usage-backup.json`，
+  **清单里已不存在的实例照样建档并标记退役**——本机实测导入 2 个已删除实例的历史用量。
+  应用启动时也会自动尝试导入一次（幂等，已有更新数据的实例跳过）。
+- **用量统计页（MVVM 样板）**：新增侧边栏「用量统计」页 —— KPI（总 token/请求/会话/缓存命中率/活跃天/热门模型）、
+  每日柱状图、按模型排行、会话明细，支持"全部实例（含已删除）/单实例"与 7 天/30 天/全部范围切换。
+  该页 code-behind 只剩注入与生命周期转发，状态全部经 `x:Bind` 绑定。
+- **新增 ViewModels 工程**（`src/DshController.ViewModels`，net10.0 不依赖 WinUI）：视图模型只认
+  `IArchiveFacade` 接口，于是 UI 逻辑第一次可以离线单测（范围切换、KPI 文案、空态、刷新命令）。
+  这是 P3 拆解现有面板的前置条件。
+- **测试**：用量解析/聚合/帧协议/范围查询/视图模型共 34 条新断言，累计 **108 条**，`dotnet test` < 0.2s。
+- **原型归档**：`test-usage-stats/`（234 MB，含 bin/obj 与一份完整工程副本）已移除，
+  源码留档在 `legacy/usage-prototype-2026-08/`，从此不会再被任何构建吸进去。
+
+### P3 界面重构主体（已完成）
+
+- **两个插件面板的重复代码归零**：目标实例 / profile 归一 / 版本文案 / 已装状态 / 忙态 /
+  过期结果丢弃，此前在市场页与管理页**逐字重复 14 个方法**，现在收敛为 ViewModels 层的
+  `PluginTargetViewModel`（可离线单测）；确认与提示对话框收敛为 `DialogService`（原 ≥10 处同形状代码）；
+  安装/升级/卸载的"跑命令 → 判失败 → 让档案失效 → 提示重启"收敛为 `PluginOpsService`。
+  插件管理页 507 → **321 行**，插件市场页 987 → **846 行**。
+- **InstancePanel 从 1741 行的上帝面板拆成 8 个 partial 文件**（主文件 340 行，其余
+  Wiring 96 / Version 260 / Status 265 / Reports 181 / Create 351 / Scan 315 / Settings 191），
+  **全部 ≤400 行**；其中纯逻辑抽到可测的 `InstanceSettingsValidator`（端口边界、主机空值、
+  版本号规范化、trusted-hosts 拆分）与 `InstancePlanFactory`（id 生成、工作区/HOME 回退规则）。
+  顺带修掉一个体验问题：新实例 id 不再一律带随机后缀（`web-dev` 而不是 `web-dev-a1b2c3`）。
+- **删除两个常驻 1 秒轮询定时器**（页面隐藏也照跑）：在线状态改由档案的 `liveness` 分面驱动，
+  统一调度器按"可见 2s / 后台 20s"采集，面板只订阅结果；用户操作后仍会立即主动探一次。
+- **日志管线增量化**：原来每 100ms 把整段 20 万字符转录重新赋给 TextBox.Text（UI 线程 O(n) 重建），
+  现在是虚拟化列表按行追加（O(1)）；缓冲与裁剪抽成可测的 `LogBuffer`。
+- **约定机检欠账清零**：`tools/conventions-allow.txt` 中 InstancePanel 的 R1/R3 例外全部删除，
+  当前 `check-conventions: PASS`（90 个文件，0 违规）。
+- **测试**：插件目标视图模型 11 条 + 实例设置/新建计划 17 条 + LogBuffer 6 条，累计 **153 条**。
+
+### P4 打磨与守则（已完成）
+
+- **设计台（Dev Gallery）**：`--dev` 启动后侧边栏出现「设计台」——全部颜色令牌、排版、按钮/输入/卡片样式、
+  实例状态四态、档案新鲜度徽标、空态与忙态，全部用假数据摆在一页。WinUI 3 的 XAML 热重载依赖
+  Visual Studio（命令行构建没有），所以改样式的回路定为「改 XAML → 15 秒 Debug 构建 → 看设计台一页」，
+  不必再制造真实运行条件（失败态、WSL 未运行…）。
+- **架构文档与决策记录**：新增 `docs/ARCHITECTURE.md`（分层与依赖方向、档案数据流、落盘位置表、
+  线程模型、界面结构、质量门禁、UI 迭代方式）与 `docs/adr/` 六篇决策记录（工程拆分、状态目录、
+  实例档案、用量并入、不承诺热重载、把守则变成构建门禁）。
+- **裸 catch 清账（部分）**：本轮重构触碰过的文件全部清干净——实例页 8 个 partial、两个插件面板、
+  MainWindow 的日志管线、Core 新增的档案/用量/存储模块；`tools/conventions-allow.txt` 里
+  InstancePanel 的 R1/R3 例外整组删除。**仍有 87 处裸 catch 留在未重写的 Core/CLI 老文件里**
+  （BackendManager、PluginCatalog、WslTools、Cli 等），它们在例外清单里逐条登记、构建时可见，
+  规则是"下次触碰该文件即清理"——不是被忽略，而是被记账。
+- **发布 2.0.0**：`build.ps1` 现在先跑约定机检与离线单测再发布；产物
+  `publish-fixed\DshController-2.0.0-win-x64.zip`，版本号由 csproj 单源提供。
+
+### 修复
+
+- **自检 `[7] 迁移生成 default 实例` 的环境依赖红条**：`--selftest-core` 此前在 bin 目录借用真实
+  `instances.json` 做 fixture，且 `InstanceRegistry.Load()` 会把本机正在运行的后端自动发现进清单，
+  导致"迁移应只生成 1 个实例"的断言随环境漂移。现在自检全程跑在临时状态沙箱里，
+  并新增 `InstanceRegistry.Load(discoverRunningInstances:false)` 保证确定性——本机结果由 84/1 变为 **85/0**。
+
+## [未发布]
+
+### 修复
+
+- **插件管理 / 插件市场首次进入不显示实例 harness 版本**：版本探测此前只挂在
+  目标实例下拉框的 `SelectionChanged` 上，而首次进入页面时的默认实例是在
+  `_loadingInstances` 屏蔽期内选中的（该事件不触发，或因实例 id 未变被跳过），
+  信息条一直停在"harness 版本未检测"，必须手动在 Windows / WSL 实例之间切换
+  一次才会探测出来。现把探测并入统一的加载流程（`EnsureVersionAsync`，按实例
+  id 记录已探测状态），首次进入即显示默认实例版本；插件市场同时补上首次进入的
+  已装状态读取（"已安装"标记与兼容性提示不再需要切换实例才出现）。
+- 版本探测与 HOME 读取改为并行，WSL 实例的慢探测不再拖住插件列表渲染；
+  探测中信息条显示"正在检测 harness 版本…"，"版本未检测"只在真的探测失败时出现；
+  两页的「刷新」按钮现在会一并失效版本缓存重新探测。
+- **主工程无法构建**：嵌套的独立工程副本 `test-usage-stats\`（自带 csproj）被 SDK
+  默认通配符吸进主工程，导致成百上千个"重复定义"编译错误；已按 `legacy\` 同样
+  的方式在 csproj 中排除。
+
 ## [1.0.0] - 2026-08-29
 
 > 首个正式版本：现代化控制台界面、统一主题系统与更稳定的运行时体验。

@@ -1,0 +1,64 @@
+<!-- TreatAsLocalProperty：解决方案级构建会把 Platform="Any CPU" 作为全局属性传进来，
+     而 WindowsAppSDK 自包含只支持具体架构；声明为本地属性后，下面的 x64 赋值才能生效。 -->
+<Project Sdk="Microsoft.NET.Sdk" TreatAsLocalProperty="Platform;PlatformTarget">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>DshController</RootNamespace>
+    <!-- 产物名保持 DshController.exe（发布目录与既有快捷方式不变） -->
+    <AssemblyName>DshController</AssemblyName>
+    <Version>2.0.0</Version>
+    <Description>DeepSeek Harness 后端控制器（WinUI 3）</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+
+    <!-- 平台：仅 x64；SDK 会在 csproj 之前把空 Platform 预置为 AnyCPU，需一并覆盖 -->
+    <!-- 解决方案级构建会传入 "Any CPU"（带空格），而 WindowsAppSDK 自包含只支持具体架构 -->
+    <Platform Condition=" '$(Platform)' == '' Or '$(Platform)' == 'AnyCPU' Or '$(Platform)' == 'Any CPU' ">x64</Platform>
+    <PlatformTarget Condition=" '$(PlatformTarget)' == '' Or '$(PlatformTarget)' == 'AnyCPU' ">x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+    <!-- WinUI 3 / Windows App SDK：免打包 + 运行时自包含（目标机零前置） -->
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <!-- build.ps1 -Portable 时连同 .NET 一并自包含，免装 .NET Desktop Runtime -->
+    <SelfContained Condition=" '$(Portable)' == 'true' ">true</SelfContained>
+    <SelfContained Condition=" '$(Portable)' != 'true' ">false</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- 自定义 Program.Main（CLI 自检入口在 WinUI 引导之前执行） -->
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
+
+    <!-- MVVM 源生成器要求 partial 属性（C# 13+）；旧代码在新语言版本下完全兼容 -->
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <SatelliteResourceLanguages>zh-CN;en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.8249" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DshController.Core\DshController.Core.csproj" />
+    <ProjectReference Include="..\DshController.ViewModels\DshController.ViewModels.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 运行时需要的资源：AppWindow.SetIcon 使用 ico；whale.svg 供窗口内展示；
+         test-server.js 为 spawn-test-node 自检辅助 -->
+    <Content Include="Assets\app.ico" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\whale.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\whale-white.svg" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="test-server.js" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>
