@@ -150,6 +150,55 @@ namespace DshController.Tests
             Assert.Equal("33.3%", vm.HitRateText);
             Assert.True(vm.UsageRefreshEnabled);
             Assert.Contains("档案更新于", vm.UsageUpdatedText);      // fake 的 usage 分面快照带 LastGoodAt
+            Assert.Equal("", vm.UsageBarsNote);                      // 单日数据无截断
+        }
+
+        [Fact]
+        public void Show档案用量超30天_柱图截断带标注()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a1", "甲", false, UsageSpanDays(35));
+            var vm = new ArchiveMetaViewModel(fake);
+            vm.Show("a1");
+
+            Assert.Equal(30, vm.DailyBars.Count);                    // 详情卡只画最近 30 根
+            Assert.Contains("30", vm.UsageBarsNote);                 // W3：不再静默截断
+            Assert.Contains("35", vm.UsageBarsNote);
+        }
+
+        /// <summary>跨多天的用量造数：一个模型带 N 天按天分桶 + 一条会话。</summary>
+        private static UsageFacetData UsageSpanDays(int days)
+        {
+            var m = new UsageModelStat
+            {
+                Provider = "deepseek",
+                Model = "chat",
+                Requests = days,
+                Totals = new TokenBuckets { UncachedInput = 10 }
+            };
+            for (int i = 0; i < days; i++)
+            {
+                string day = DateTime.Now.Date.AddDays(-i).ToString("yyyy-MM-dd");
+                m.Daily[day] = new TokenBuckets { UncachedInput = 10 };
+                m.DailyRequests[day] = 1;
+            }
+            var data = new UsageFacetData
+            {
+                ModelsComplete = true,
+                Models = new List<UsageModelStat> { m },
+                SessionCount = 1,
+                RequestCount = days,
+                Totals = m.Totals.Clone()
+            };
+            data.Sessions.Add(new UsageSessionStat
+            {
+                SessionId = "s0",
+                Title = "会话 0",
+                CreatedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Turns = 1,
+                Totals = new TokenBuckets { UncachedInput = 10 }
+            });
+            return data;
         }
 
         [Fact]

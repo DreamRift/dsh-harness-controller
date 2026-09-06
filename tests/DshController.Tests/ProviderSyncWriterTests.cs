@@ -257,10 +257,10 @@ namespace DshController.Tests
             var write = ProviderSyncWrite.For(AcmePreset());
             Assert.True(new ProviderSyncWriter().Apply(_file, write, out string err), "err=" + err);
             string afterFirst = File.ReadAllText(_file);
-            Assert.Equal(1, Directory.GetFiles(_dir, "*.bak-*").Length);   // 首写有备份
+            Assert.Single(Directory.GetFiles(_dir, "*.bak-*"));            // 首写有备份
             Assert.True(new ProviderSyncWriter().Apply(_file, write, out err), "err=" + err);
             Assert.Equal(afterFirst, File.ReadAllText(_file));
-            Assert.Equal(1, Directory.GetFiles(_dir, "*.bak-*").Length);   // 无变化不产生新备份
+            Assert.Single(Directory.GetFiles(_dir, "*.bak-*"));            // 无变化不产生新备份
         }
     }
 }

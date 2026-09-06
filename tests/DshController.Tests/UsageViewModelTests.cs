@@ -86,6 +86,70 @@ namespace DshController.Tests
         }
 
         [Fact]
+        public void 全部档柱图超60天给出截断标注()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a", "实例A", false, UsageSpanDays(70));
+
+            var vm = new UsageViewModel(fake);
+            vm.OnShown();
+
+            Assert.Equal(60, vm.DailyBars.Count);                   // 只画最近 60 根
+            Assert.Contains("60", vm.BarsNote);                     // W3：不再静默截断
+            Assert.Contains("70", vm.BarsNote);
+
+            vm.SetRangeCommand.Execute("7");
+            Assert.Equal("", vm.BarsNote);                          // 明确范围本就只剩范围内数据，无截断
+        }
+
+        [Fact]
+        public void 全部档柱图不满60天无标注()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a", "实例A", false, Usage(1000));             // 只有今天 1 天
+
+            var vm = new UsageViewModel(fake);
+            vm.OnShown();
+
+            Assert.Equal("", vm.BarsNote);
+        }
+
+        /// <summary>跨多天的用量造数：一个模型带 N 天按天分桶 + 一条会话。</summary>
+        private static UsageFacetData UsageSpanDays(int days)
+        {
+            var m = new UsageModelStat
+            {
+                Provider = "deepseek",
+                Model = "chat",
+                Requests = days,
+                Totals = new TokenBuckets { UncachedInput = 10 }
+            };
+            for (int i = 0; i < days; i++)
+            {
+                string day = DateTime.Now.Date.AddDays(-i).ToString("yyyy-MM-dd");
+                m.Daily[day] = new TokenBuckets { UncachedInput = 10 };
+                m.DailyRequests[day] = 1;
+            }
+            var data = new UsageFacetData
+            {
+                ModelsComplete = true,
+                Models = new List<UsageModelStat> { m },
+                SessionCount = 1,
+                RequestCount = days,
+                Totals = m.Totals.Clone()
+            };
+            data.Sessions.Add(new UsageSessionStat
+            {
+                SessionId = "s0",
+                Title = "会话 0",
+                CreatedAtMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                Turns = 1,
+                Totals = new TokenBuckets { UncachedInput = 10 }
+            });
+            return data;
+        }
+
+        [Fact]
         public void 没有任何用量时给出空态提示()
         {
             var vm = new UsageViewModel(new FakeArchiveFacade());

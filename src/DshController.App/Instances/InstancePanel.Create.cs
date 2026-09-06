@@ -340,21 +340,42 @@ namespace DshController
                     (pinnedVersion.Length > 0 ? "harness 指定 v" + pinnedVersion : "harness 跟随当前环境") + "）");
 
                 // 新建页同步勾选：勾选 = 把启用的全局预设写入新实例 settings.yaml（失败不阻断创建）
-                // 非官方 → llm-pi-ai.providers.<key>（含思考档/多模态）；官方 → 仅送 llm-deepseek 密钥引用
-                if (chkSyncPresets?.IsChecked == true && home.Length > 0)
+                // 非官方 → llm-pi-ai.providers.<key>（含思考档/多模态）；官方 → 仅送 llm-deepseek 密钥引用；
+                // WSL 实例 → 发行版 Linux 侧 HOME（N7：路径解析一次，发行版未运行时命令会自然唤醒）
+                if (chkSyncPresets?.IsChecked == true)
                 {
                     int written = 0;
                     var syncStore = new ProviderPresetStore();
                     syncStore.Load();
                     var writer = new ProviderSyncWriter();
-                    string settingsPath = Path.Combine(home, "settings.yaml");
+                    string wslSettingsPath = "";
+                    if (IsWslPanel)
+                    {
+                        WslSyncResult resolve = await writer.ResolveWslSettingsPathAsync(def.WslDistro, wslHomeInput);
+                        if (resolve.Path == null)
+                            PushLog("  预设同步跳过：" + resolve.Error);
+                        else
+                            wslSettingsPath = resolve.Path;
+                    }
                     foreach (ProviderPreset preset in syncStore.All())
                     {
                         if (!preset.Enabled) continue;
-                        if (writer.Apply(settingsPath, ProviderSyncWrite.For(preset), out string werr))
+                        bool ok; string werr = "";
+                        if (IsWslPanel)
+                        {
+                            if (wslSettingsPath.Length == 0) { continue; }
+                            WslSyncResult applied = await writer.ApplyWslPathAsync(def.WslDistro, wslSettingsPath, ProviderSyncWrite.For(preset));
+                            ok = applied.Ok; werr = applied.Error;
+                        }
+                        else if (home.Length > 0)
+                        {
+                            ok = writer.Apply(Path.Combine(home, "settings.yaml"), ProviderSyncWrite.For(preset), out werr);
+                        }
+                        else { continue; }
+                        if (ok)
                         {
                             written++;
-                            PushLog("  已同步预设「" + preset.Name + "」 → " + settingsPath);
+                            PushLog("  已同步预设「" + preset.Name + "」→ " + (IsWslPanel ? wslSettingsPath : Path.Combine(home, "settings.yaml")));
                         }
                         else
                         {
@@ -364,10 +385,6 @@ namespace DshController
                     PushLog(written > 0
                         ? "新实例已带 " + written + " 项供应商预设（见 settings.yaml llm-pi-ai.providers）。"
                         : "无启用的供应商预设可同步。");
-                }
-                else if (chkSyncPresets?.IsChecked == true && IsWslPanel)
-                {
-                    PushLog("WSL 实例的 providers 写入走其 Linux 侧 HOME（Windows 侧无 settings.yaml），已跳过。");
                 }
                 NotifyInstancesChanged();
             }

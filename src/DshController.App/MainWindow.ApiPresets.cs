@@ -6,6 +6,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -152,14 +153,14 @@ namespace DshController
                     "同步预览");
                 return;
             }
-            var targets = new List<(string Id, string Label, string HomeDir)>();
+            var targets = new List<(string Id, string Label, string HomeDir, bool IsWsl, string WslDistro, string WslHome)>();
             if (_archive.Instances != null)
             {
                 foreach (InstanceDef d in _archive.Instances)
                 {
                     string home = string.IsNullOrWhiteSpace(d.Home)
                         ? AppPaths.DefaultDshHome : d.Home;
-                    targets.Add((d.Id, InstanceDisplayName.For(d), home));
+                    targets.Add((d.Id, InstanceDisplayName.For(d), home, d.IsWsl, d.WslDistro ?? "", d.WslHome ?? ""));
                 }
             }
             if (targets.Count == 0)
@@ -168,14 +169,16 @@ namespace DshController
                 return;
             }
             var targetPairs = new List<(string Id, string Label)>();
-            foreach ((string id, string label, _) in targets) targetPairs.Add((id, label));
+            foreach ((string id, string label, _, _, _, _) in targets) targetPairs.Add((id, label));
             List<SyncPlanRow> rows = ProviderSyncPlan.PlanFor(preset, targetPairs, id => null);
             ProviderSyncWrite write = ProviderSyncWrite.For(preset);
             var sb = new StringBuilder();
             sb.AppendLine("将同步预设「" + preset.Name + "」到 " + targets.Count + " 台实例：");
             foreach (SyncPlanRow r in rows)
             {
-                sb.AppendLine(" · " + r.InstanceLabel + "  [" + r.Kind + "] " + SyncTargetText(preset) +
+                bool wsl = targets.Any(t => t.Id == r.InstanceId && t.IsWsl);
+                sb.AppendLine(" · " + r.InstanceLabel + (wsl ? "（WSL:写入发行版 Linux 侧 HOME）" : "") +
+                    "  [" + r.Kind + "] " + SyncTargetText(preset) +
                     (r.Fields.Count > 0 ? "（" + string.Join("/", r.Fields) + "）" : ""));
             }
             if (rows.Count > 0)
@@ -200,18 +203,30 @@ namespace DshController
             ContentDialogResult res = await _dialogService.ShowAsync(dlg);
             if (res == ContentDialogResult.Primary)
             {
-                // 真实写入：每台目标实例 settings.yaml 并入（同源渲染；失败不覆盖）
+                // 真实写入：Windows 直写 settings.yaml；WSL 走发行版 Linux 侧 HOME（N7）。
+                // 一次同步只涉及一个预设：WSL 实例解析一次路径后写入（失败不覆盖）。
                 int okCount = 0;
                 var failLines = new System.Collections.Generic.List<string>();
                 var writer = new ProviderSyncWriter();
-                foreach ((string id, string label, string home) in targets)
+                foreach ((string id, string label, string home, bool isWsl, string wslDistro, string wslHome) in targets)
                 {
-                    string settingsPath = System.IO.Path.Combine(home, "settings.yaml");
-                    if (writer.Apply(settingsPath, write, out string werr))
+                    bool ok; string werr = "";
+                    if (isWsl)
                     {
-                        okCount++;
-                        AppendLog("[同步] 已写入 " + label + " · settings.yaml（" + SyncTargetText(preset) + "）");
+                        WslSyncResult resolve = await writer.ResolveWslSettingsPathAsync(wslDistro, wslHome);
+                        WslSyncResult applied = resolve.Path == null
+                            ? resolve
+                            : await writer.ApplyWslPathAsync(wslDistro, resolve.Path, write);
+                        ok = applied.Ok; werr = applied.Error;
+                        if (ok) AppendLog("[同步] 已写入 " + label + " · " + resolve.Path + "（" + SyncTargetText(preset) + "）");
                     }
+                    else
+                    {
+                        string settingsPath = System.IO.Path.Combine(home, "settings.yaml");
+                        ok = writer.Apply(settingsPath, write, out werr);
+                        if (ok) AppendLog("[同步] 已写入 " + label + " · settings.yaml（" + SyncTargetText(preset) + "）");
+                    }
+                    if (ok) okCount++;
                     else
                     {
                         failLines.Add(label + "：" + werr);
