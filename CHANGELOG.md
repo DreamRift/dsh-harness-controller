@@ -3,7 +3,43 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
-## [Unreleased] - 2026-09-06（dev 测试版 · 档案页用量二次改版轮）
+## [2.1.0] - 2026-09-06（正式版 · 挂账清偿轮）
+
+> 用户指令：W1 留台账、W5 与目检三单搁置，其余挂账全部修掉。
+
+- **W6 档案页首开提速**：用量看板 Reload 重构为"帧"模型——快照收集留 UI 线程，
+  Summarize/行构造移后台线程（世代守卫防串台）；看板与详情页的模型排行/会话明细
+  ItemsControl → ListView（虚拟化 + 列表自带滚动）。UIA 首开 **~13s → ~0.5s**（uia 35/35）。
+- **W3 截断标注**：按天柱图超出上限不再静默截断——看板"全部"档超 60 根、
+  详情卡超 30 根时显示"仅显示最近 N 天（共 M 天）"。
+- **W2**：移除日志 flush catch 内残留的 `Debug.WriteLine`。
+- **N7-WSL**：供应商同步接通 WSL 实例（发行版 Linux 侧 HOME；`ResolveWslSettingsPathAsync`
+  展开 ~、内容经 `/mnt/c` 中转、发行版内备份 `.bak-<ts>`、LF、无变化不落盘）；
+  顺带修复 WSL 实例被**误写 Windows 默认 HOME** 的隐藏缺陷。
+- **文档整理**：TEST-RESULTS 压缩为唯一测试账；删除已完结的计划/审计/调研/报告文档；
+  测试证据截图移出版本库（`docs/evidence/` gitignore，历史重写清除）。
+
+## [2.1.0] - 2026-09-06（正式版 · API 页 llm-pi-ai 同步迁移轮）
+
+> 依据 dsh 源码核实：自定义提供方真身 = `llm-pi-ai.providers.<key>`，
+> 根级 `providers:` 全源码无消费方（历史同步写的是死配置）。
+
+- **同步目标迁移**：非官方预设 → `llm-pi-ai.providers.<key>`；**增补式合并**——
+  路由字段更新，模型按 id 匹配（容量/名称预设权威，compat 等未知字段与已有
+  `reasoningEfforts` 声明保留），实例侧多出的模型不删；同 key 幂等不落盘。
+  每次同步自动清除根级 `providers.<key>` 旧块，段空连段移除。
+- **思考强度自动写入**：非官方来源模型同步时自动补四档
+  `reasoningEfforts: {off: null, low: low, high: high, max: max}`
+  （对齐 dsh-thinking-efforts v0.2.0；实例侧已有声明含 `false` 不覆盖）。
+- **多模态自动获取**：探针解析 `architecture.input_modalities`/`input_modalities`/
+  `input`/布尔 `supports_vision` 等别名 → 三态（未知/文本/图文）；编辑卡模型行
+  三态开关，同步时已知多模态写入 `input: [text, image]`（词表对齐 dsh ModelModalityMap）。
+- **官方提供方 = 仅送密钥**：同步只写 `llm-deepseek.apiKeyEnv`（官方模型/思考档/多模态
+  由实例原生适配器提供）；未填密钥整单跳过。启动实例时注入 `DSH_PRESET_*` 环境变量
+  （WSL 经 WSLENV）——密钥值不落任何配置文件。
+- 内置官方 vision-exp 出厂即多模态；旧档缺字段 = 未知（兼容）。
+
+## [2.1.0] - 2026-09-06（正式版 · 档案页用量二次改版轮）
 
 > 用户指令：看板去掉实例卡与范围切换、恒显合并口径；单实例完整用量移入档案详情页。
 
@@ -23,7 +59,7 @@
 - **档案页主区两页互斥**：左栏选中真实档案 → 详情（元信息 + 完整用量）；
   左栏"总计"/无选中 → 用量看板。原"元信息 + 看板上下双显"布局废止。
 
-## [Unreleased] - 2026-09-05（dev 测试版 · API 页照 dsh 模型页适配轮）
+## [2.1.0] - 2026-09-05（正式版 · API 页照 dsh 模型页适配轮）
 
 > 依据：提取官方插件 `@deepseek-ai/dsh-client-ui-settings-models`（0.1.1-rc.2）的模型页
 > 交互逻辑与文案，对 API 页做界面适配（数据/同步引擎沿用既有台账 + 预览/写入单源）。
