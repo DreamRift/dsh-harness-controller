@@ -64,6 +64,31 @@ function Invoke-Click([long]$hwnd, [string]$id) {
     }
     return $false
 }
+function Select-ComboItem([long]$hwnd, [string]$id, [string]$token) {
+    # select the first combo item whose Name contains the token; retries cover
+    # the transient disabled state while the manage page reload is busy
+    for ($try = 1; $try -le 5; $try++) {
+        $el = Find-ById $hwnd $id
+        if ($null -ne $el) {
+            $exp = $null
+            $hasExp = $el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)
+            if ($hasExp) { try { $exp.Expand() } catch { } }
+            Start-Sleep -Milliseconds 400
+            $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
+            $ok = $false
+            foreach ($i in $el.FindAll($TS::Descendants, $condLI)) {
+                if (($i.Current.Name).Contains($token)) {
+                    $pat = $null
+                    if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { try { $pat.Select(); $ok = $true } catch { }; break }
+                }
+            }
+            if ($hasExp) { try { $exp.Collapse() } catch { } }
+            if ($ok) { return $true }
+        }
+        Start-Sleep -Milliseconds 600
+    }
+    return $false
+}
 function Get-Row([long]$hwnd, [string]$rowText) {
     $lv = Find-ById $hwnd 'ListPlugins'
     if ($null -eq $lv) { return $null }
@@ -120,7 +145,7 @@ try {
 
     if (Test-Path $homeU) { Remove-Item -Recurse -Force $homeU }
     New-Item -ItemType Directory -Force -Path (Join-Path $homeU 'profiles\web') | Out-Null
-    $modDir = Join-Path $homeU ('profiles\web\node_modules\' + $pkg.Replace('/', '\'))   # PkgToRelPath 保留 @ 前缀（只转斜杠）
+    $modDir = Join-Path $homeU ('profiles\web\node_modules\' + $pkg.Replace('/', '\'))   # PkgToRelPath keeps the @ prefix (only converts slashes)
     New-Item -ItemType Directory -Force -Path $modDir | Out-Null
     $depObj = @{ name='profile' }
     $depObj.dependencies = @{ $pkg = '*' }
@@ -150,22 +175,10 @@ try {
 
     Invoke-Click $hwnd 'BtnPagePlug' | Out-Null; Start-Sleep -Milliseconds 900
     Invoke-Click $hwnd 'BtnSubManage' | Out-Null; Start-Sleep -Milliseconds 1800
-    $lvT = Find-ById $hwnd 'PluginTargetTree'
-    $selU = $false
-    if ($null -ne $lvT) {
-        $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
-        $condTx = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
-        foreach ($i in $lvT.FindAll($TS::Descendants, $condLI)) {
-            $txt = ''
-            foreach ($tx in $i.FindAll($TS::Descendants, $condTx)) { $txt = $tx.Current.Name; break }
-            if ($txt.StartsWith('windows:3185')) {
-                $pat = $null
-                if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); $selU = $true }
-                break
-            }
-        }
-    }
-    Add-Result $selU 'select-fixture' ('tree row windows:3185=' + $selU)
+    # manage page owns its CmbInstance now (PluginTargetTree was removed in the rework);
+    # item labels are "windows:3185" or "alias (windows:3185)" -> match by Contains
+    $selU = Select-ComboItem $hwnd 'CmbInstance' 'windows:3185'
+    Add-Result $selU 'select-fixture' ('combo item windows:3185=' + $selU)
 
     $row = $null; $hintMs = -1
     $sw = [Diagnostics.Stopwatch]::StartNew()

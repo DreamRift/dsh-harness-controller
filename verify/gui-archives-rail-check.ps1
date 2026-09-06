@@ -179,6 +179,29 @@ Remove-Item -Recurse -Force $homeA -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force $homeR -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $homeA | Out-Null
 New-Item -ItemType Directory -Force -Path $homeR | Out-Null
+# seed a usage ledger into the active fixture home: UsageCollector (windows) reads
+# <HOME>/storages/session_projcache.json, pure filesystem, so the RTEST-A archive
+# gets a usage facet on the mirror pass and the meta view's hero card (big number)
+# renders real numbers instead of the empty state. 2026-09-06 usage-merge round.
+New-Item -ItemType Directory -Force -Path (Join-Path $homeA 'storages') | Out-Null
+$seedProj = @{
+    tables = @{
+        sessions = @{
+            'seed-sess-a1' = @{
+                identity = @{ createdAt = 1788220800000; cwd = 'C:\seed' }
+                rows = @{
+                    title = @{ val = 'seeded-usage-session' }
+                    sessionStats = @{ val = @{ turns = 4 } }
+                    tokenUsage = @{ val = @{ totals = @{
+                        uncachedInputTokens = 1200; cacheReadTokens = 45000
+                        cacheWriteTokens = 3000; outputTokens = 2100 } } }
+                }
+            }
+        }
+    }
+}
+[IO.File]::WriteAllText((Join-Path $homeA 'storages\session_projcache.json'),
+    ($seedProj | ConvertTo-Json -Depth 12), (New-Object System.Text.UTF8Encoding($false)))
 
 try {
     if (Test-Path $reg) { Copy-Item $reg $backup -Force } else { Set-Content -Path $backup -Value '{}' }
@@ -260,6 +283,20 @@ try {
     Add-Result $m1 'meta-active-row' ('title=' + $mTitleName + ' state=' + $mStateName)
     Save-Shot $hwnd 'archives-meta-active'
 
+    # ---- meta usage section (2026-09-06 usage-merge): hero big-number card + resample ----
+    $swU = [Diagnostics.Stopwatch]::StartNew(); $mTotal = $null
+    while ($swU.ElapsedMilliseconds -lt 5000) {
+        $mTotal = Find-ById $hwnd 'MetaUsageTotal'
+        if ($null -ne $mTotal -and -not $mTotal.Current.IsOffscreen -and $mTotal.Current.Name.Length -gt 0) { break }
+        Start-Sleep -Milliseconds 300
+    }
+    $mTotName = ''; if ($null -ne $mTotal) { $mTotName = $mTotal.Current.Name }
+    $dash = [string][char]0x2014
+    $mTotOk = ($null -ne $mTotal -and -not $mTotal.Current.IsOffscreen -and $mTotName.Length -gt 0 -and ($mTotName -ne $dash))
+    $mRef = Find-ById $hwnd 'MetaUsageRefresh'
+    $mRefOk = ($null -ne $mRef -and -not $mRef.Current.IsOffscreen)
+    Add-Result ($mTotOk -and $mRefOk) 'meta-usage-section' ('total=' + $mTotName + ' refresh=' + $mRefOk)
+
     [void](Select-RowBy $hwnd 'windows:3186')
     Start-Sleep -Milliseconds 900
     $mState2 = Find-ById $hwnd 'MetaState'
@@ -274,14 +311,22 @@ try {
     $m3 = ($null -eq $mTitle3 -or $mTitle3.Current.IsOffscreen)
     Add-Result $m3 'meta-totals-falls-back' ('metaTitle offscreen=' + $(if ($null -ne $mTitle3) { $mTitle3.Current.IsOffscreen } else { 'absent-el' }))
 
-    # ---- panel coexistence: active row -> both meta + usage visible ----
+    # ---- panel mutual exclusion (2026-09-06 usage-merge): active row -> meta only ----
+    # MetaUsageArea is a plain StackPanel: WinUI 3 gives it no automation peer, so it
+    # never appears in the UIA tree - detect the section through its exposed children
+    # (hero card MetaUsageTotal / resample button MetaUsageRefresh) instead.
     [void](Select-RowBy $hwnd 'windows:3185')
     Start-Sleep -Milliseconds 1000
     $uHost = Find-ById $hwnd 'UsageHost'
     $mTitle = Find-ById $hwnd 'MetaTitle'
-    $uOk = ($null -ne $uHost -and -not $uHost.Current.IsOffscreen)
+    $uGone = ($null -eq $uHost -or $uHost.Current.IsOffscreen)
     $mOk = ($null -ne $mTitle -and -not $mTitle.Current.IsOffscreen)
-    Add-Result ($uOk -and $mOk) 'panels-both-active' ('usage=' + $uOk + ' meta=' + $mOk)
+    $mArea = Find-ById $hwnd 'MetaUsageArea'
+    if ($null -eq $mArea) { $mArea = Find-ById $hwnd 'MetaUsageTotal' }
+    if ($null -eq $mArea) { $mArea = Find-ById $hwnd 'MetaUsageRefresh' }
+    $mAreaOk = ($null -ne $mArea -and -not $mArea.Current.IsOffscreen)
+    $viaId = 'none'; if ($null -ne $mArea) { $viaId = $mArea.Current.AutomationId }
+    Add-Result ($uGone -and $mOk -and $mAreaOk) 'panels-mutual-exclusive-archive' ('usage-hidden=' + $uGone + ' meta=' + $mOk + ' metaUsage=' + $mAreaOk + ' via=' + $viaId)
 
     # ---- panel coexistence: totals -> usage visible, meta collapsed ----
     [void](Select-RowBy $hwnd $S_TOTALS)
@@ -291,6 +336,11 @@ try {
     $u2Ok = ($null -ne $uHost2 -and -not $uHost2.Current.IsOffscreen)
     $m2Ok = ($null -eq $mTitle2 -or $mTitle2.Current.IsOffscreen)
     Add-Result ($u2Ok -and $m2Ok) 'panels-totals-usage-only' ('usage=' + $u2Ok + ' meta-offscreen=' + $m2Ok)
+
+    # ---- usage dashboard subtitle (2026-09-06 usage-merge): fixed aggregate wording ----
+    $uSub = Find-ById $hwnd 'UsageSubtitle'
+    $uSubOk = ($null -ne $uSub -and -not $uSub.Current.IsOffscreen -and $uSub.Current.Name.Length -gt 0)
+    Add-Result $uSubOk 'usage-subtitle-aggregate' ('subtitle-len=' + $(if ($null -ne $uSub) { $uSub.Current.Name.Length } else { -1 }))
 
     # ---- rename: seeded alias shown everywhere (persisted rename state) ----
     $rows5 = @(Get-RailRows $hwnd)

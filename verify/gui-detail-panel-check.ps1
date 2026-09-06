@@ -18,6 +18,7 @@ $S_RUN    = [string]([char]0x8FD0) + [char]0x884C              # running
 $S_READY  = [string]([char]0x5C31) + [char]0x7EEA              # ready
 $S_STOP   = [string]([char]0x505C) + [char]0x6B62              # stopped
 $S_NOTRUN = [string]([char]0x672A) + [char]0x8FD0 + [char]0x884C  # not-running
+$S_ENVSEL = [string]([char]0x73AF) + [char]0x5883                # environment (env-choice dialog)
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
@@ -72,18 +73,19 @@ function Invoke-Click([long]$hwnd, [string]$id) {
     }
     return $false
 }
-function Select-RailRow([long]$hwnd, [string]$namePrefix) {
+function Select-RailRow([long]$hwnd, [string]$nameContains) {
+    # revamp: rail row template was rebuilt (dot + name/port lines + state text), so match
+    # on the aggregate row text instead of the first Text child only
     $lv = Find-ById $hwnd 'RailList'
     if ($null -eq $lv) { return $false }
     $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
     $condTx = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
     foreach ($i in $lv.FindAll($TS::Descendants, $condLI)) {
-        foreach ($tx in $i.FindAll($TS::Descendants, $condTx)) {
-            if ($tx.Current.Name.StartsWith($namePrefix)) {
-                $pat = $null
-                if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); return $true }
-            }
-            break
+        $rowText = ''
+        foreach ($tx in $i.FindAll($TS::Descendants, $condTx)) { $rowText += ' ' + $tx.Current.Name }
+        if ($rowText.Contains($nameContains)) {
+            $pat = $null
+            if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); return $true }
         }
     }
     return $false
@@ -126,8 +128,10 @@ function Wait-State([long]$hwnd, [string[]]$wantAny, [int]$timeoutMs) {
     }
     return -1
 }
-$ALL_IDS = @('CmbInstance','BtnNew','BtnClone','BtnDelete','BtnScan','BtnStart','BtnRestart','BtnStop','BtnOpen',
-             'BtnCopyUrl','UrlLink','ExpInstanceSettings','VersionText','StatusText','EnvBadgeText','HomeText','PidText')
+# revamp: the per-instance toolbar (CmbInstance/BtnNew/BtnScan) and the VersionText badge
+# are gone; new/scan moved to the rail top (BtnRailNew/BtnRailScan, always visible)
+$ALL_IDS = @('BtnRailNew','BtnRailScan','BtnClone','BtnDelete','BtnStart','BtnRestart','BtnStop','BtnOpen',
+             'BtnCopyUrl','UrlLink','ExpInstanceSettings','StatusText','EnvBadgeText','HomeText','PidText')
 
 $state = Join-Path $env:LOCALAPPDATA 'DshController'
 $reg = Join-Path $state 'instances.json'
@@ -166,21 +170,34 @@ try {
     $absent = @(); foreach ($i in $ALL_IDS) { if (-not (Test-Visible $hwnd $i)) { $absent += $i } }
     Add-Result ($absent.Count -eq 0) 'ext-controls-present' ('missing=' + ($absent -join ','))
     $mExt = ''
-    foreach ($i in @('BtnStart','BtnRestart','BtnStop','BtnOpen','BtnDelete','BtnScan')) { $mExt += $i + '=' + (Get-Enabled $hwnd $i) + ' ' }
+    foreach ($i in @('BtnStart','BtnRestart','BtnStop','BtnOpen','BtnDelete')) { $mExt += $i + '=' + (Get-Enabled $hwnd $i) + ' ' }
     Write-Output ('  enabled-matrix-ext: ' + $mExt)
     Save-Shot $hwnd 'ctx-ext-selected'
-    $scanOk = Invoke-Click $hwnd 'BtnScan'; Start-Sleep -Milliseconds 1500
+    # revamp: scan is the rail-top global entry (BtnRailScan); when a not-running WSL
+    # distro is detected the app first asks permission ("launch WSL to scan?") - close
+    # that prompt if it appears (appearance is environment-dependent; the scan covers
+    # all environments now, so skipping the WSL boot is fine for this probe)
+    $scanOk = Invoke-Click $hwnd 'BtnRailScan'; Start-Sleep -Milliseconds 1500
+    $scanPromptClosed = $false
+    $swS = [Diagnostics.Stopwatch]::StartNew()
+    while ($swS.ElapsedMilliseconds -lt 5000) {
+        $cbS = Find-ById $hwnd 'CloseButton'
+        if ($null -ne $cbS) {
+            $patS = $null
+            if ($cbS.TryGetCurrentPattern($IPC::Pattern, [ref]$patS)) { $patS.Invoke(); $scanPromptClosed = $true; break }
+        }
+        Start-Sleep -Milliseconds 300
+    }
     $urlOk = Invoke-Click $hwnd 'BtnCopyUrl'; Start-Sleep -Milliseconds 500
     $expOk = Invoke-Click $hwnd 'ExpInstanceSettings'; Start-Sleep -Milliseconds 1200
-    $verOk = Invoke-Click $hwnd 'BtnDetectVersion'; Start-Sleep -Milliseconds 2500
     $expVisible = Test-InTree $hwnd 'TxtPort'
-    Add-Result ($scanOk -and $verOk -and $urlOk -and $expOk -and $expVisible) 'ext-readonly-actions' ('scan=' + $scanOk + ' copy=' + $urlOk + ' expand=' + $expOk + ' fields=' + $expVisible + ' detect=' + $verOk)
+    Add-Result ($scanOk -and $urlOk -and $expOk -and $expVisible) 'ext-readonly-actions' ('scan=' + $scanOk + ' wslPromptClosed=' + $scanPromptClosed + ' copy=' + $urlOk + ' expand=' + $expOk + ' fields=' + $expVisible)
     # G1/G3 (subagent cold review): every settings-area interactive control must be present
     # when expanded (existence only; side-effectful ones are deliberately not clicked)
     $missing2 = @()
     # row containers (RowWinHome etc.) are layout panels - not in the UIA control view;
     # their children (TxtHome/BtnBrowseHome/...) prove the row is realized
-    foreach ($i in @('TxtHost','TxtPort','BtnSuggestPort','TxtWorkspace','BtnBrowseWs','BtnOpenWs','TxtHome','BtnBrowseHome','BtnOpenHome','CmbVersion','BtnDetectVersion','BtnFetchVersions','SwAutoOpen','SwStopOnExit','TxtTrustedHosts','BtnCancelInstance','BtnSaveInstance')) {
+    foreach ($i in @('TxtHost','TxtPort','BtnSuggestPort','TxtWorkspace','BtnBrowseWs','BtnOpenWs','TxtHome','BtnBrowseHome','BtnOpenHome','SwAutoOpen','SwStopOnExit','TxtTrustedHosts','BtnCancelInstance','BtnSaveInstance')) {
         if (-not (Test-InTree $hwnd $i)) { $missing2 += $i }
     }
     Add-Result ($missing2.Count -eq 0) 'ext-settings-full-coverage' ('missing=' + ($missing2 -join ','))
@@ -252,14 +269,35 @@ try {
     $clickStop = Invoke-Click $hwnd 'BtnStop'
     $stopMs = Wait-State $hwnd @($S_STOP, $S_NOTRUN, 'Stopped') 30000
     Add-Result ($clickStop -and $stopMs -ge 0) 'test-stopped' ('click=' + $clickStop + ' status-ms=' + $stopMs)
-    # new-instance dialog first awaits a version probe + port suggestion (seconds of latency),
-    # so poll for its cancel button up to 15s, then dismiss it (create flow itself is
-    # covered end-to-end by --selftest-core group [10]/[11]).
-    $newOk = Invoke-Click $hwnd 'BtnNew'
+    # revamp: the new-instance entry is the rail-top button (BtnRailNew); with WSL distros
+    # registered the app first shows an environment-choice dialog (primary = Windows) -
+    # pick it, then the classic create form opens. The form still takes seconds (port
+    # suggestion + async version fill), so poll for its cancel button up to 15s, gated on
+    # the form's ChkSyncPresets checkbox (the only create-form control carrying an
+    # AutomationId, so the env-choice dialog's own cancel button can never be mistaken
+    # for the form's; create flow itself is covered end-to-end by --selftest-core [10]/[11]).
+    $newOk = Invoke-Click $hwnd 'BtnRailNew'
+    $envPicked = $false
+    $swE = [Diagnostics.Stopwatch]::StartNew()
+    while ($swE.ElapsedMilliseconds -lt 8000) {
+        if ($null -ne (Find-ById $hwnd 'ChkSyncPresets')) { break }
+        $pbE = Find-ById $hwnd 'PrimaryButton'
+        if ($null -ne $pbE) {
+            try {
+                if ($pbE.Current.Name.Contains($S_ENVSEL)) {
+                    $patE = $null
+                    if ($pbE.TryGetCurrentPattern($IPC::Pattern, [ref]$patE)) { $patE.Invoke(); $envPicked = $true; break }
+                }
+            } catch { }
+        }
+        Start-Sleep -Milliseconds 400
+    }
+    Start-Sleep -Milliseconds 800
     $anyNew = $false
     $rootNow = $AE::FromHandle([IntPtr]$hwnd)
     $swN = [Diagnostics.Stopwatch]::StartNew()
     while ($swN.ElapsedMilliseconds -lt 15000) {
+        if ($null -eq (Find-ById $hwnd 'ChkSyncPresets')) { Start-Sleep -Milliseconds 400; continue }
         foreach ($bb in $rootNow.FindAll($TS::Descendants, $condBtn)) {
             $nm = $bb.Current.Name
             if ($nm.Contains($S_CANCEL)) {
@@ -273,7 +311,7 @@ try {
         Start-Sleep -Milliseconds 400
     }
     Start-Sleep -Milliseconds 600
-    Add-Result ($newOk -and $anyNew) 'test-new-dialog-cancel' ('new clicked=' + $newOk + ' dialog cancel found=' + $anyNew)
+    Add-Result ($newOk -and $anyNew) 'test-new-dialog-cancel' ('rail-new clicked=' + $newOk + ' envDialogPicked=' + $envPicked + ' dialog cancel found=' + $anyNew)
     # G2 (subagent cold review): clone uses the same dialog path as new - prove it opens and cancels
     $cloneOk = Invoke-Click $hwnd 'BtnClone'
     $cloneDlg = $false

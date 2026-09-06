@@ -88,7 +88,7 @@ function Save-Shot([long]$hwnd, [string]$name) {
 # same element type in all four shells -> strictly comparable), body/far markers per page
 $pages = @(
     @{ key='inst'; btn='BtnPageInst'; body='TxtPageTitle'; far='BtnStart' },
-    @{ key='plug'; btn='BtnPagePlug'; body='TxtFreshness'; far='CmbInstance' },
+    @{ key='plug'; btn='BtnPagePlug'; body='TxtFreshness'; far='TxtProfile' },   # revamp: CmbInstance removed; far marker = market page profile input
     @{ key='arch'; btn='BtnPageArch'; body='UsageHost';    far=$null },
     @{ key='api';  btn='BtnPageApi';  body=$null;          far=$null }
 )

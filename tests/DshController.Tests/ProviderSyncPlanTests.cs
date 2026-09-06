@@ -94,5 +94,65 @@ namespace DshController.Tests
             Assert.Equal("'it''s'", ProviderSyncPlan.Quote("it's"));
             Assert.Equal("''", ProviderSyncPlan.Quote(""));
         }
+
+        // ---- llm-pi-ai 迁移轮：新字段渲染 / 官方预设计划行 --------------------------
+
+        [Fact]
+        public void 规范渲染_非官方模型带input与思考档四档()
+        {
+            var p = Preset();
+            p.ProviderId = "acme";
+            p.Models = new System.Collections.Generic.List<PresetModel>
+            {
+                new PresetModel { Id = "vlm", Multimodal = true }
+            };
+            string text = ProviderSyncPlan.RenderYamlBlock(ProviderConfigMapper.ToEntry(p).Entry);
+            Assert.Contains("input: [text, image]", text);
+            Assert.Contains("reasoningEfforts:", text);
+            Assert.Contains("off: null", text);
+            Assert.Contains("low: low", text);
+            Assert.Contains("high: high", text);
+            Assert.Contains("max: max", text);
+        }
+
+        [Fact]
+        public void 规范渲染_官方模型无思考档_多模态保留input()
+        {
+            string text = ProviderSyncPlan.RenderYamlBlock(
+                ProviderConfigMapper.ToEntry(ProviderPreset.CreateBuiltinDefault()).Entry);
+            Assert.DoesNotContain("reasoningEfforts", text);
+            Assert.Contains("input: [text, image]", text);   // vision-exp 出厂即多模态
+            Assert.DoesNotContain("input: [text]", text);    // 纯文本模型未知模态 → 省略
+        }
+
+        [Fact]
+        public void 官方预设计划_仅密钥引用与清理note()
+        {
+            var official = ProviderPreset.CreateBuiltinDefault();
+            official.ApiKey = "sk-x";
+            var rows = ProviderSyncPlan.PlanFor(official, Instances, id => null);
+            Assert.Equal(2, rows.Count);
+            Assert.All(rows, r =>
+            {
+                Assert.Equal("新增", r.Kind);
+                Assert.Contains("apiKeyEnv（llm-deepseek）", r.Fields);
+                Assert.DoesNotContain("models", r.Fields);
+                Assert.Contains(r.Notes, n => n.Contains("llm-deepseek"));
+                Assert.Contains(r.Notes, n => n.Contains("旧根级 providers.deepseek-official"));
+            });
+        }
+
+        [Fact]
+        public void 官方预设未填密钥_计划为无变化()
+        {
+            var official = ProviderPreset.CreateBuiltinDefault();
+            official.ApiKey = "";
+            var rows = ProviderSyncPlan.PlanFor(official, Instances, id => null);
+            Assert.All(rows, r =>
+            {
+                Assert.Equal("无变化", r.Kind);
+                Assert.Empty(r.Fields);
+            });
+        }
     }
 }

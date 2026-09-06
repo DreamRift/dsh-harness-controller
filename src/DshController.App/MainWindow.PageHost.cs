@@ -36,8 +36,6 @@ namespace DshController
         private AliasStore _aliasStore; // 改版·改名入口：实例别名台账
         private DialogService _dialogService; // 改名/预设弹窗（MainWindow 级，跟随窗根）
         private Microsoft.UI.Dispatching.DispatcherQueueTimer _railTimer;
-        private bool _treeWired;              // 改版·管理实例树：与共享 PluginTargetViewModel 的接 Once
-        private bool _treeSyncing;            // 代码回设选中时的防重入门闩
 
         /// <summary>左栏实例列表初始化（构造里在档案启动后调用一次）。</summary>
         private void RailInit()
@@ -59,7 +57,7 @@ namespace DshController
 
         }
 
-        /// <summary>档案页左栏初始化（构造里在档案启动后调用一次）：行点击落选中态并联动元信息主区。</summary>
+        /// <summary>档案页左栏初始化（构造里在档案启动后调用一次）：行点击落选中态并联动详情主区。</summary>
         private void ArchRailInit()
         {
             _archRail = new ArchivesRailViewModel(_archive);
@@ -68,29 +66,23 @@ namespace DshController
             _aliasStore.Load();
             _dialogService = new DialogService(() => Root?.XamlRoot);   // MainWindow 是 Window，XamlRoot 取自根 Grid
             foreach (var kv in _aliasStore.All()) InstanceDisplayName.SetAlias(kv.Key, kv.Value);
-            _archMeta = new ArchiveMetaViewModel(_archive);
+            _archMeta = new ArchiveMetaViewModel(_archive, m => AppendLog(m));
             PanelArchiveMeta.Bind(_archMeta);
             PanelArchiveMeta.RenameRequested += async id => await RenameArchiveAsync(id);
             RailArch.RowSelected += row => { _archRail.Select(row.Id); ShowArchiveMeta(row.Id); };
         }
 
-        /// <summary>元信息显示 + 用量看板过滤范围同步（双双可见，互不排斥）。</summary>
+        /// <summary>档案页主区互斥（2026-09-06 二次改版）：选中真实档案 → 单实例详情
+        /// （元信息 + 完整用量）；总计行/未知 id → 用量看板（全部实例合并口径）。
+        /// 不在这里调 PanelUsage.OnShown()：行点击不改聚合数据，ApplyPage 进页时统一重渲染，
+        /// 免得首次进页 Reload 跑两遍（旧语义行点击也不触发 Reload）。</summary>
         private void ShowArchiveMeta(string id)
         {
             if (_archMeta == null || PanelArchiveMeta == null || PanelUsage == null) return;
             PanelArchiveMeta.Show(id);
-            Show(PanelArchiveMeta, _archMeta.HasArchive);
-            SyncUsageScope(id);
-        }
-
-        /// <summary>用量看板过滤到左栏选中的档案（总计 → 全部实例）。</summary>
-        private void SyncUsageScope(string id)
-        {
-            var vm = PanelUsage?.ViewModel;
-            if (vm == null || vm.Scopes == null || vm.Scopes.Count == 0) return;
-            var target = vm.Scopes.FirstOrDefault(s =>
-                string.Equals(s.ArchiveId, id, StringComparison.OrdinalIgnoreCase));
-            vm.SelectedScope = target ?? vm.Scopes[0];  // 0 = 全部实例（含已删除）
+            bool meta = _archMeta.HasArchive;
+            Show(PanelArchiveMeta, meta);
+            Show(PanelUsage, _primary == "arch" && !meta);
         }
 
         /// <summary>改名弹窗：输入别名 → 落台账 + 更新全局别名表 + 全应用刷新（原名进 tooltip）。</summary>
@@ -182,16 +174,15 @@ namespace DshController
             {
                 SetRailSelected(BtnSubMarket, _plugSub == "market");
                 SetRailSelected(BtnSubManage, _plugSub == "plugins");
-                bool manage = _plugSub == "plugins";
-                PluginTargetTree.Visibility = manage ? Visibility.Visible : Visibility.Collapsed;
-                if (manage) EnsurePluginTreeWired();
             }
 
             Show(PanelWin, inst && _instSub == "win");
             Show(PanelWsl, inst && _instSub == "wsl");
             Show(PanelMarket, plug && _plugSub == "market");
             Show(PanelPlugins, plug && _plugSub == "plugins");
-            Show(PanelUsage, _primary == "arch");
+            // 档案页主区互斥：详情卡优先（ShowArchiveMeta 已按左栏选中定态并刷新 _archMeta.HasArchive），
+            // 只有总计/无真实档案时看板可见；这里兜住"从其它页切回"的路径
+            Show(PanelUsage, _primary == "arch" && (_archMeta == null || !_archMeta.HasArchive));
             Show(PageSettings, _primary == "settings");
             Show(PanelGallery, _primary == "gallery");
 
@@ -207,47 +198,6 @@ namespace DshController
                 _railTimer?.Start();               // 进实例页才跟 liveness（只读档案，零探测）
             }
             else _railTimer?.Stop();
-        }
-
-        /// <summary>左栏头部小标 = 实例数/运行数（旧环境行能力归并，UpdateFooter 汇聚点驱动）。</summary>
-        internal void UpdateRailHeader(int total, int running)
-        {
-            if (RailWin == null) return;
-            RailWin.SetHeader("实例 " + total + " 台" + (running > 0 ? " · " + running + " 运行中" : "") + " · 按最近启动");
-        }
-
-        // ==================== 管理实例树（与顶栏选择器共享同一份 PluginTargetViewModel） ====================
-
-        private void EnsurePluginTreeWired()
-        {
-            var t = PanelPlugins == null ? null : PanelPlugins.Target;
-            if (t == null) return;
-            if (!_treeWired)
-            {
-                PluginTargetTree.ItemsSource = t.Instances;
-                t.PropertyChanged += (s, e) =>
-                {
-                    if (e.PropertyName == nameof(DshController.ViewModels.PluginTargetViewModel.SelectedInstance))
-                    {
-                        _treeSyncing = true;
-                        try { PluginTargetTree.SelectedItem = t.SelectedInstance; }
-                        finally { _treeSyncing = false; }
-                    }
-                };
-                _treeWired = true;
-            }
-            _treeSyncing = true;
-            try { PluginTargetTree.SelectedItem = t.SelectedInstance; }
-            finally { _treeSyncing = false; }
-        }
-
-        private void PluginTargetTree_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_treeSyncing) return;
-            if (PluginTargetTree.SelectedItem is InstanceDef def)
-            {
-                PanelPlugins.SelectFromTree(def);
-            }
         }
 
         private static void Show(FrameworkElement el, bool visible)

@@ -305,7 +305,8 @@ namespace DshController.Core
                       "h=no; [ -f \"$HOME/.dsh/profiles/web/cordis.yml\" ] && h=yes; " +
                       "echo \"DSHINST|$v|$h|$p\"; " +
                     "fi";
-                var r = WslTools.RunInDistroAsync(distro, script, 60000).GetAwaiter().GetResult();
+                // 90s（原 60s）：离线拉起场景下冷启动发行版首次引导可能很慢，热发行版 60s 假设不成立
+                var r = WslTools.RunInDistroAsync(distro, script, 90000).GetAwaiter().GetResult();
                 return ParseInstallProbeOutput(distro, r.Output);
             }
             catch
@@ -330,6 +331,91 @@ namespace DshController.Core
                 };
             }
             return null;
+        }
+
+        // ==================== 离线拉起探测（已注册未运行发行版） ====================
+
+        /// <summary>离线拉起候选：已注册发行版 − 正在运行 − 已有运行中后端（exclude 参数）。
+        /// 纯内存差集，不启动任何东西。</summary>
+        public static List<string> OfflineBootCandidates(ICollection<string> distrosWithBackend) =>
+            SubtractCandidates(
+                WslTools.ListRegisteredDistrosOffline(),
+                WslTools.ListRunningDistrosAsync().GetAwaiter().GetResult(),
+                distrosWithBackend);
+
+        /// <summary>离线拉起候选的可测纯差集：OrdinalIgnoreCase 相减，null 集合按空处理，顺序保持 registered 枚举顺序。</summary>
+        public static List<string> SubtractCandidates(List<string> registered, List<string> running, ICollection<string> withBackend)
+        {
+            var exclude = new HashSet<string>(
+                (running ?? (IEnumerable<string>)Array.Empty<string>())
+                    .Concat(withBackend ?? (ICollection<string>)Array.Empty<string>()),
+                StringComparer.OrdinalIgnoreCase);
+            var result = new List<string>();
+            if (registered == null) return result;
+            foreach (string d in registered)
+                if (!string.IsNullOrWhiteSpace(d) && !exclude.Contains(d))
+                    result.Add(d);
+            return result;
+        }
+
+        /// <summary>
+        /// 逐个"拉起"未运行发行版做 dsh 安装探测（RunInDistroAsync 即隐式引导发行版），
+        /// 探测完把我们拉起过的发行版 terminate 恢复关机（发行版探测前未运行=内部无用户进程，可安全关闭）。
+        /// 返回"已安装 dsh"的发行版信息；任何单发行版失败只记 log 继续下一个；整体永不抛异常。
+        /// 同步方法：调用方在 Task.Run 上调用（沿用本文件 .GetAwaiter().GetResult() 约定）。
+        /// </summary>
+        public static List<DistroInstallInfo> ProbeOfflineDistrosAsync(IEnumerable<string> distros, Action<string> log = null)
+        {
+            var result = new List<DistroInstallInfo>();
+            try
+            {
+                var booted = new List<string>();
+                foreach (string distro in distros ?? (IEnumerable<string>)Array.Empty<string>())
+                {
+                    if (string.IsNullOrWhiteSpace(distro)) continue;
+                    log?.Invoke("拉起 " + distro + " 探测 dsh 安装…");
+                    try
+                    {
+                        if (WslTools.IsDistroRunningAsync(distro).GetAwaiter().GetResult())
+                        {
+                            DistroInstallInfo running = ProbeInstalledDistro(distro);
+                            if (running != null) result.Add(running);
+                            else log?.Invoke(distro + "：未安装或探测失败");
+                            continue;
+                        }
+                        // 探测前未运行：RunInDistroAsync 会隐式拉起，探测完记入恢复关机集合
+                        booted.Add(distro);
+                        DistroInstallInfo info = ProbeInstalledDistro(distro);
+                        if (info != null) result.Add(info);
+                        else log?.Invoke(distro + "：未安装或探测失败");
+                    }
+                    catch (Exception ex)
+                    {
+                        // 理由: 单发行版探测失败（wsl.exe 异常/超时）只记 log 继续下一个，不阻断其余候选
+                        log?.Invoke(distro + " 探测异常：" + ex.Message);
+                    }
+                }
+                // 恢复关机：只 terminate 我们拉起过的发行版，用户本来就在运行的绝不碰
+                foreach (string distro in booted)
+                {
+                    try
+                    {
+                        WslTools.TerminateDistroAsync(distro).GetAwaiter().GetResult();
+                        log?.Invoke("已恢复 " + distro + " 为关闭状态");
+                    }
+                    catch (Exception ex)
+                    {
+                        // 理由: terminate 失败仅记 log 不抛，恢复失败不影响已取得的探测结果
+                        log?.Invoke("恢复 " + distro + " 关闭失败：" + ex.Message);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 理由: 整体兜底——离线探测是扫描的增强路径，任何异常（如 log 回调抛出）都不得阻断调用方扫描
+                log?.Invoke("离线探测中断：" + ex.Message);
+            }
+            return result;
         }
 
         // ==================== 既有辅助 ====================

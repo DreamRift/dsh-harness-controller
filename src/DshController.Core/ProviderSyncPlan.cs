@@ -9,6 +9,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 
@@ -28,7 +29,8 @@ namespace DshController.Core
     public static class ProviderSyncPlan
     {
         /// <summary>对每个目标实例出计划行；currentOf(id) 返回该实例当前 providers 条目（null=无）。
-        /// 目标清单必须来自内存（档案/预设），禁止扫盘。</summary>
+        /// 目标清单必须来自内存（档案/预设），禁止扫盘。
+        /// 官方预设仅同步密钥引用（llm-deepseek.apiKeyEnv）；非官方写入 llm-pi-ai.providers.<key>。</summary>
         public static List<SyncPlanRow> PlanFor(
             ProviderPreset preset,
             IReadOnlyList<(string Id, string Label)> instances,
@@ -36,12 +38,39 @@ namespace DshController.Core
         {
             var rows = new List<SyncPlanRow>();
             if (preset == null || instances == null) return rows;
+            if (preset.IsBuiltin)
+            {
+                foreach ((string id, string label) in instances)
+                {
+                    var row = new SyncPlanRow { InstanceId = id, InstanceLabel = label, EntryKey = preset.ProviderId };
+                    row.Notes.Add("官方预设仅同步密钥引用（llm-deepseek.apiKeyEnv）：官方模型、思考档与多模态由实例原生适配器提供");
+                    if ((preset.ApiKey ?? "").Trim().Length == 0)
+                    {
+                        row.Kind = "无变化";
+                        row.Notes.Add("预设未填密钥：官方同步无内容可写，填密钥后再同步");
+                    }
+                    else
+                    {
+                        row.Kind = "新增";
+                        row.Fields.Add("apiKeyEnv（llm-deepseek）");
+                    }
+                    row.Notes.Add("旧根级 providers." + preset.ProviderId + " 旧块将一并清除");
+                    row.Notes.Add("密钥由 DshController 启动实例时注入环境变量；手动启动的实例需自行设置");
+                    rows.Add(row);
+                }
+                return rows;
+            }
             MappingResult mapped = ProviderConfigMapper.ToEntry(preset);
+            bool anyInput = mapped.Entry.Models.Any(m => m.InputModalities != null && m.InputModalities.Count > 0);
+            bool anyEfforts = mapped.Entry.Models.Any(m => m.WriteReasoningEfforts);
             foreach ((string id, string label) in instances)
             {
                 InstanceProviderEntry cur = currentOf == null ? null : currentOf(id);
                 var row = new SyncPlanRow { InstanceId = id, InstanceLabel = label, EntryKey = mapped.Entry.Key };
                 row.Notes.AddRange(mapped.Notes);
+                if (anyEfforts) row.Notes.Add("自动补思考档四档（off/low/high/max，非官方来源；实例侧已有声明不覆盖）");
+                if (anyInput) row.Notes.Add("已知多模态写入 input 字段（对齐 dsh pi-ai 模型条目）");
+                row.Notes.Add("写入 llm-pi-ai.providers." + mapped.Entry.Key + "（dsh 实际读取的段）；旧根级 providers 块将一并清除");
                 if (cur == null || !string.Equals(cur.Key, mapped.Entry.Key, StringComparison.OrdinalIgnoreCase))
                 {
                     row.Kind = "新增";
@@ -50,6 +79,8 @@ namespace DshController.Core
                     if (mapped.Entry.ApiKeyEnv.Length > 0) row.Fields.Add("apiKeyEnv");
                     if (mapped.Entry.BaseUrl.Length > 0) row.Fields.Add("baseURL");
                     if (mapped.Entry.Models.Count > 0) row.Fields.Add("models");
+                    if (anyInput) row.Fields.Add("input");
+                    if (anyEfforts) row.Fields.Add("reasoningEfforts");
                 }
                 else
                 {
@@ -61,6 +92,10 @@ namespace DshController.Core
                     var curIds = cur.Models.Select(m => m.Id).OrderBy(x => x, StringComparer.Ordinal).ToList();
                     var newIds = mapped.Entry.Models.Select(m => m.Id).OrderBy(x => x, StringComparer.Ordinal).ToList();
                     if (!curIds.SequenceEqual(newIds)) AddField(row, "models");
+                    // 思考档/多模态是逐模型字段：实例侧任一模型缺失才列为将写差异
+                    if (anyEfforts && cur.Models.Any(m => !m.WriteReasoningEfforts)) AddField(row, "reasoningEfforts");
+                    if (anyInput && cur.Models.Any(m => m.InputModalities == null || m.InputModalities.Count == 0))
+                        AddField(row, "input");
                     row.Kind = row.Fields.Count > 0 ? "更新" : "无变化";
                 }
                 if (row.Kind == "无变化") row.Notes.Add("该实例当前配置已一致");
@@ -92,9 +127,50 @@ namespace DshController.Core
                 {
                     sb.Append("    - id: ").Append(Quote(m.Id)).Append(Environment.NewLine);
                     if (m.Name.Length > 0) sb.Append("      name: ").Append(Quote(m.Name)).Append(Environment.NewLine);
+                    AppendNumberField(sb, m.Extra, "contextWindow");
+                    AppendNumberField(sb, m.Extra, "maxTokens");
+                    AppendInputModalities(sb, m);
+                    AppendReasoningEfforts(sb, m);
                 }
             }
             return sb.ToString().TrimEnd();
+        }
+
+        /// <summary>渲染模型输入模态（dsh pi-ai 条目字段 input；flow 序列，空=不渲染=未声明）。</summary>
+        private static void AppendInputModalities(StringBuilder sb, ProviderModelConfig m)
+        {
+            if (m.InputModalities == null || m.InputModalities.Count == 0) return;
+            sb.Append("      input: [").Append(string.Join(", ", m.InputModalities)).Append(']')
+              .Append(Environment.NewLine);
+        }
+
+        /// <summary>渲染四档思考档（对齐 dsh-thinking-efforts v0.2.0：off 档发 null=线上省略）。</summary>
+        private static void AppendReasoningEfforts(StringBuilder sb, ProviderModelConfig m)
+        {
+            if (!m.WriteReasoningEfforts) return;
+            sb.Append("      reasoningEfforts:").Append(Environment.NewLine);
+            sb.Append("        off: null").Append(Environment.NewLine);
+            sb.Append("        low: low").Append(Environment.NewLine);
+            sb.Append("        high: high").Append(Environment.NewLine);
+            sb.Append("        max: max").Append(Environment.NewLine);
+        }
+
+        /// <summary>渲染模型容量等数值宽松段（contextWindow/maxTokens；数字不加引号）。</summary>
+        private static void AppendNumberField(StringBuilder sb, Dictionary<string, object> extra, string key)
+        {
+            if (extra == null || !extra.TryGetValue(key, out object v) || v == null) return;
+            if (v is sbyte || v is byte || v is short || v is ushort || v is int || v is uint
+                || v is long || v is ulong)
+            {
+                sb.Append("      ").Append(key).Append(": ").Append(Convert.ToString(v, CultureInfo.InvariantCulture))
+                  .Append(Environment.NewLine);
+                return;
+            }
+            if (v is string s && long.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out long n))
+            {
+                sb.Append("      ").Append(key).Append(": ").Append(n.ToString(CultureInfo.InvariantCulture))
+                  .Append(Environment.NewLine);
+            }
         }
 
         /// <summary>YAML 标量：含特殊字符才加引号（宽松，够用即可；写入引擎负责真正合并）。</summary>

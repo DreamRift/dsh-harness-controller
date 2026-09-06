@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ============================================================================
+     ProviderRailView — API 页左边栏的「提供方列表」（照 dsh 模型页适配）
+     行=密钥状态点(已配置/缺失)+显示名+路由·协议·模型数·启用态副行；
+     顶部「添加提供方」= dsh add 动作（打开新建卡）；数据只经视图模型读全局台账。
+     ============================================================================ -->
+<UserControl
+    x:Class="DshController.Views.ProviderRailView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:DshController.Views"
+    xmlns:vm="using:DshController.ViewModels"
+    mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <views:BoolToVisibilityConverter x:Key="RailBoolToVis" />
+        <views:InverseBoolToVisibilityConverter x:Key="RailInverseBoolToVis" />
+    </UserControl.Resources>
+
+    <Grid RowSpacing="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Button x:Name="BtnProviderAdd" Grid.Row="0" Content="＋ 添加提供方"
+                Style="{StaticResource BtnCompact}" HorizontalAlignment="Stretch"
+                Click="BtnProviderAdd_Click" AutomationProperties.AutomationId="BtnProviderAdd" />
+
+        <TextBlock x:Name="TxtRailEmpty" Grid.Row="1" Text="还没有提供方，先添加一个。"
+                   Style="{StaticResource NavCaption}" Margin="4,0,0,0" TextWrapping="Wrap" />
+
+        <ListView x:Name="ProviderList" Grid.Row="2" SelectionMode="Single" BorderThickness="0"
+                  Background="Transparent" Padding="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                  SelectionChanged="ProviderList_SelectionChanged"
+                  AutomationProperties.AutomationId="PresetList">
+            <ListView.Resources>
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="{ThemeResource BrandSoftColor}" />
+                <SolidColorBrush x:Key="ListViewItemForegroundSelected" Color="{ThemeResource BrandPrimaryColor}" />
+            </ListView.Resources>
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="Padding" Value="6,4" />
+                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProviderPresetRow">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0" Width="10" VerticalAlignment="Center">
+                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Fill="{ThemeResource StateRunBrush}"
+                                     Visibility="{x:Bind ConfiguredVisible, Converter={StaticResource RailBoolToVis}}" />
+                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Fill="{ThemeResource StateStopBrush}"
+                                     Visibility="{x:Bind MissingVisible, Converter={StaticResource RailBoolToVis}}" />
+                        </Grid>
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center"
+                                    ToolTipService.ToolTip="{x:Bind KeyStateText}">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <TextBlock Text="{x:Bind Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                <Border VerticalAlignment="Center" CornerRadius="3" Padding="4,0"
+                                        Background="{ThemeResource BrandSoftBrush}"
+                                        Visibility="{x:Bind IsBuiltin, Converter={StaticResource RailBoolToVis}}">
+                                    <TextBlock Text="{x:Bind TagText}" FontSize="9.5"
+                                               Foreground="{ThemeResource BrandPrimaryBrush}" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{x:Bind MetaText}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                                       Foreground="{ThemeResource LabelTertiaryBrush}" />
+                        </StackPanel>
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid>
+</UserControl>

@@ -2,7 +2,10 @@
 //  InstancePanel — 新建与克隆实例对话框
 //
 //  对话框编排；ID/端口/工作区/HOME 的决定逻辑在 InstancePlanFactory。
-//  （重构 2.0 / P3：InstancePanel 按职责拆成多个 partial 文件，单文件不超过 400 行；
+//  （改版·分步流程：新建入口 = 左栏「＋ 新建实例」→ MainWindow 完成环境/发行版
+//   选择 → InstancePanel.OpenCreateAsync 打开本表单，发行版预填值一次性消费；
+//   版本下拉的异步填充在 InstancePanel.Create.Steps.cs。
+//   重构 2.0 / P3：InstancePanel 按职责拆成多个 partial 文件，单文件不超过 400 行；
 //   纯逻辑已抽到 ViewModels 层的 InstanceSettingsValidator / InstancePlanFactory。）
 // ============================================================================
 
@@ -30,11 +33,7 @@ namespace DshController
     public sealed partial class InstancePanel : UserControl
     {
         // ==================== 实例管理 ====================
-
-        private async void BtnNew_Click(object sender, RoutedEventArgs e)
-        {
-            await ShowCreateInstanceDialogAsync(cloneMode: false);
-        }
+        // （改版：新建入口改走 OpenCreateAsync（InstancePanel.xaml.cs），工具条「新建」按钮已移除。）
 
         private async void BtnClone_Click(object sender, RoutedEventArgs e)
         {
@@ -45,8 +44,10 @@ namespace DshController
         {
             try
             {
-                // 新建实例默认 = 当前环境 harness 主实例版本：先确保版本检测完成
-                if (!_versionDetectDone) await DetectVersionAsync(show: false);
+                // 改版·分步流程：左栏「＋ 新建实例」由 MainWindow 先完成环境/发行版选择，
+                // 预填值 _pendingCreateDistro 一次性消费（非空 = 预填并锁定发行版输入）。
+                string prefillDistro = _pendingCreateDistro;
+                _pendingCreateDistro = null;
 
                 int suggested = await PortAllocatorSuggestAsync(IsWslPanel ? 3081 : 3080);
                 var txtName = new TextBox { PlaceholderText = "实例名称，如 项目A" };
@@ -102,10 +103,13 @@ namespace DshController
                 TextBox txtWslHome = null;
                 if (IsWslPanel)
                 {
+                    // 分步流程：MainWindow 已选定发行版（prefillDistro 非空）时预填并禁用，
+                    // 表单内不再允许改环境/发行版；从面板直接进入（克隆等）时仍可手填。
                     txtWslDistro = new TextBox
                     {
                         PlaceholderText = "如 Ubuntu-26.04",
-                        Text = CurrentDistro(),
+                        Text = string.IsNullOrEmpty(prefillDistro) ? CurrentDistro() : prefillDistro,
+                        IsEnabled = string.IsNullOrEmpty(prefillDistro),
                         Style = (Style)Application.Current.Resources["InputBox"]
                     };
                     txtWslHome = new TextBox
@@ -117,49 +121,34 @@ namespace DshController
                     layout.Children.Add(LabelledField("WSL DSH_HOME", txtWslHome));
                 }
 
-                // harness 版本：默认跟随当前环境主实例版本（可改为任意指定版本）
+                // harness 版本（改版·分步流程）：首项固定"跟随当前环境"（值为空串）；
+                // npm 已发布版本列表在弹窗出现后异步填充（Create.Steps.cs，不阻塞弹窗；
+                // 获取失败时只剩首项并可手动输入，保留 IsEditable 手输能力）。
                 var cmbVersion = new ComboBox
                 {
                     Width = 320,
                     IsEditable = true,
                     Style = (Style)Application.Current.Resources["InputCombo"]
                 };
-                var verDefault = new ComboBoxItem
-                {
-                    Content = _detectedVersion.Length > 0
-                        ? "跟随当前环境（v" + _detectedVersion + "）"
-                        : "跟随当前环境",
-                    Tag = ""
-                };
+                var verDefault = new ComboBoxItem { Content = "跟随当前环境", Tag = "" };
                 cmbVersion.Items.Add(verDefault);
-                if (_detectedVersion.Length > 0)
-                    cmbVersion.Items.Add(new ComboBoxItem
-                    {
-                        Content = _detectedVersion + "（指定为当前环境版本）",
-                        Tag = _detectedVersion
-                    });
-                foreach (string v in _publishedVersions)
+                cmbVersion.SelectedItem = verDefault;      // 默认 = 跟随当前环境主实例版本
+                var verHint = new TextBlock
                 {
-                    if (v == _detectedVersion) continue;
-                    cmbVersion.Items.Add(new ComboBoxItem { Content = v, Tag = v });
-                }
-                cmbVersion.SelectedItem = verDefault;      // 默认 = 当前环境主实例版本
+                    Text = "默认跟随当前环境主实例版本；也可指定版本（经 npx 拉取该版本启动）",
+                    Style = (Style)Application.Current.Resources["FooterText"],
+                    TextWrapping = TextWrapping.Wrap
+                };
                 var verRow = new StackPanel { Spacing = 4 };
                 verRow.Children.Add(new TextBlock
                 {
-                    Text = "harness 版本（默认跟随当前环境主实例版本，可改为指定版本）",
+                    Text = "harness 版本",
                     Style = (Style)Application.Current.Resources["FieldLabel"]
                 });
                 verRow.Children.Add(cmbVersion);
-                verRow.Children.Add(new TextBlock
-                {
-                    Text = _detectedVersion.Length > 0
-                        ? "当前环境检测到 v" + _detectedVersion + "；填写其他版本号则该实例经 npx 拉取指定版本启动"
-                        : "未检测到当前环境版本；可直接填写版本号（如 0.1.0-rc.7）由 npx 拉取",
-                    Style = (Style)Application.Current.Resources["FooterText"],
-                    TextWrapping = TextWrapping.Wrap
-                });
+                verRow.Children.Add(verHint);
                 layout.Children.Add(verRow);
+                _ = FillCreateVersionComboAsync(cmbVersion, verDefault, verHint);   // 异步填充，不阻塞弹窗
 
                 ComboBox cmbSource = null;
                 ComboBox cmbLevel = null;
@@ -351,6 +340,7 @@ namespace DshController
                     (pinnedVersion.Length > 0 ? "harness 指定 v" + pinnedVersion : "harness 跟随当前环境") + "）");
 
                 // 新建页同步勾选：勾选 = 把启用的全局预设写入新实例 settings.yaml（失败不阻断创建）
+                // 非官方 → llm-pi-ai.providers.<key>（含思考档/多模态）；官方 → 仅送 llm-deepseek 密钥引用
                 if (chkSyncPresets?.IsChecked == true && home.Length > 0)
                 {
                     int written = 0;
@@ -361,8 +351,7 @@ namespace DshController
                     foreach (ProviderPreset preset in syncStore.All())
                     {
                         if (!preset.Enabled) continue;
-                        MappingResult mapped = ProviderConfigMapper.ToEntry(preset);
-                        if (writer.Apply(settingsPath, mapped.Entry, out string werr))
+                        if (writer.Apply(settingsPath, ProviderSyncWrite.For(preset), out string werr))
                         {
                             written++;
                             PushLog("  已同步预设「" + preset.Name + "」 → " + settingsPath);
@@ -373,7 +362,7 @@ namespace DshController
                         }
                     }
                     PushLog(written > 0
-                        ? "新实例已带 " + written + " 项供应商预设（见 settings.yaml providers）。"
+                        ? "新实例已带 " + written + " 项供应商预设（见 settings.yaml llm-pi-ai.providers）。"
                         : "无启用的供应商预设可同步。");
                 }
                 else if (chkSyncPresets?.IsChecked == true && IsWslPanel)

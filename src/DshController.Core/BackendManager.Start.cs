@@ -20,6 +20,24 @@ namespace DshController.Core
 {
     public sealed partial class BackendManager
     {
+        /// <summary>供应商预设凭据环境对（api-presets.json：Enabled 且填了密钥的预设）。
+        /// 同步只往实例 settings.yaml 写 env 名，密钥值在拉起子进程时注入——不落盘。</summary>
+        private List<(string Name, string Value)> PresetCredentialEnvPairs()
+        {
+            var pairs = new List<(string, string)>();
+            try
+            {
+                pairs = new ProviderPresetStore(AppPaths.ProviderPresetsFile).CredentialEnvPairs();
+                if (pairs.Count > 0) Diag("预设凭据注入", string.Join(", ", pairs.Select(p => p.Item1)));
+            }
+            catch (Exception ex)
+            {
+                // 理由: 台账读取失败不阻断启动；实例侧缺该变量时由 dsh MISSING_CREDENTIAL 提示
+                Diag("预设凭据注入", "读取失败跳过：" + ex.Message);
+            }
+            return pairs;
+        }
+
         // ==================== 核心（调用方已持有 _gate） ====================
 
         private async Task<bool> StartCoreAsync(Config cfg, StartOptions opts)
@@ -139,6 +157,10 @@ namespace DshController.Core
             // v0.3.0 多实例：非空 DSH_HOME 注入到子进程环境，避免实例间共享 ~/.dsh。
             if (!string.IsNullOrEmpty(cfg.Home))
                 psi.EnvironmentVariables["DSH_HOME"] = cfg.Home;
+
+            // 供应商预设凭据注入（llm-pi-ai 同步只写 env 名，值随启动注入）
+            foreach ((string envName, string envValue) in PresetCredentialEnvPairs())
+                psi.EnvironmentVariables[envName] = envValue;
 
             Diag("工作目录", ws + (Directory.Exists(ws) ? "" : "（不存在）"));
             Diag("DSH_HOME 注入", string.IsNullOrEmpty(cfg.Home) ? "（未注入，使用默认 ~/.dsh）" : cfg.Home);

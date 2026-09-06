@@ -1,6 +1,9 @@
 // ============================================================================
-//  用量改版（定稿方案）的视图模型状态迁移单测：统一视图实例卡、按天钻取、
-//  范围/实例切换一致性、刷新摘要、空态可行动。不起 WinUI、不碰真实档案。
+//  用量看板按天钻取与合并口径的离线单测（2026-09-06 二次改版 · 纯聚合）
+//
+//  实例卡/合计条已废（单实例完整用量移至 ArchiveMetaViewModel），本文件只验证：
+//  多实例合并的柱图/模型/会话、按天钻取（选中→过滤→清除→再点退出）、
+//  范围切换清钻取、hero 口径、刷新摘要与空态。不起 WinUI、不碰真实档案。
 // ============================================================================
 
 using System;
@@ -55,80 +58,63 @@ namespace DshController.Tests
         }
 
         [Fact]
-        public void 统一视图实例卡三态与合计条()
+        public void 看板为多实例合并口径_柱图模型会话齐全()
         {
             var fake = new FakeArchiveFacade();
-            fake.Add("run", "运行实例", false, Usage(10000), running: true);
-            fake.Add("gone", "老实例", true, Usage(4000));
-            fake.Add("empty", "空实例", false, null);
+            fake.Add("a", "实例A", false, Usage(200, ("今天", 0)));
+            fake.Add("b", "实例B", false, Usage(200, ("今天", 0)));
             var vm = new UsageViewModel(fake);
             vm.OnShown();
 
-            Assert.True(vm.IsAllView);
-            Assert.Equal(3, vm.InstanceCards.Count);
-            UsageInstanceCardRow run = vm.InstanceCards.Single(c => c.ArchiveId == "run");
-            Assert.True(run.RunningVisible); Assert.Equal("●运行中", run.RunningText);
-            Assert.True(run.HasData);
-            Assert.Equal(200, run.BarWUncached + run.BarWCacheRead + run.BarWCacheWrite + run.BarWOutput, 0); // k=200 满宽
-            Assert.NotEmpty(run.SparkHeights);
-            Assert.Contains("已删除", vm.InstanceCards.Single(c => c.ArchiveId == "gone").RetiredText);
-            UsageInstanceCardRow empty = vm.InstanceCards.Single(c => c.ArchiveId == "empty");
-            Assert.False(empty.HasData); Assert.Equal("无用量数据", empty.NoDataText);
-            Assert.Contains("合计：总 1.4 万", vm.GrandTotalText);
+            UsageDayBar today = vm.DailyBars.Single(b => b.Day == Today.ToString("yyyy-MM-dd"));
+            Assert.Equal(200, today.Total);                         // 每实例当日 100，合并 200
+            Assert.Single(vm.Models);                               // 同 provider/model 合并成一行
+            Assert.Equal("400", vm.Models[0].TotalText);            // projcache 总账 200 + 200
+            Assert.Equal(2, vm.Sessions.Count);
+            Assert.True(vm.HasData);
         }
 
         [Fact]
-        public void 点实例卡切入聚焦视图且范围下拉同步()
+        public void 按天钻取_选中当日过滤会话_清除与再点同柱退出()
         {
             var fake = new FakeArchiveFacade();
-            fake.Add("a", "实例A", false, Usage(10000));
-            fake.Add("b", "实例B", false, Usage(4000));
+            fake.Add("a", "实例A", false, Usage(200, ("昨天", -1), ("今天", 0)));
             var vm = new UsageViewModel(fake);
             vm.OnShown();
+            Assert.Equal(2, vm.Sessions.Count);
 
-            vm.InstanceCards.Single(c => c.ArchiveId == "b").OpenCommand.Execute(null);
-
-            Assert.Equal("b", vm.SelectedScope.ArchiveId);
-            Assert.False(vm.IsAllView); Assert.True(vm.ShowFocus);
-            Assert.Equal("4,000", vm.TotalTokensText);
-        }
-
-        [Fact]
-        public void 按天钻取_选中当日过滤会话再点清除()
-        {
-            var fake = new FakeArchiveFacade();
-            fake.Add("a", "实例A", false, Usage(10000, ("昨天", -1), ("今天", 0), ("更早", -2)));
-            var vm = new UsageViewModel(fake);
-            vm.OnShown();
-            vm.SelectedScope = vm.Scopes.Single(s => s.ArchiveId == "a");
-
-            UsageDayBar yesterday = vm.DailyBars.Single(b => b.Day == Today.AddDays(-1).ToString("yyyy-MM-dd"));
+            string yesterdayKey = Today.AddDays(-1).ToString("yyyy-MM-dd");
+            UsageDayBar yesterday = vm.DailyBars.Single(b => b.Day == yesterdayKey);
             yesterday.ToggleCommand.Execute(null);
 
-            Assert.True(vm.HasDay); Assert.Equal(yesterday.Day, vm.SelectedDay);
-            UsageSessionRow drow = vm.Sessions.Single();                      // 展开↔收起（定稿 §3.5）
-            Assert.False(drow.IsExpanded);
-            drow.ExpandCommand.Execute(null);
-            Assert.True(drow.IsExpanded);
-            Assert.Contains("未缓存输入", drow.ExactDetailText);
-            drow.ExpandCommand.Execute(null);
-            Assert.False(drow.IsExpanded);
-            Assert.Contains("当日", vm.DayStripText);
+            Assert.True(vm.HasDay); Assert.Equal(yesterdayKey, vm.SelectedDay);
+            Assert.Contains("未缓存输入 50", vm.DayStripText);      // 当日四桶（FormatTokens 口径）
             Assert.Contains("当日模型", vm.DayModelsText);
             Assert.True(yesterday.IsSelected);
-            UsageSessionRow only = Assert.Single(vm.Sessions);                  // 只剩当天会话
-            Assert.Equal("会话 昨天", only.Title);
+            UsageSessionRow only = Assert.Single(vm.Sessions);      // 只剩昨天会话（聚合视图带前缀）
+            Assert.EndsWith("会话 昨天", only.Title);
+            only.ExpandCommand.Execute(null);                       // 展开↔收起
+            Assert.True(only.IsExpanded);
+            Assert.Contains("未缓存输入", only.ExactDetailText);
+            only.ExpandCommand.Execute(null);
+            Assert.False(only.IsExpanded);
 
-            yesterday.ToggleCommand.Execute(null);                              // 再点同柱 = 退出
-            Assert.False(vm.HasDay); Assert.Equal(3, vm.Sessions.Count);
+            vm.ClearDayCommand.Execute(null);
+            Assert.False(vm.HasDay); Assert.Equal(2, vm.Sessions.Count);
+            Assert.DoesNotContain(vm.DailyBars, b => b.IsSelected);
+
+            yesterday.ToggleCommand.Execute(null);
+            Assert.True(vm.HasDay);
+            yesterday.ToggleCommand.Execute(null);                  // 再点同柱 = 退出
+            Assert.False(vm.HasDay); Assert.Equal(2, vm.Sessions.Count);
             Assert.DoesNotContain(vm.DailyBars, b => b.IsSelected);
         }
 
         [Fact]
-        public void 钻取后切范围或实例_钻取态自动清空()
+        public void 钻取后切范围_钻取态自动清空()
         {
             var fake = new FakeArchiveFacade();
-            fake.Add("a", "实例A", false, Usage(10000, ("昨天", -1)));
+            fake.Add("a", "实例A", false, Usage(200, ("昨天", -1)));
             var vm = new UsageViewModel(fake);
             vm.OnShown();
             vm.DailyBars.First().ToggleCommand.Execute(null);
@@ -175,12 +161,24 @@ namespace DshController.Tests
             fake.Add("a", "实例A", false, old);
             var vm = new UsageViewModel(fake);
             vm.OnShown();
-            vm.SelectedScope = vm.Scopes.Single(s => s.ArchiveId == "a");
             vm.SetRangeCommand.Execute("7");
 
             Assert.False(vm.HasData); Assert.True(vm.EmptyVisible);
             Assert.True(vm.EmptyCanChangeRange);
             Assert.Contains("换个范围试试", vm.EmptyText);
+        }
+
+        [Fact]
+        public void 空数据时柱图为空并显示空态()
+        {
+            var vm = new UsageViewModel(new FakeArchiveFacade());
+            vm.OnShown();
+
+            Assert.Empty(vm.DailyBars);
+            Assert.Empty(vm.Models);
+            Assert.Empty(vm.Sessions);
+            Assert.False(vm.HasData);
+            Assert.True(vm.EmptyVisible);
         }
     }
 }

@@ -103,6 +103,31 @@ function Click-Button($btn) {
     if ($btn.TryGetCurrentPattern($IPC::Pattern, [ref]$pat)) { $pat.Invoke(); return $true }
     return $false
 }
+function Select-ComboItem([long]$hwnd, [string]$id, [string]$token) {
+    # select the first combo item whose Name contains the token; retries cover
+    # the transient disabled state while a page reload is busy
+    for ($try = 1; $try -le 5; $try++) {
+        $el = Find-ById $hwnd $id
+        if ($null -ne $el) {
+            $exp = $null
+            $hasExp = $el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)
+            if ($hasExp) { try { $exp.Expand() } catch { } }
+            Start-Sleep -Milliseconds 400
+            $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
+            $ok = $false
+            foreach ($i in $el.FindAll($TS::Descendants, $condLI)) {
+                if (($i.Current.Name).Contains($token)) {
+                    $pat = $null
+                    if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { try { $pat.Select(); $ok = $true } catch { }; break }
+                }
+            }
+            if ($hasExp) { try { $exp.Collapse() } catch { } }
+            if ($ok) { return $true }
+        }
+        Start-Sleep -Milliseconds 600
+    }
+    return $false
+}
 function Get-Dialog([long]$hwnd) {
     # WinUI3 ContentDialog surfaces as a Popup window in the UIA tree (ClassName 'Popup',
     # ControlType.Window); 'ContentDialog' ClassName is NOT what the provider exposes.
@@ -327,7 +352,7 @@ try {
     Add-Result $installed 'market-shows-installed' ('row mentions ' + $shortName + ' = ' + $installed)
 
     # ---------- manage page shows it under the test instance ----------
-    # settle: dismiss any leftover dialog so the assertions see a calm tree
+    # settle: dismiss any leftover dialog so the assertions see a calm page
     $S_NEXT2 = [string]([char]0x4E0B) + [char]0x6B21
     $lgz = Get-Dialog $hwnd
     if ($null -ne $lgz) {
@@ -335,21 +360,10 @@ try {
         Start-Sleep -Milliseconds 800
     }
     Invoke-Click $hwnd 'BtnSubManage' | Out-Null; Start-Sleep -Milliseconds 2200
-    $lvT = Find-ById $hwnd 'PluginTargetTree'
-    $condLI2 = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
-    $selMg = $false
-    if ($null -ne $lvT) {
-        foreach ($i in $lvT.FindAll($TS::Descendants, $condLI2)) {
-            $txt = ''
-            foreach ($tx in $i.FindAll($TS::Descendants, $condTx)) { $txt = $tx.Current.Name; break }
-            if ($txt.StartsWith('windows:3185')) {
-                $pat = $null
-                if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); $selMg = $true }
-                break
-            }
-        }
-    }
-    Add-Result $selMg 'manage-tree-select' ('tree row windows:3185=' + $selMg)
+    # manage page owns its CmbInstance now (PluginTargetTree was removed in the rework);
+    # item labels are "windows:3185" or "alias (windows:3185)" -> match by Contains
+    $selMg = Select-ComboItem $hwnd 'CmbInstance' 'windows:3185'
+    Add-Result $selMg 'manage-combo-select' ('combo item windows:3185=' + $selMg)
     [void](Invoke-Click $hwnd 'BtnRefresh')
     $foundMs = -1
     $swM = [Diagnostics.Stopwatch]::StartNew()

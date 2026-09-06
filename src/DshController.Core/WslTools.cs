@@ -146,16 +146,10 @@ namespace DshController.Core
         }
 
         /// <summary>按行拆分（清理 BOM、\0、空白行）。</summary>
-        public static List<string> SplitLines(string s)
-        {
-            var result = new List<string>();
-            foreach (var rawLine in (s ?? "").Replace("\0", "").Split('\n'))
-            {
-                var line = rawLine.Trim('\r', ' ', '\t', '\uFEFF');
-                if (line.Length > 0) result.Add(line);
-            }
-            return result;
-        }
+        public static List<string> SplitLines(string s) =>
+            (s ?? "").Replace("\0", "").Split('\n')
+                .Select(raw => raw.Trim('\r', ' ', '\t', '\uFEFF'))
+                .Where(line => line.Length > 0).ToList();
 
         /// <summary>bash 单引号安全包装：it's → 'it'\''s'</summary>
         public static string Shq(string s) =>
@@ -169,7 +163,9 @@ namespace DshController.Core
             var r = await ExecAsync(new[] { "--status" }, 20000);
             bool installed = r.ExitCode == 0
                 && !ContainsNotInstalled(r.Output) && !ContainsNotInstalled(r.Error);
-            _installedCache = installed;
+            // 只缓存肯定结果：应用启动早期 wsl.exe 可能暂时不可用（服务未起/发行版尚未就绪），
+            // 若把否定结果钉死在静态缓存里，用户之后装好/启动了 WSL 也永远扫不到（重启应用才恢复）。
+            if (installed) _installedCache = true;
             return installed;
         }
 
@@ -224,19 +220,37 @@ namespace DshController.Core
             return names;
         }
 
-        private static bool LooksLikeDistroName(string s)
+        private static bool LooksLikeDistroName(string s) => !string.IsNullOrEmpty(s)
+            && (char.IsAsciiLetterOrDigit(s[0]) || s[0] == '*');
+
+        /// <summary>解析 PowerShell 注册表枚举输出（每行 "名称|BasePath"；空行/无名称行跳过，容忍 \r 与 BOM）。</summary>
+        public static List<string> ParseRegisteredDistroLines(string output) =>
+            (output ?? "").TrimStart('\uFEFF').Split('\n')
+                .Select(raw => raw.Trim('\r', ' ', '\t'))
+                .Where(raw => raw.IndexOf('|') >= 0)
+                .Select(raw => raw.Substring(0, raw.IndexOf('|')).Trim())
+                .Where(LooksLikeDistroName).ToList();
+
+        /// <summary>离线枚举本机已注册的 WSL 发行版（读 HKCU Lxss 注册表，毫秒级，绝不启动 WSL）。失败/未装 WSL 返回空表。同步方法：调用方在 Task.Run 上调用。</summary>
+        public static List<string> ListRegisteredDistrosOffline()
         {
-            if (string.IsNullOrEmpty(s)) return false;
-            char c = s[0];
-            return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '*';
+            try
+            {
+                const string script =
+                    @"[Console]::OutputEncoding=[Text.Encoding]::UTF8; Get-ChildItem 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' -ErrorAction SilentlyContinue | ForEach-Object { $p = Get-ItemProperty $_.PSPath; if ($p.DistributionName) { '{0}|{1}' -f $p.DistributionName, $p.BasePath } }";
+                var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"" + script + "\"")
+                { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, StandardOutputEncoding = Encoding.UTF8 };
+                using var p = Process.Start(psi);
+                string text = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(20000);
+                return ParseRegisteredDistroLines(text);
+            }
+            catch (Exception) { /* 理由: 离线枚举失败（未装 WSL/powershell 不可用/注册表不可读）按空表降级，绝不阻断扫描 */ return new List<string>(); }
         }
 
         /// <summary>指定发行版是否正在运行。</summary>
-        public static async Task<bool> IsDistroRunningAsync(string distro)
-        {
-            var running = await ListRunningDistrosAsync();
-            return running.Contains(distro, StringComparer.OrdinalIgnoreCase);
-        }
+        public static async Task<bool> IsDistroRunningAsync(string distro) =>
+            (await ListRunningDistrosAsync()).Contains(distro, StringComparer.OrdinalIgnoreCase);
 
         /// <summary>终止指定发行版（wsl -t，强制断电语义）。</summary>
         public static Task<WslResult> TerminateDistroAsync(string distro) =>
@@ -363,12 +377,9 @@ namespace DshController.Core
         }
 
         /// <summary>追加 WSLENV 条目（Windows→WSL 传递环境变量）。</summary>
-        public static string AppendWslenv(string existing, string entry)
-        {
-            if (string.IsNullOrEmpty(existing)) return entry;
-            if (existing.Split(';').Any(x => x.Trim() == entry)) return existing;
-            return existing + ";" + entry;
-        }
+        public static string AppendWslenv(string existing, string entry) =>
+            string.IsNullOrEmpty(existing) ? entry
+            : existing.Split(';').Any(x => x.Trim() == entry) ? existing : existing + ";" + entry;
 
         /// <summary>解析 Linux 侧 DSH_HOME/工作区：~ 前缀展开，空 = Linux 默认 ~/.dsh。</summary>
         public static string ResolveLinuxPath(string configPath, string distroHomeRoot)

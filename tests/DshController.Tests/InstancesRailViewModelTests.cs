@@ -143,5 +143,41 @@ namespace DshController.Tests
             Assert.Equal("wsl", InstancesRailViewModel.SubPageOf(vm.Rows.First(r => r.Id == "w")));
             Assert.Equal("win", InstancesRailViewModel.SubPageOf(vm.Rows.First(r => r.Id == "x")));
         }
+
+        // ---------------- 稳定态零重建（左栏等间隔闪烁修复） ----------------
+
+        [Fact]
+        public void 稳定态刷新不触碰行集合()
+        {
+            var f = new FakeArchiveFacade();
+            f.AddInstance("a", "A").LastStartedAt = T(5);
+            f.AddInstance("b", "B").LastStartedAt = T(4);
+            var vm = new InstancesRailViewModel(f);
+            vm.Refresh();
+
+            int events = 0;
+            vm.Rows.CollectionChanged += (s, e) => events++;
+            InstanceRailRow first = vm.Rows[0], second = vm.Rows[1];
+
+            vm.Refresh();   // 清单与 liveness 均无变化 → 稳定态
+            Assert.Equal(0, events);          // 集合零事件：ListView 不重建（闪烁根源已断）
+            Assert.Same(first, vm.Rows[0]);   // 行对象原样保留：选中引用不失效
+            Assert.Same(second, vm.Rows[1]);
+        }
+
+        [Fact]
+        public void 清单或状态变化才重建()
+        {
+            var f = new FakeArchiveFacade();
+            f.AddInstance("a", "A").LastStartedAt = T(5);
+            var vm = new InstancesRailViewModel(f);
+            vm.Refresh();
+            InstanceRailRow before = vm.Rows[0];
+
+            f.AddInstance("b", "B").LastStartedAt = T(9);   // 新实例 → 排序变化
+            vm.Refresh();
+            Assert.Equal(new[] { "b", "a" }, vm.Rows.Select(r => r.Id).ToArray());
+            Assert.NotSame(before, vm.Rows[1]);             // 变化路径仍整表重建（行为不变）
+        }
     }
 }

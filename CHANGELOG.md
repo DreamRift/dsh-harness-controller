@@ -3,6 +3,79 @@
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格，
 版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased] - 2026-09-06（dev 测试版 · 档案页用量二次改版轮）
+
+> 用户指令：看板去掉实例卡与范围切换、恒显合并口径；单实例完整用量移入档案详情页。
+
+### 用量看板（纯聚合）
+
+- **恒显全部实例合并用量**（含已删除档案的退役回顾数据）；"统计范围"下拉（CmbUsageScope）、
+  实例卡网格与合计条整体移除，工具栏只剩 7天/30天/全部 + 刷新；
+  页头新增副标题"全部实例合计（含已删除档案）"。
+- 会话明细每行标注来源实例（`实例名 · 会话标题`），找不到标签时优雅降级不加前缀。
+
+### 档案详情页（完整用量并入）
+
+- **ArchiveMetaView 新增完整用量区**：大数卡（总 tokens + 四桶堆叠条，与看板同口径 ×330）、
+  缓存命中率/请求次数/会话数/活跃天数/最常用模型、按天柱图（30 根）页内钻取、
+  模型排行、会话明细（会话 ID 复制钮）；无数据时空态文案。
+- **单档案重采**：详情页"重采"按钮只刷新当前档案（退役档案没有实例可采，禁用并提示）。
+- **档案页主区两页互斥**：左栏选中真实档案 → 详情（元信息 + 完整用量）；
+  左栏"总计"/无选中 → 用量看板。原"元信息 + 看板上下双显"布局废止。
+
+## [Unreleased] - 2026-09-05（dev 测试版 · API 页照 dsh 模型页适配轮）
+
+> 依据：提取官方插件 `@deepseek-ai/dsh-client-ui-settings-models`（0.1.1-rc.2）的模型页
+> 交互逻辑与文案，对 API 页做界面适配（数据/同步引擎沿用既有台账 + 预览/写入单源）。
+
+### API 页改版（主从布局，字段与 dsh 一致）
+
+- **左栏提供方列表**（`ProviderRailView` 新增）：密钥状态点（已配置/缺失，对齐 dsh 行圆点）、
+  路由·协议·模型数·启用态副行、「添加提供方」入口；页面壳沿用 `SplitPageShell`。
+- **详情编辑卡**（`ProviderPresetsView` 重写）：API 密钥主字段（只写不读：空=保持已存、
+  占位"已配置——输入新值可替换"）、折叠区「自定义设置」（Provider ID / 显示名称 /
+  API 协议下拉 / API 地址 / 启用）、模型目录行编辑（ID/显示名称/上下文窗口/最大输出，
+  支持 256K/1M 容量写法）、页脚 取消｜保存/创建（就绪门实时放开，dsh EditorFooter 语义）。
+- **新建卡**（dsh CustomProviderCard 语义）：Provider ID 路由（小写开头、台账查重）、
+  地址必填、模型 ≥1；就绪门 + 行内实时错误文案逐条对齐 dsh zh 文案。
+- **实例页/插件页改版（用户 5 点）**：插件页删左栏实例树（切换走页内"目标实例"）、
+  profile 标签中文化"配置档案"+解释 ToolTip；实例页删全部版本展示（含页脚）、
+  新建/扫描上左栏顶部、新建分步（环境→WSL 发行版→表单）、表单版本下拉自动载 npm 版本、
+  详情区去掉"当前实例"下拉（左栏=唯一切换器，克隆/删除移至状态卡头部）、
+  实例设置新增"升级"卡（按环境真升级到指定版本，成功后跟随该版本，重启生效）；
+  附带修复选中实例瞬间状态沿用旧值的竞态。
+- **修复实例左栏等间隔闪烁**：左栏刷新从"每 2.5s 整表 Clear+重建"改为稳定态零触碰
+  （逐字段比对，真有启停/增删/排序变化才重排），选中同步不再重复赋值/滚动。
+- **WSL 离线枚举 + 拉起扫描（用户方案）**：扫描先离线读 Lxss 注册表枚举已注册但未运行的
+  发行版（零启动），弹窗「拉起 WSL 来扫描？」征求许可（确认/不扫描WSL）；确认后逐个拉起做
+  dsh 安装探测，探测完自动恢复关机（只 terminate 自己拉起的发行版），发现已安装的走既有
+  询问添加流程并立即落盘。
+- **内置"DeepSeek 官方"提供方**（默认常驻，对齐 dsh 官方路由）：台账缺失即播种
+  （路由 `deepseek-official`、默认端点 api.deepseek.com、模型目录对齐 dsh-llm-deepseek
+  预留：deepseek-v4-flash / deepseek-v4-pro / deepseek-v4-flash-vision-exp，1M 上下文 / 384K 输出），置顶显示带"官方"徽标（自定义提供方带"自定义"），
+  不可删除（删除按钮禁用 + 台账守卫），可编辑密钥/地址/目录；官方路由对新建查重占用。
+- **获取可用模型**（dsh ModelListEditor 语义）：按"表单当前所填"端点+密钥探针
+  （`Core/ProviderModelProbe`，GET {baseUrl}/models），候选勾选窗（全选/取消全选/添加所选）；
+  **应答能给出上下文长度/最大输出时自动填入**（别名含 context_length、top_provider.
+  completion_max_tokens 等）；候选只是候选，绝不越过用户直接写配置。
+
+### 数据模型（向后兼容）
+
+- 预设新增 **ProviderId 稳定路由**（创建时选定后不可改，同步键与凭据名由它派生；
+  旧档案载入回填 slug(kind+name)，与既有同步键一致）与 **Models 模型目录数组**
+  （id/name/contextWindow/maxTokens）；DefaultModel 保留为兼容字段（=Models[0].Id，
+  旧档案反向播种）。同步写入块的容量经 `RenderYamlBlock` 渲染为数值行（预览=写入同源）。
+- API 协议精确透传（openai-completions / openai-responses / azure-openai-responses /
+  openai-codex-responses / anthropic-messages），未知值回落旧规则。
+
+### 工程与验证
+
+- 新增 `ProviderPresetRules`（dsh 校验规则移植）、`ProviderModelProbe`（探针）；
+  `HttpFetch` 支持 Bearer；探针脚本 `gui-api-presets-check.ps1` 重写为主从走查（8/8 绿，
+  证据 `docs/evidence/2026-09-api-dsh-adapt/`）；契约文档 `provider-sync-alignment.md` 同步更新。
+- 离线单测 275 → **376**（+101：规则/兼容/映射渲染/探针解析/草稿状态机/内置官方/离线枚举/升级安装八组）；
+  约定机检 149 文件 PASS；构建 0 警告 0 错误；GUI 冒烟无 crash.log。
+
 ## [2.0.0] - 2026-09-05
 
 > 计划全文见 `docs/REFACTOR-2.0-PLAN.md`。目标：实例档案子系统 + 代码精简 + 便于迭代的界面架构。

@@ -1,81 +1,79 @@
 // ============================================================================
-//  ProviderPresetsView — 供应商预设编辑页 View 侧薄壳：注入 VM + 选中转发 +
-//  事件转发（弹窗在 App 层 DialogService）。零逻辑零取数。
+//  ProviderPresetsView — API 页详情区 View 侧薄壳（照 dsh 模型页适配）：
+//  注入 VM + 生命周期转发 + 卡片内轻动作转发（增删模型行/取消/保存直达 VM）；
+//  弹窗与网络动作（同步/删除确认/获取模型）经事件交 App 层（MainWindow.ApiPresets）。
 // ============================================================================
 
 using System;
 using DshController.ViewModels;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 
 namespace DshController.Views
 {
     public sealed partial class ProviderPresetsView : UserControl
     {
-        private ProviderPresetsViewModel _vm;
-        private bool _syncing;
-
+        /// <summary>空态「添加提供方」。</summary>
         public event Action AddRequested;
-        public event Action<string> EditRequested;
-        public event Action<string> DeleteRequested;
+        /// <summary>「同步到实例…」（App 层弹预览确认）。</summary>
         public event Action<string> SyncRequested;
+        /// <summary>「删除提供方」（App 层弹确认）。</summary>
+        public event Action<string> DeleteRequested;
+        /// <summary>「获取可用模型」（App 层发起 Core 探针 + 勾选弹窗）。</summary>
+        public event Action FetchRequested;
 
         public ProviderPresetsView()
         {
             InitializeComponent();
         }
 
+        public ProviderPresetsViewModel ViewModel { get; private set; }
+
+        /// <summary>MainWindow 构造后注入依赖。</summary>
         public void Bind(ProviderPresetsViewModel vm)
         {
-            _vm = vm ?? throw new ArgumentNullException(nameof(vm));
-            PresetList.ItemsSource = _vm.Rows;
+            ViewModel = vm ?? throw new ArgumentNullException(nameof(vm));
+            Bindings.Update();   // x:Bind 在 ViewModel 赋值后需要显式刷新一次
         }
 
-        public void RefreshActionStates()
+        // ---- 字符串→可见性（校验/提示行：空串收起） ----
+        public Visibility NonEmpty(string text)
+            => string.IsNullOrEmpty(text) ? Visibility.Collapsed : Visibility.Visible;
+
+        public Visibility Empty(string text)
+            => string.IsNullOrEmpty(text) ? Visibility.Visible : Visibility.Collapsed;
+
+        // ---- 轻动作转发（直达 VM，无弹窗无网络） ----
+
+        private void BtnPresetAdd_Click(object sender, RoutedEventArgs e) => AddRequested?.Invoke();
+
+        private void PresetSave_Click(object sender, RoutedEventArgs e)
         {
-            bool hasSel = _vm != null && !string.IsNullOrEmpty(_vm.SelectedId);
-            if (BtnPresetEdit != null) BtnPresetEdit.IsEnabled = hasSel;
-            if (BtnPresetDelete != null) BtnPresetDelete.IsEnabled = hasSel;
-            if (BtnPresetSync != null) BtnPresetSync.IsEnabled = hasSel;
+            if (ViewModel != null) ViewModel.TrySaveEditor(out _);
         }
 
-        /// <summary>把视图选中同步到 VM（代码回设/编辑后恢复高亮用）。</summary>
-        public void SyncSelection(string id)
+        private void PresetCancel_Click(object sender, RoutedEventArgs e) => ViewModel?.CancelEditor();
+
+        private void PresetModelAdd_Click(object sender, RoutedEventArgs e) => ViewModel?.Editor?.AddModelRow();
+
+        private void RemoveModelRow_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm == null) return;
-            _syncing = true;
-            try
-            {
-                ProviderPresetRow row = string.IsNullOrEmpty(id) ? null : _vm.RowById(id);
-                PresetList.SelectedItem = row;
-                if (row != null) PresetList.ScrollIntoView(row);
-            }
-            finally { _syncing = false; }
-            RefreshActionStates();
+            if (sender is FrameworkElement fe && fe.DataContext is DraftModelRow row)
+                ViewModel?.Editor?.RemoveModelRow(row);
         }
 
-        private void PresetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        // ---- 重动作转发（弹窗/网络在 App 层） ----
+
+        private void BtnPresetSync_Click(object sender, RoutedEventArgs e)
         {
-            if (_syncing || _vm == null) return;
-            ProviderPresetRow row = PresetList.SelectedItem as ProviderPresetRow;
-            if (row != null) _vm.Select(row.Id);
-            RefreshActionStates();
+            if (ViewModel != null && ViewModel.HasSelection) SyncRequested?.Invoke(ViewModel.SelectedId);
         }
 
-        private void BtnPresetAdd_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) => AddRequested?.Invoke();
-
-        private void BtnPresetEdit_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        private void BtnPresetDelete_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm != null && !string.IsNullOrEmpty(_vm.SelectedId)) EditRequested?.Invoke(_vm.SelectedId);
+            if (ViewModel != null && ViewModel.HasSelection) DeleteRequested?.Invoke(ViewModel.SelectedId);
         }
 
-        private void BtnPresetDelete_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            if (_vm != null && !string.IsNullOrEmpty(_vm.SelectedId)) DeleteRequested?.Invoke(_vm.SelectedId);
-        }
-
-        private void BtnPresetSync_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            if (_vm != null && !string.IsNullOrEmpty(_vm.SelectedId)) SyncRequested?.Invoke(_vm.SelectedId);
-        }
+        private void PresetFetch_Click(object sender, RoutedEventArgs e) => FetchRequested?.Invoke();
     }
 }

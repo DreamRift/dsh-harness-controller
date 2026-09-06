@@ -1,28 +1,19 @@
 // ============================================================================
-//  用量页的行视图模型（用量改版方案定稿后扩展）
+//  用量页与档案详情页共用的行视图模型（用量改版方案定稿后扩展）
 //
 //  纯展示对象：把 Core 的统计结构翻译成可直接 x:Bind 的字符串与比例，
-//  界面里不再出现任何格式化逻辑。交互命令（钻取/展开/开实例）由 VM 装配。
+//  界面里不再出现任何格式化逻辑。交互命令（钻取/展开）由 VM 装配。
+//  2026-09-06 二次改版：UsageScopeItem / UsageInstanceCardRow 随实例范围
+//  切换一起废除；同一套行对象现由用量看板与 ArchiveMetaViewModel 共用。
 // ============================================================================
 
 using System;
-using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DshController.Core.Usage;
 
 namespace DshController.ViewModels
 {
-    /// <summary>统计范围：全部实例，或某一份档案（含已删除实例的历史档案）。</summary>
-    public sealed class UsageScopeItem
-    {
-        public string ArchiveId { get; set; } = "";      // 空 = 全部
-        public string Label { get; set; } = "";
-        public bool IsRetired { get; set; }
-        public bool IsAll => string.IsNullOrEmpty(ArchiveId);
-        public override string ToString() => Label;
-    }
-
     public sealed class UsageModelRow
     {
         public string Model { get; set; } = "";
@@ -116,28 +107,5 @@ namespace DshController.ViewModels
         public IRelayCommand ToggleCommand { get; set; }
 
         [ObservableProperty] public partial bool IsSelected { get; set; }
-    }
-
-    /// <summary>统一视图的一个实例卡（定稿方案 §1.2）。ItemsRepeater 模板要求 INPC，
-    /// 故为 ObservableObject；卡片仍按“整卡重建”使用，通知只是绑定契约。</summary>
-    public sealed partial class UsageInstanceCardRow : ObservableObject
-    {
-        [ObservableProperty] public partial string ArchiveId { get; set; } = "";
-        [ObservableProperty] public partial string Name { get; set; } = "";
-        [ObservableProperty] public partial string RetiredText { get; set; } = "";
-        [ObservableProperty] public partial string RunningText { get; set; } = "";   // ●运行中 / 空
-        [ObservableProperty] public partial bool RunningVisible { get; set; }
-        [ObservableProperty] public partial bool HasData { get; set; }
-        [ObservableProperty] public partial string TotalText { get; set; } = "—";
-        [ObservableProperty] public partial string HitRateText { get; set; } = "—";
-        [ObservableProperty] public partial string StatsLine { get; set; } = "";
-        [ObservableProperty] public partial string NoDataText { get; set; } = "";
-        [ObservableProperty] public partial double BarWUncached { get; set; }
-        [ObservableProperty] public partial double BarWCacheRead { get; set; }
-        [ObservableProperty] public partial double BarWCacheWrite { get; set; }
-        [ObservableProperty] public partial double BarWOutput { get; set; }
-        [ObservableProperty] public partial List<double> SparkHeights { get; set; } = new List<double>();
-        [ObservableProperty] public partial string ToolTip { get; set; } = "";
-        public IRelayCommand OpenCommand { get; set; }
     }
 }

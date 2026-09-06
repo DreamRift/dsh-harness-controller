@@ -27,6 +27,7 @@ using DshController.Core.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.Storage.Pickers;
@@ -105,6 +106,9 @@ namespace DshController
             // 两个独立面板（各自持有实例列表 / 状态 / 设置）
             PanelWin.Init(_registry, _instanceMgr, "windows", AppendLog, UpdateFooter, _archive);
             PanelWsl.Init(_registry, _instanceMgr, "wsl", AppendLog, UpdateFooter, _archive);
+            // 左栏「＋ 新建实例 / 扫描」按钮接线：事件由 InstancesRailView 暴露（并行代理新增），MainWindow 统一路由
+            RailWin.NewInstanceRequested += () => _ = OnRailNewInstanceAsync();
+            RailWin.ScanRequested += () => _ = OnRailScanAsync();
             // 插件市场 / 插件管理（页面惰性加载：首次切过去才拉目录 / 读实例 HOME）
             PanelMarket.Init(_registry, _instanceMgr, AppendLog, _archive);
             PanelPlugins.Init(_registry, _instanceMgr, AppendLog, _archive);
@@ -394,10 +398,9 @@ namespace DshController
                 if (added == 0 && dropped == 0) return;
                 if (_autoScroll) ScrollLogToEnd();
             }
-            catch (Exception ex)
+            catch
             {
                 // 理由: 日志渲染失败绝不能影响后端操作；下一轮批次会继续尝试
-                System.Diagnostics.Debug.WriteLine("log flush failed: " + ex.Message);
             }
         }
 
@@ -488,22 +491,106 @@ namespace DshController
             string report = string.IsNullOrEmpty(_registry.Settings.ErrorReportDir)
                 ? "默认目录" : _registry.Settings.ErrorReportDir;
 
-            // 各环境检测到的 harness 主实例版本（面板异步探测后回调刷新）
-            string vWin = "", vWsl = "";
-            try { vWin = PanelWin.DetectedVersion ?? ""; } catch { /* 理由: 版本属性探测未完成或面板未初始化时可能抛，失败仅省略页脚 WIN 版本段 */ }
-            try { vWsl = PanelWsl.DetectedVersion ?? ""; } catch { /* 理由: WSL 版本探测失败仅省略页脚版本段，实例计数与主体信息不受影响 */ }
-            string vers = "";
-            if (vWin.Length > 0) vers += " · WIN harness v" + vWin;
-            if (vWsl.Length > 0) vers += " · WSL harness v" + vWsl;
-
-            FooterText.Text = "Windows 实例 " + win + " 个 · WSL 实例 " + wsl + " 个" + vers +
-                " · 报告目录: " + report + " · v" + ErrorReporter.AppVersion;
+            // 去版本化轮：页脚不再显示 harness 版本段（实例页版本链路已整体移除）
+            FooterText.Text = "Windows 实例 " + win + " 个 · WSL 实例 " + wsl + " 个 · 报告目录: " + report + " · v" + ErrorReporter.AppVersion;
 
             _rail?.Refresh();   // 改版·启动序列表：清单与打点变化即时重排左栏（UpdateFooter 是变更汇聚点）
-            // 左栏头部实时显示实例数与运行数（旧环境行/侧边栏导航项能力的归并迁移）
-            int run = 0;
-            try { run = PanelWin.RunningCount() + PanelWsl.RunningCount(); } catch { /* 理由: 运行数探测可能因端口探测未就绪而抛，失败仅省略「运行中」标注，实例总数仍正常显示 */ }
-            UpdateRailHeader(_registry.Instances.Count, run);
+            // 跨面板新增实例后的接线补齐：任一面板扫描发现的实例（含对方环境）都在这里补上事件接线
+            try { PanelWin.EnsureWired(); } catch { /* 理由: 面板未就绪时跳过，下一次清单变更会再试 */ }
+            try { PanelWsl.EnsureWired(); } catch { /* 理由: 同上 */ }
+        }
+
+        // ==================== 左栏新建 / 扫描路由（启动序列表头部按钮） ====================
+
+        /// <summary>
+        /// 左栏「＋ 新建实例」：本机没有 WSL 发行版时直接开 Windows 新建向导；
+        /// 有发行版先弹环境选择，选 WSL 再按发行版数量决定是否二次选择。
+        /// </summary>
+        private async Task OnRailNewInstanceAsync()
+        {
+            try
+            {
+                // 1) 枚举本机 WSL 发行版：离线清单优先（不起 wsl.exe 进程），失败当无 WSL
+                List<string> distros = new List<string>();
+                try { distros = WslTools.ListRegisteredDistrosOffline() ?? new List<string>(); }
+                catch (Exception ex)
+                {
+                    // 理由: 离线清单读取失败（未装 WSL/清单缺失）按无发行版处理，不阻断新建流程
+                    AppendLog("[新建] 离线发行版清单读取失败: " + ex.Message);
+                }
+                if (distros.Count == 0)
+                {
+                    // 离线为空再问一次 wsl.exe（await 异步等结果，不在 UI 线程同步阻塞）；仍失败当无 WSL
+                    try { distros = await WslTools.ListDistrosAsync(); }
+                    catch (Exception ex)
+                    {
+                        // 理由: wsl.exe 探测失败视为本机无 WSL，直接走 Windows 新建
+                        AppendLog("[新建] WSL 发行版探测失败: " + ex.Message);
+                    }
+                }
+
+                // 2) 本机无 WSL → 不弹选择，直接开 Windows 新建
+                if (distros.Count == 0) { await PanelWin.OpenCreateAsync(); return; }
+
+                // 3) 环境选择：Windows / WSL / 取消
+                var envDlg = new ContentDialog
+                {
+                    Title = "新建实例",
+                    Content = "要在哪个环境创建实例？",
+                    PrimaryButtonText = "Windows 环境",
+                    SecondaryButtonText = "WSL 环境",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Primary
+                };
+                ContentDialogResult envPick = await _dialogService.ShowAsync(envDlg);
+                if (envPick == ContentDialogResult.Primary) { await PanelWin.OpenCreateAsync(); return; }
+                if (envPick != ContentDialogResult.Secondary)
+                {
+                    AppendLog("[新建] 已取消。");
+                    return;
+                }
+
+                // 4) WSL：单发行版直开；多发行版先选目标发行版
+                if (distros.Count == 1) { await PanelWsl.OpenCreateAsync(distros[0]); return; }
+
+                var cmb = new ComboBox { MinWidth = 240, PlaceholderText = "选择发行版" };
+                foreach (string d in distros) cmb.Items.Add(d);
+                cmb.SelectedIndex = 0;
+                AutomationProperties.SetAutomationId(cmb, "RailDistroCombo");
+                var distroDlg = new ContentDialog
+                {
+                    Title = "选择 WSL 发行版",
+                    Content = cmb,
+                    PrimaryButtonText = "确认",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Primary
+                };
+                if (await _dialogService.ShowAsync(distroDlg) == ContentDialogResult.Primary
+                    && cmb.SelectedItem is string sel)
+                {
+                    await PanelWsl.OpenCreateAsync(sel);
+                }
+            }
+            catch (Exception ex)
+            {
+                // 理由: 本方法经 fire-and-forget 事件接线调用（_ = ...），异常必须就地承接，避免未观察任务异常
+                AppendLog("[新建] 打开新建向导失败: " + ex.Message);
+            }
+        }
+
+        /// <summary>左栏「扫描」：详情主区当前在 WSL 子页就扫 WSL，否则扫 Windows。</summary>
+        private async Task OnRailScanAsync()
+        {
+            try
+            {
+                if (PanelWsl.Visibility == Microsoft.UI.Xaml.Visibility.Visible) await PanelWsl.RunScanAsync();
+                else await PanelWin.RunScanAsync();
+            }
+            catch (Exception ex)
+            {
+                // 理由: fire-and-forget 调用，扫描失败就地记日志，不影响界面与后续操作
+                AppendLog("[扫描] 失败: " + ex.Message);
+            }
         }
 
         // ==================== 关闭 ====================

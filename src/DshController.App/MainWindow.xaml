@@ -119,34 +119,6 @@
                                         <TextBlock Text="插件管理" VerticalAlignment="Center" />
                                     </StackPanel>
                                 </Button>
-                                <!-- 管理实例树：选中「插件管理」即展开各活跃实例子节点（统一显示名）；
-                                     点节点与顶栏选择器共享同一份 PluginTargetViewModel，双向同步 -->
-                                <ListView x:Name="PluginTargetTree" Visibility="Collapsed" Margin="18,2,0,0"
-                                          SelectionMode="Single" BorderThickness="0" Background="Transparent" Padding="0"
-                                          ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                          SelectionChanged="PluginTargetTree_SelectionChanged">
-                                    <ListView.Resources>
-                                        <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="{ThemeResource BrandSoftColor}" />
-                                        <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="{ThemeResource BrandSoftColor}" />
-                                        <SolidColorBrush x:Key="ListViewItemForegroundSelected" Color="{ThemeResource BrandPrimaryColor}" />
-                                    </ListView.Resources>
-                                    <ListView.ItemContainerStyle>
-                                        <Style TargetType="ListViewItem">
-                                            <Setter Property="MinHeight" Value="0" />
-                                            <Setter Property="Padding" Value="6,3" />
-                                            <Setter Property="Margin" Value="0,1" />
-                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                        </Style>
-                                    </ListView.ItemContainerStyle>
-                                    <ListView.ItemTemplate>
-                                        <DataTemplate>
-                                            <TextBlock FontSize="11.5" TextTrimming="CharacterEllipsis"
-                                                       Text="{Binding Converter={StaticResource DisplayLabel}}"
-                                                       ToolTipService.ToolTip="{Binding Converter={StaticResource DisplayTooltip}}"
-                                                       Foreground="{ThemeResource LabelSecondaryBrush}" />
-                                        </DataTemplate>
-                                    </ListView.ItemTemplate>
-                                </ListView>
                             </StackPanel>
                         </views:SplitPageShell.LeftContent>
                         <views:SplitPageShell.BodyContent>
@@ -163,27 +135,27 @@
                             <views:ArchivesRailView x:Name="RailArch" />
                         </views:SplitPageShell.LeftContent>
                         <views:SplitPageShell.BodyContent>
-                            <!-- 改版·用量看板并入：双行脊=元信息(Auto)+用量(*)，左栏选中同步过滤范围 -->
+                            <!-- 2026-09-06 二次改版：档案页主区两页互斥（同格叠放）——
+                                 左栏选中真实档案 → 单实例详情（元信息 + 完整用量）；
+                                 左栏总计/无选中 → 用量看板（全部实例合并口径）。 -->
                             <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="*" />
-                                </Grid.RowDefinitions>
-                                <views:ArchiveMetaView x:Name="PanelArchiveMeta" Grid.Row="0" Visibility="Collapsed" />
-                                <views:UsageView x:Name="PanelUsage" Grid.Row="1" />
+                                <views:UsageView x:Name="PanelUsage" />
+                                <views:ArchiveMetaView x:Name="PanelArchiveMeta" Visibility="Collapsed" />
                             </Grid>
                         </views:SplitPageShell.BodyContent>
                     </views:SplitPageShell>
 
                     <views:SplitPageShell x:Name="ShellApi" Grid.Row="0" LeftEyebrow="API" Visibility="Collapsed">
                         <views:SplitPageShell.LeftContent>
-                            <StackPanel Spacing="4">
+                            <!-- 改版·照 dsh 模型页适配：左栏提供方列表（点选在右侧详情区配置） -->
+                            <StackPanel Spacing="8">
                                 <TextBlock x:Name="ApiCaption" AutomationProperties.AutomationId="ApiCaption"
                                            Text="供应商 0 家" Style="{StaticResource NavCaption}" Margin="4,2,4,0" />
+                                <views:ProviderRailView x:Name="RailApi" />
                             </StackPanel>
                         </views:SplitPageShell.LeftContent>
                         <views:SplitPageShell.BodyContent>
-                            <!-- 改版·供应商编辑页：全局预设 CRUD；写实例 HOME 属供应商同步大类（预览确认） -->
+                            <!-- 改版·照 dsh 模型页适配：详情区（密钥/协议/地址/模型目录），同步写实例属预览确认 -->
                             <views:ProviderPresetsView x:Name="PanelApiPresets" />
                         </views:SplitPageShell.BodyContent>
                     </views:SplitPageShell>

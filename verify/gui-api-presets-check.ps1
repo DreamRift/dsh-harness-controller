@@ -1,10 +1,11 @@
-# ============================================================================
-#  gui-api-presets-check.ps1 - API page provider preset editor walk
-#  (sub-task "provider editor page")
-#  Walks: page visible / add via dialog with validation-passing fields /
-#  edit rename / delete with confirm. Global store file (api-presets.json) is
-#  backed up, cleared and restored (self-recovering). External instances are
-#  untouched (page never reads/writes them). ASCII-only source.
+﻿# ============================================================================
+#  gui-api-presets-check.ps1 - API page provider walk (dsh-style master-detail)
+#  (2026-09 API page rework: left rail providers + right detail editor card)
+#  Walks: page visible / rail add -> detail create card (Provider ID+name+URL+
+#  key+model) / sync preview cancel = zero write / sync confirm = real write
+#  into RTEST-S temp HOME settings.yaml / edit rename via detail card / delete
+#  with confirm. Global store file (api-presets.json) is backed up, cleared and
+#  restored (self-recovering). External instances are untouched. ASCII-only.
 #  Usage: powershell -ExecutionPolicy Bypass -File verify\gui-api-presets-check.ps1 -Exe <exe> -Out <dir>
 # ============================================================================
 param(
@@ -43,13 +44,15 @@ function Find-ById([long]$hwnd, [string]$id) {
     return $root.FindFirst($TS::Descendants, (New-Object System.Windows.Automation.PropertyCondition($AE::AutomationIdProperty, $id)))
 }
 function Invoke-Click([long]$hwnd, [string]$id) {
-    for ($try = 1; $try -le 3; $try++) {
+    for ($try = 1; $try -le 5; $try++) {
         $el = Find-ById $hwnd $id
         if ($null -ne $el) {
             $pat = $null
-            if ($el.TryGetCurrentPattern($IPC::Pattern, [ref]$pat)) { $pat.Invoke(); return $true }
+            if ($el.TryGetCurrentPattern($IPC::Pattern, [ref]$pat)) {
+                try { $pat.Invoke(); return $true } catch { Write-Host ('  invoke retry ' + $try + ': ' + $_.Exception.Message) }
+            }
         }
-        Start-Sleep -Milliseconds 300
+        Start-Sleep -Milliseconds 400
     }
     return $false
 }
@@ -58,9 +61,11 @@ function Set-Value([long]$hwnd, [string]$id, [string]$val) {
         $el = Find-ById $hwnd $id
         if ($null -ne $el) {
             $vp = $null
-            if ($el.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) { $vp.SetValue($val); return $true }
+            if ($el.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern, [ref]$vp)) {
+                try { $vp.SetValue($val); return $true } catch { Write-Host ('  setval retry ' + $try + ': ' + $_.Exception.Message) }
+            }
         }
-        Start-Sleep -Milliseconds 300
+        Start-Sleep -Milliseconds 400
     }
     return $false
 }
@@ -123,7 +128,17 @@ try {
     [IO.File]::WriteAllText($presetFile, '[]', (New-Object System.Text.UTF8Encoding($false)))
     Remove-Item -Recurse -Force $homeS -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $homeS | Out-Null
-    $fixture = @('version: 1', '', 'providers:', '  other:', '    displayName: other', '    api: openai-completions', '    baseURL: https://other.example.com') -join [Environment]::NewLine
+    $fixture = @('version: 1', '',
+        'providers:',
+        '  other:',
+        '    displayName: other',
+        '    api: openai-completions',
+        '    baseURL: https://other.example.com',
+        '  probe-preset:',
+        '    displayName: Probe Legacy',
+        '    api: openai-completions',
+        '    apiKeyEnv: DSH_PRESET_PROBE_PRESET',
+        '') -join [Environment]::NewLine
     [IO.File]::WriteAllText((Join-Path $homeS 'settings.yaml'), $fixture, (New-Object System.Text.UTF8Encoding($false)))
     $rtest = @{ id='RTEST-S'; name='RTEST-S'; port=3185; host='127.0.0.1'; runtime='windows'; home=$homeS; workspace=$env:TEMP; trustedHosts=@(); autoOpenBrowser=$false; stopOnExit=$true }
     $regDoc = [pscustomobject]@{ version=2; instances=@($rtest) }
@@ -135,37 +150,47 @@ try {
     while ((Get-Date) -lt $deadline) { $p.Refresh(); if ($p.MainWindowHandle -ne 0) { $hwnd = $p.MainWindowHandle.ToInt64(); break }; Start-Sleep -Milliseconds 250 }
     Add-Result ($hwnd -ne 0) 'window-smoke' ('hwnd=' + $hwnd)
     if ($hwnd -eq 0) { throw 'no window' }
+    Start-Sleep -Seconds 8          # 冷启动缓冲：等待实例清单加载/首轮档案采集高峰过去
 
     $nav = Invoke-Click $hwnd 'BtnPageApi'
-    Start-Sleep -Milliseconds 1200
+    Start-Sleep -Milliseconds 2200
     $hostEl = Find-ById $hwnd 'PresetsHost'
     $pageOk = ($nav -and $null -ne $hostEl -and -not $hostEl.Current.IsOffscreen)
     Add-Result $pageOk 'api-page-visible' ('nav=' + $nav)
+    Start-Sleep -Milliseconds 600
+    $rows0 = @(Get-Rows $hwnd)
+    $builtinOk = ($rows0.Count -ge 1 -and (($rows0 | ForEach-Object { $_.Text }) -join '|').Contains('DeepSeek'))
+    Add-Result $builtinOk 'api-builtin-deepseek' ('rows=' + $rows0.Count)
     Save-Shot $hwnd 'api-presets-initial'
 
-    # ---- add ----
-    $addBtn = Invoke-Click $hwnd 'BtnPresetAdd'
-    Start-Sleep -Milliseconds 700
+    # ---- create via rail: open detail create card, fill dsh-style fields ----
+    $addBtn = Invoke-Click $hwnd 'BtnProviderAdd'
+    Start-Sleep -Milliseconds 1200
+    $okR = Set-Value $hwnd 'PresetRoute' 'probe-preset'
     $ok1 = Set-Value $hwnd 'PresetName' 'Probe Preset'
-    $ok2 = Set-Value $hwnd 'PresetKind' 'probe'
     $ok3 = Set-Value $hwnd 'PresetBaseUrl' 'https://127.0.0.1/v1'
     $ok4 = Set-Value $hwnd 'PresetApiKey' 'sk-probe'
+    $okAdd = Invoke-Click $hwnd 'PresetModelAdd'
+    Start-Sleep -Milliseconds 300
     $ok5 = Set-Value $hwnd 'PresetModel' 'probe-model'
-    $prim = Find-ById $hwnd 'PrimaryButton'
-    $saved = $false
-    if ($null -ne $prim) { $ip = $null; if ($prim.TryGetCurrentPattern($IPC::Pattern, [ref]$ip)) { $ip.Invoke(); $saved = $true } }
+    Start-Sleep -Milliseconds 500
+    $mmOk = ($null -ne (Find-ById $hwnd 'PresetModelMultimodal'))
+    Add-Result $mmOk 'api-model-multimodal-toggle' ('threeState=' + $mmOk)
+    $saved = Invoke-Click $hwnd 'PresetSave'
     $ms = Wait-Rows $hwnd 1 5000
     $rows = @(Get-Rows $hwnd)
-    $stillOpen = $null -ne (Find-ById $hwnd 'PresetName')
     $fileDump = ''
     if (Test-Path $presetFile) { $fileDump = (Get-Content $presetFile -Raw -Encoding UTF8) }
-    Write-Output ('  diag: saved=' + $saved + ' waitMs=' + $ms + ' rowsCount=' + $rows.Count + ' dialogStillOpen=' + $stillOpen + ' file=' + $fileDump)
-    $addOk = ($addBtn -and $ok1 -and $ok2 -and $saved -and $ms -ge 0 -and $rows.Count -ge 1 -and $rows[0].Text.Contains('Probe Preset'))
-    Add-Result $addOk 'api-add-row' ('fill=' + $ok1 + $ok2 + $ok3 + $ok4 + $ok5 + ' rows=' + $rows.Count)
+    Write-Output ('  diag: saved=' + $saved + ' waitMs=' + $ms + ' rowsCount=' + $rows.Count + ' routeSet=' + $okR + ' file=' + $fileDump)
+    $rowsText = ($rows | ForEach-Object { $_.Text }) -join '|'
+    $addOk = ($addBtn -and $okR -and $ok1 -and $ok3 -and $okAdd -and $saved -and $ms -ge 0 -and $rows.Count -ge 2 -and $rowsText.Contains('Probe Preset') -and $rowsText.Contains('DeepSeek'))
+    Add-Result $addOk 'api-add-row' ('routeSet=' + $okR + ' fill=' + $ok1 + $ok3 + $ok4 + ' addRow=' + $okAdd + ' model=' + $ok5 + ' rows=' + $rows.Count)
     Save-Shot $hwnd 'api-presets-added'
 
-    # ---- sync preview: opens, cancel = zero write ----
+    # ---- sync preview: opens, cancel = zero write (actions live in the detail card) ----
     $preBefore = ''; if (Test-Path $presetFile) { $preBefore = Get-Content $presetFile -Raw -Encoding UTF8 }
+    [void](Select-RowContains $hwnd 'Probe Preset')
+    Start-Sleep -Milliseconds 700
     $syncBtn = Invoke-Click $hwnd 'BtnPresetSync'
     Start-Sleep -Milliseconds 800
     $primS = Find-ById $hwnd 'PrimaryButton'
@@ -174,7 +199,7 @@ try {
     Save-Shot $hwnd 'api-presets-sync-preview'
     $closeB = Find-ById $hwnd 'CloseButton'
     $cancelled = $false
-    if ($null -ne $closeB) { $ci = $null; if ($closeB.TryGetCurrentPattern($IPC::Pattern, [ref]$ci)) { $ci.Invoke(); $cancelled = $true } }
+    if ($null -ne $closeB) { $ci = $null; if ($closeB.TryGetCurrentPattern($IPC::Pattern, [ref]$ci)) { try { $ci.Invoke(); $cancelled = $true } catch { } } }
     Start-Sleep -Milliseconds 900
     $preAfter = ''; if (Test-Path $presetFile) { $preAfter = Get-Content $presetFile -Raw -Encoding UTF8 }
     $rowsX = @(Get-Rows $hwnd)
@@ -188,43 +213,47 @@ try {
     Start-Sleep -Milliseconds 800
     $primW = Find-ById $hwnd 'PrimaryButton'
     $wrote = $false
-    if ($null -ne $primW) { $wi = $null; if ($primW.TryGetCurrentPattern($IPC::Pattern, [ref]$wi)) { $wi.Invoke(); $wrote = $true } }
+    if ($null -ne $primW) { $wi = $null; if ($primW.TryGetCurrentPattern($IPC::Pattern, [ref]$wi)) { try { $wi.Invoke(); $wrote = $true } catch { } } }
     Start-Sleep -Milliseconds 1500
     # close the result Info dialog if present
     $infClose = Find-ById $hwnd 'CloseButton'
-    if ($null -ne $infClose) { $ii = $null; if ($infClose.TryGetCurrentPattern($IPC::Pattern, [ref]$ii)) { $ii.Invoke() } }
+    if ($null -ne $infClose) { $ii = $null; if ($infClose.TryGetCurrentPattern($IPC::Pattern, [ref]$ii)) { try { $ii.Invoke() } catch { } } }
     Start-Sleep -Milliseconds 600
     $afterSettings = ''
     if (Test-Path $settings) { $afterSettings = Get-Content $settings -Raw -Encoding UTF8 }
-    $expectKey = 'probe-probe-preset:'
-    $writeOk = ($wrote -and $afterSettings.Contains($expectKey) -and $afterSettings.Contains('other:') -and $beforeSettings.Contains('version: 1'))
-    Add-Result $writeOk 'sync-confirm-real-write' ('wrote=' + $wrote + ' hasKey=' + $afterSettings.Contains($expectKey) + ' keptOther=' + $afterSettings.Contains('other:'))
+    $expectKey = '    probe-preset:'
+    $rootLines = @(); if (Test-Path $settings) { $rootLines = @(Get-Content $settings -Encoding UTF8 | ForEach-Object { $_.TrimEnd() }) }
+    $rootProbeGone = -not ($rootLines -contains '  probe-preset:')
+    $rootOtherKept = $rootLines -contains '  other:'
+    $writeOk = ($wrote -and $afterSettings.Contains('llm-pi-ai:') -and $afterSettings.Contains($expectKey) -and `
+        $afterSettings.Contains('reasoningEfforts:') -and $afterSettings.Contains('            off: null') -and `
+        $rootProbeGone -and $rootOtherKept -and $beforeSettings.Contains('version: 1'))
+    Add-Result $writeOk 'sync-confirm-real-write' ('wrote=' + $wrote + ' llmPiAi=' + $afterSettings.Contains('llm-pi-ai:') + ' efforts=' + $afterSettings.Contains('reasoningEfforts:') + ' rootProbeGone=' + $rootProbeGone + ' rootOtherKept=' + $rootOtherKept)
     Save-Shot $hwnd 'api-presets-sync-written'
 
-    # ---- edit (rename) ----
+    # ---- edit (rename) via detail card: select row -> editor opens ----
     $sel = Select-RowContains $hwnd 'Probe Preset'
-    Start-Sleep -Milliseconds 500
-    $edBtn = Invoke-Click $hwnd 'BtnPresetEdit'
-    Start-Sleep -Milliseconds 700
+    Start-Sleep -Milliseconds 900
     [void](Set-Value $hwnd 'PresetName' 'Probe Renamed')
-    $prim2 = Find-ById $hwnd 'PrimaryButton'
-    $saved2 = $false
-    if ($null -ne $prim2) { $ip2 = $null; if ($prim2.TryGetCurrentPattern($IPC::Pattern, [ref]$ip2)) { $ip2.Invoke(); $saved2 = $true } }
+    Start-Sleep -Milliseconds 300
+    $saved2 = Invoke-Click $hwnd 'PresetSave'
     Start-Sleep -Milliseconds 1200
     $rows2 = @(Get-Rows $hwnd)
-    $editOk = ($sel -and $edBtn -and $saved2 -and $rows2.Count -ge 1 -and $rows2[0].Text.Contains('Probe Renamed'))
+    $editOk = ($sel -and $saved2 -and $rows2.Count -ge 2 -and (($rows2 | ForEach-Object { $_.Text }) -join '|').Contains('Probe Renamed'))
     Add-Result $editOk 'api-edit-renamed' ('rows=' + $rows2.Count)
     Save-Shot $hwnd 'api-presets-edited'
 
-    # ---- delete ----
+    # ---- delete (confirm dialog; reopen editor first) ----
+    [void](Select-RowContains $hwnd 'Probe Renamed')
+    Start-Sleep -Milliseconds 700
     $delBtn = Invoke-Click $hwnd 'BtnPresetDelete'
     Start-Sleep -Milliseconds 700
     $prim3 = Find-ById $hwnd 'PrimaryButton'
     $delOk2 = $false
-    if ($null -ne $prim3) { $ip3 = $null; if ($prim3.TryGetCurrentPattern($IPC::Pattern, [ref]$ip3)) { $ip3.Invoke(); $delOk2 = $true } }
+    if ($null -ne $prim3) { $ip3 = $null; if ($prim3.TryGetCurrentPattern($IPC::Pattern, [ref]$ip3)) { try { $ip3.Invoke(); $delOk2 = $true } catch { } } }
     Start-Sleep -Milliseconds 1200
     $rows3 = @(Get-Rows $hwnd)
-    $delOk = ($delBtn -and $delOk2 -and $rows3.Count -eq 0)
+    $delOk = ($delBtn -and $delOk2 -and $rows3.Count -eq 1 -and (($rows3 | ForEach-Object { $_.Text }) -join '|').Contains('DeepSeek'))
     Add-Result $delOk 'api-delete-removed' ('rows=' + $rows3.Count)
     Save-Shot $hwnd 'api-presets-deleted'
 

@@ -39,6 +39,8 @@ function Get-Dialog([long]$hwnd){ $root=$AE::FromHandle([IntPtr]$hwnd); if($null
 function Save-Shot([long]$hwnd,[string]$name){ $r=New-Object Win32E+RECT; [void][Win32E]::GetWindowRect([IntPtr]$hwnd,[ref]$r); $w=$r.Right-$r.Left; $h=$r.Bottom-$r.Top; if($w -le 0 -or $h -le 0){return}; $bmp=New-Object System.Drawing.Bitmap($w,$h); $g=[System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($r.Left,$r.Top,0,0,(New-Object System.Drawing.Size($w,$h))); $bmp.Save((Join-Path $Out ($name+'.png')),[System.Drawing.Imaging.ImageFormat]::Png); $g.Dispose(); $bmp.Dispose() }
 function Get-RowTexts($row){ $cTx=New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::Text); $out=@(); foreach($t in $row.FindAll($TS::Descendants,$cTx)){ $out += $t.Current.Name }; return $out }
 function Wait-RowVersion([long]$hwnd,[string]$rowText,[string]$wanted,[int]$timeoutMs){ $sw=[Diagnostics.Stopwatch]::StartNew(); while($sw.ElapsedMilliseconds -lt $timeoutMs){ $row=Get-Row $hwnd $rowText; if($null -ne $row){ foreach($t in @(Get-RowTexts $row)){ if($t.Contains($wanted)){return $sw.ElapsedMilliseconds} } }; Start-Sleep -Milliseconds 800 }; return -1 }
+function Get-ComboValue([long]$hwnd,[string]$id){ $el=Find-ById $hwnd $id; if($null -eq $el){return '<absent>'}; $sp=$null; if(-not $el.TryGetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern,[ref]$sp)){return '<nopattern>'}; $sel=$sp.Current.GetSelection(); foreach($s in $sel){ return $s.Current.Name }; return '<none>' }
+function Select-ComboItem([long]$hwnd,[string]$id,[string]$token){ for($try=1;$try -le 5;$try++){ $el=Find-ById $hwnd $id; if($null -ne $el){ $exp=$null; $hasExp=$el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern,[ref]$exp); if($hasExp){ try { $exp.Expand() } catch { } }; Start-Sleep -Milliseconds 400; $cLI=New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem); $ok=$false; foreach($i in $el.FindAll($TS::Descendants,$cLI)){ if(($i.Current.Name).Contains($token)){ $pat=$null; if($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern,[ref]$pat)){ try { $pat.Select(); $ok=$true } catch { }; break } } }; if($hasExp){ try { $exp.Collapse() } catch { } }; if($ok){ return $true } }; Start-Sleep -Milliseconds 600 }; return $false }
 $state = Join-Path $env:LOCALAPPDATA 'DshController'
 $reg = Join-Path $state 'instances.json'
 $ledger = Join-Path $state 'upgrade-ignores.json'
@@ -74,13 +76,10 @@ try {
     Start-Sleep -Seconds 8
     Invoke-Click $hwnd 'BtnPagePlug' | Out-Null; Start-Sleep -Milliseconds 900
     Invoke-Click $hwnd 'BtnSubManage' | Out-Null; Start-Sleep -Milliseconds 1800
-    $lvT = Find-ById $hwnd 'PluginTargetTree'; $selU = $false
-    if ($null -ne $lvT) {
-        $cLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::ListItem)
-        $cTx = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty,[System.Windows.Automation.ControlType]::Text)
-        foreach ($i in $lvT.FindAll($TS::Descendants,$cLI)) { $txt=''; foreach ($tx in $i.FindAll($TS::Descendants,$cTx)) { $txt = $tx.Current.Name; break }; if ($txt.StartsWith('windows:3185')) { $pat=$null; if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern,[ref]$pat)) { $pat.Select(); $selU=$true }; break } }
-    }
-    Add-Result $selU 'select-fixture' ('tree row='+$selU)
+    # manage page owns its CmbInstance now (PluginTargetTree was removed in the rework);
+    # item labels are "windows:3185" or "alias (windows:3185)" -> match by Contains
+    $selU = Select-ComboItem $hwnd 'CmbInstance' 'windows:3185'
+    Add-Result $selU 'select-fixture' ('combo item windows:3185='+$selU)
     $row = $null; $hintMs = -1
     $sw = [Diagnostics.Stopwatch]::StartNew()
     while ($sw.ElapsedMilliseconds -lt 45000) {
@@ -117,6 +116,7 @@ try {
     Start-Sleep -Seconds 8
     Invoke-Click $hwnd 'BtnPagePlug' | Out-Null; Start-Sleep -Milliseconds 900
     Invoke-Click $hwnd 'BtnSubManage' | Out-Null; Start-Sleep -Milliseconds 1800
+    [void](Select-ComboItem $hwnd 'CmbInstance' 'windows:3185')
     $row3 = $null; $hint2 = -1; $sw2 = [Diagnostics.Stopwatch]::StartNew()
     while ($sw2.ElapsedMilliseconds -lt 45000) {
         $row3 = Get-Row $hwnd $pkg

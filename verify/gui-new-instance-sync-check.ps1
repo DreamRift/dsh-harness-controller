@@ -12,6 +12,7 @@ param(
     [int]$StartupSec = 25
 )
 $ErrorActionPreference = 'Stop'
+$S_ENVSEL = [string]([char]0x73AF) + [char]0x5883              # environment (env-choice dialog)
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
@@ -70,11 +71,36 @@ try {
     Add-Result ($hwnd -ne 0) 'window-smoke' ('hwnd=' + $hwnd)
     if ($hwnd -eq 0) { throw 'no window' }
 
-    # instances page is default; click BtnNew (empty-state or rail) to open dialog
-    $open = Invoke-Click $hwnd 'BtnNew'
+    # instances page is default; the rail top button is the only new-instance entry now
+    # (revamp removed the per-page toolbar). With WSL distros registered the app first
+    # shows an environment-choice dialog (primary = Windows) - pick it, then the create
+    # form (with ChkSyncPresets) opens. ChkSyncPresets is the only create-form control
+    # carrying an AutomationId, so it is the reliable "form is open" marker.
+    $open = Invoke-Click $hwnd 'BtnRailNew'
     Start-Sleep -Milliseconds 400
-    if (-not $open) { $open = Invoke-Click $hwnd 'BtnNewFromEmpty' }
-    Add-Result $open 'new-dialog-open' ('btn=' + $open)
+    if (-not $open) { Start-Sleep -Seconds 1; $open = Invoke-Click $hwnd 'BtnRailNew' }
+    $envPicked = $false
+    for ($t = 0; $t -lt 15; $t++) {
+        if ($null -ne (Find-ById $hwnd 'ChkSyncPresets')) { break }
+        $pb = Find-ById $hwnd 'PrimaryButton'
+        if ($null -ne $pb) {
+            try {
+                if ($pb.Current.Name.Contains($S_ENVSEL)) {
+                    $pi = $null
+                    if ($pb.TryGetCurrentPattern($IPC::Pattern, [ref]$pi)) { $pi.Invoke(); $envPicked = $true }
+                }
+            } catch { }
+        }
+        if ($envPicked) { break }
+        Start-Sleep -Milliseconds 400
+    }
+    # form appears 1-2s after env pick (port suggestion probe runs before the dialog shows)
+    $formUp = $false
+    for ($t = 0; $t -lt 20; $t++) {
+        if ($null -ne (Find-ById $hwnd 'ChkSyncPresets')) { $formUp = $true; break }
+        Start-Sleep -Milliseconds 400
+    }
+    Add-Result ($open -and $formUp) 'new-dialog-open' ('rail-new=' + $open + ' envPicked=' + $envPicked + ' form=' + $formUp)
 
     # checkbox present + default checked
     $chk = $null

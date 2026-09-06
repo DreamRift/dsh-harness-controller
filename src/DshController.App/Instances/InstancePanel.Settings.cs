@@ -60,14 +60,6 @@ namespace DshController
                 return false;
             }
 
-            string version = ReadVersionCombo();
-            if (version == null)
-            {
-                if (showErrors)
-                    PushLog("harness 版本格式无效（需形如 0.1.0 或 0.1.0-rc.7；留空/选「跟随当前环境」= 用当前环境版本），未保存设置。");
-                return false;
-            }
-
             string distroText = IsWslPanel ? (CmbWslDistro.Text ?? "").Trim() : "";
             var input = new InstanceSettingsInput
             {
@@ -78,7 +70,7 @@ namespace DshController
                     ? DefaultWorkspace() : TxtWorkspace.Text,
                 Home = IsWslPanel ? "" : TxtHome.Text,
                 TrustedHosts = TxtTrustedHosts.Text,
-                HarnessVersion = version,
+                HarnessVersion = def.HarnessVersion,   // 版本编辑入口已移除：保持既有值（升级走设置区升级卡）
                 IsWsl = IsWslPanel,
                 // 发行版留空只警告不阻断（用户可能稍后补），校验器那关用占位符通过
                 WslDistro = IsWslPanel ? (distroText.Length == 0 ? "-" : distroText) : "",
@@ -119,13 +111,9 @@ namespace DshController
             def.AutoOpenBrowser = SwAutoOpen.IsOn;
             def.StopOnExit = SwStopOnExit.IsOn;
             def.Runtime = IsWslPanel ? "wsl" : "windows";
-            def.HarnessVersion = version;
-
             UpdateHomeLabel(def);
             UpdateUrl(def);
-            UpdateVersionText(def);
             RefreshInstanceList();
-            SyncPickerSelection();
             return true;
         }
 

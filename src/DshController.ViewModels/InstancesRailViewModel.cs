@@ -65,7 +65,9 @@ namespace DshController.ViewModels
                 .ToList();
         }
 
-        /// <summary>重排行+刷新运行态（liveness 每轮前台 2s，这里只读结论不探测）。</summary>
+        /// <summary>重排行+刷新运行态（liveness 每轮前台 2s，这里只读结论不探测）。
+        /// 稳定态（行序列与内容与现有完全一致）不触碰 Rows——每轮 Clear+重加新对象会让
+        /// ListView 整表重建容器（左栏等间隔闪烁的根源），只有真有变化才重排。</summary>
         public void Refresh()
         {
             List<InstanceRailRow> next = OrderForRail(_facade.Instances)
@@ -83,10 +85,28 @@ namespace DshController.ViewModels
                 })
                 .ToList();
 
+            if (SequenceEqualsCurrent(next)) return;
+
             Rows.Clear();
             foreach (InstanceRailRow r in next) Rows.Add(r);
 
             if (!string.IsNullOrEmpty(SelectedId) && !Rows.Any(r => r.Id == SelectedId)) SelectedId = "";
+        }
+
+        /// <summary>现有行序列与 next 逐字段一致（同长度、同序、同内容）→ 稳定态。</summary>
+        private bool SequenceEqualsCurrent(List<InstanceRailRow> next)
+        {
+            if (Rows.Count != next.Count) return false;
+            for (int i = 0; i < next.Count; i++)
+            {
+                InstanceRailRow a = Rows[i], b = next[i];
+                if (a.Id != b.Id || a.Name != b.Name || a.OriginalName != b.OriginalName
+                    || a.Tooltip != b.Tooltip || a.Runtime != b.Runtime || a.Port != b.Port
+                    || a.Running != b.Running || a.LastStartedAt != b.LastStartedAt
+                    || a.CreatedAt != b.CreatedAt)
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>选中一行（UI 事件转发进来）：更新 SelectedId + 采集焦点。返回是否变化。空 id = 清除选中。</summary>

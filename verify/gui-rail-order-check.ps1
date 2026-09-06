@@ -99,23 +99,6 @@ function Get-SelectedRailText([long]$hwnd) {
     foreach ($e in $sel) { $out += (Get-ItemText $e) + ' ' }
     return $out
 }
-function Select-ComboItem([long]$hwnd, [string]$comboId, [string]$contains) {
-    $cmb = Find-ById $hwnd $comboId
-    if ($null -eq $cmb) { return $false }
-    $exp = $null
-    if ($cmb.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)) { $exp.Expand(); Start-Sleep -Milliseconds 500 }
-    $cond = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
-    $col = $cmb.FindAll($TS::Descendants, $cond)
-    $done = $false
-    foreach ($i in $col) {
-        if ($i.Current.Name -like ('*' + $contains + '*')) {
-            $pat = $null
-            if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); $done = $true; break }
-        }
-    }
-    if ($null -ne $exp) { try { $exp.Collapse() } catch { } }
-    return $done
-}
 function Test-PortListening([int]$port) {
     return [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
 }
@@ -191,15 +174,8 @@ try {
     # ToolTipService.ToolTip="{x:Bind TooltipText}". Keep this file ASCII-only: PS 5.1
     # reads BOM-less UTF-8 as GBK and CJK comments can swallow the next line.
     Add-Result ($order0 -match 'windows:3185\s+RTEST-A') 'naming-original-visible' ('row line2 = original name; row0=' + (($order0 -split '\\|\|')[0]).Trim())
-    # combo items are env:port too
-    $cmbx = Find-ById $hwnd 'CmbInstance'
-    $exp2 = $null
-    if ($cmbx.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp2)) { $exp2.Expand(); Start-Sleep -Milliseconds 400 }
-    $condT = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
-    $cmbTexts = ''
-    if ($null -ne $cmbx) { $col2 = $cmbx.FindAll($TS::Descendants, (New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem))); foreach ($ci in $col2) { $cmbTexts += (Get-ItemText $ci) + ' ~ ' }; }
-    if ($null -ne $exp2) { try { $exp2.Collapse() } catch { } }
-    Add-Result ($cmbTexts -match 'windows:3185') 'naming-combo-item' ('combo items=' + $cmbTexts.Substring(0, [Math]::Min(160, $cmbTexts.Length)))
+    # (revamp: the detail dropdown CmbInstance is gone; env:port naming is proven by the
+    # rail-order checks above, which read the same row texts the dropdown used to list)
     Write-Output ('  order: ' + $order0)
     Save-Shot $hwnd 'rail-initial'
 
@@ -210,9 +186,13 @@ try {
     $silent3186 = -not (Test-PortListening 3186)
     Add-Result ($selB -and $silent3185 -and $silent3186) 'row-click-no-misfire' ('selectedB=' + $selB + ' 3185 silent=' + $silent3185 + ' 3186 silent=' + $silent3186)
 
-    $picked = Select-ComboItem $hwnd 'CmbInstance' '3186'
-    Add-Result $picked 'combo-select-B' 'CmbInstance -> item matching :3186 (env:port label)'
-    Start-Sleep -Seconds 2
+    # revamp: instance switching = rail row selection (detail dropdown removed); pick the
+    # row by its env:port label, then assert the rail selection actually moved to it
+    $picked = Select-RailRow $hwnd '3186'
+    Start-Sleep -Milliseconds 1200
+    $selAfter = Get-SelectedRailText $hwnd
+    Add-Result ($picked -and ($selAfter -like '*3186*')) 'rail-select-B' ('rail row select by env:port label; selected=' + $selAfter.Trim())
+    Start-Sleep -Seconds 1
     Invoke-Click $hwnd 'BtnStart'
     $started = Wait-RailState $hwnd 'RTEST-B' $S_RUN 60000
     Add-Result $started 'start-B-running' ('row shows running=' + $started)
@@ -228,7 +208,8 @@ try {
     Write-Output ('  order: ' + $order1)
     Save-Shot $hwnd 'rail-jumped'
 
-    [void](Select-ComboItem $hwnd 'CmbInstance' '3186')
+    [void](Select-RailRow $hwnd '3186')
+    Start-Sleep -Milliseconds 800
     Invoke-Click $hwnd 'BtnStop'
     $stopped = Wait-RailState $hwnd 'RTEST-B' $S_STOP 30000
     Add-Result $stopped 'stop-B' ('row shows stopped=' + $stopped)

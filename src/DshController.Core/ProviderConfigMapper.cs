@@ -31,6 +31,10 @@ namespace DshController.Core
         public string Name { get; set; } = "";
         /// <summary>contextWindow/maxTokens/compat 等预设不认识的宽松段。</summary>
         public Dictionary<string, object> Extra { get; } = new Dictionary<string, object>();
+        /// <summary>输入模态（dsh pi-ai 条目字段 input；非空才渲染，词表对齐 dsh ModelModalityMap：text|image）。</summary>
+        public List<string> InputModalities { get; set; }
+        /// <summary>是否渲染四档 reasoningEfforts（非官方来源一律 true，对齐 dsh-thinking-efforts 设计）。</summary>
+        public bool WriteReasoningEfforts { get; set; }
     }
 
     /// <summary>实例侧 providers 条目入形（key 外置；宽松段保留在 Extra）。</summary>
@@ -81,11 +85,16 @@ namespace DshController.Core
             return key.Length == 0 ? "preset" : key;
         }
 
-        /// <summary>预设 kind → 实例 api 适配值（宽松段归一先例：认子串再回落）。</summary>
+        /// <summary>预设协议 → 实例 api 适配值。已知协议精确透传（azure/codex/anthropic
+        /// 不能被子串误改写）；未知值回落旧规则（含 responses 子串→responses，否则 completions）。</summary>
         public static string ApiAdapter(string kind)
         {
-            string k = (kind ?? "").ToLowerInvariant();
+            string k = (kind ?? "").Trim().ToLowerInvariant();
             if (k.Length == 0) return "openai-completions";
+            foreach (string p in ProviderProtocols.All)
+            {
+                if (k == p) return p;
+            }
             if (k.Contains("responses")) return "openai-responses";
             return "openai-completions";
         }
@@ -96,29 +105,53 @@ namespace DshController.Core
             return ("DSH_PRESET_" + (providerKey ?? "")).ToUpperInvariant().Replace('-', '_');
         }
 
-        /// <summary>预设 → 实例入形条目（含降级 note）。</summary>
+        /// <summary>预设 → 实例入形条目（含降级 note）。同步键优先用稳定路由 ProviderId
+        /// （旧档案无路由时回落 kind+name slug，与既有同步键一致）。</summary>
         public static MappingResult ToEntry(ProviderPreset preset)
         {
             var result = new MappingResult();
             if (preset == null) { result.Notes.Add("预设为空，无可同步内容"); return result; }
-            string key = ProviderKey(preset.Kind, preset.Name);
+            string key = (preset.ProviderId ?? "").Trim().Length > 0
+                ? preset.ProviderId.Trim()
+                : ProviderKey(preset.Kind, preset.Name);
             result.Entry.Key = key;
             result.Entry.DisplayName = (preset.Name ?? "").Trim();
             result.Entry.Api = ApiAdapter(preset.Kind);
             result.Entry.ApiKeyEnv = ApiKeyEnvName(key);
             result.Entry.BaseUrl = NormalizeBaseUrl(preset.BaseUrl);
             if (result.Entry.BaseUrl.Length == 0) result.Notes.Add("未设 BaseUrl：将使用实例默认端点");
-            string modelId = (preset.DefaultModel ?? "").Trim();
-            if (modelId.Length > 0)
+            if (preset.Models != null && preset.Models.Count > 0)
             {
-                result.Entry.Models.Add(new ProviderModelConfig { Id = modelId, Name = preset.Name });
+                foreach (PresetModel m in preset.Models)
+                {
+                    if (m == null || (m.Id ?? "").Trim().Length == 0) continue;
+                    var cfg = new ProviderModelConfig { Id = m.Id.Trim(), Name = (m.Name ?? "").Trim() };
+                    if (m.ContextWindow.HasValue) cfg.Extra["contextWindow"] = m.ContextWindow.Value;
+                    if (m.MaxTokens.HasValue) cfg.Extra["maxTokens"] = m.MaxTokens.Value;
+                    if (m.Multimodal == true)
+                        cfg.InputModalities = new List<string> { "text", "image" };
+                    else if (m.Multimodal == false)
+                        cfg.InputModalities = new List<string> { "text" };
+                    // 思考档四档：非官方来源一律自动补（官方模型由实例 llm-deepseek 适配器原生提供档位）
+                    cfg.WriteReasoningEfforts = !preset.IsBuiltin;
+                    result.Entry.Models.Add(cfg);
+                }
             }
             else
             {
-                result.Notes.Add("未设默认模型：省略 models 段，可在实例侧手动补模型");
+                // 旧档案兼容：只有 DefaultModel 的预设按原单行形状映射
+                string modelId = (preset.DefaultModel ?? "").Trim();
+                if (modelId.Length > 0)
+                {
+                    result.Entry.Models.Add(new ProviderModelConfig { Id = modelId, Name = preset.Name });
+                }
+                else
+                {
+                    result.Notes.Add("未设默认模型：省略 models 段，可在实例侧手动补模型");
+                }
             }
             if (!string.IsNullOrEmpty(preset.ApiKey))
-                result.Notes.Add("预设含 API 密钥：实例侧仅写 apiKeyEnv 名，密钥需在实例环境注入该变量");
+                result.Notes.Add("预设含 API 密钥：实例侧仅写 apiKeyEnv 名，密钥由 DshController 启动实例时注入环境变量（手动启动的实例需自行设置）");
             return result;
         }
 

@@ -26,10 +26,12 @@ namespace DshController.Tests
         {
             var vm = new ProviderPresetsViewModel(new ProviderPresetStore(_file));
             Assert.True(vm.TryAdd("DeepSeek", "deepseek", "https://api.deepseek.com", "sk-1", "chat", true, out string id, out string err));
-            Assert.Single(vm.Rows);
+            Assert.Equal(2, vm.Rows.Count);                  // 内置官方置顶 + 新行
+            Assert.True(vm.Rows[0].IsBuiltin);
             Assert.Equal(id, vm.SelectedId);
-            Assert.Equal("DeepSeek", vm.Rows[0].Name);
-            Assert.Contains("启用", vm.Rows[0].MetaText);
+            Assert.Equal("DeepSeek", vm.RowById(id).Name);
+            Assert.Equal("自定义", vm.RowById(id).TagText);
+            Assert.Contains("启用", vm.RowById(id).MetaText);
         }
 
         [Fact]
@@ -38,11 +40,11 @@ namespace DshController.Tests
             var vm = new ProviderPresetsViewModel(new ProviderPresetStore(_file));
             Assert.False(vm.TryAdd("", "deepseek", "", "", "", true, out _, out string err));
             Assert.Equal("预设名不能为空", err);
-            Assert.Empty(vm.Rows);
+            Assert.Single(vm.Rows);                          // 仅内置官方
             Assert.True(vm.TryAdd("A", "deepseek", "", "", "", true, out string id, out _));
             Assert.False(vm.TryUpdate(id, "A", "deepseek", "ftp://x", "", "", true, out string err2));
             Assert.Equal("BaseUrl 须以 http:// 或 https:// 开头", err2);
-            Assert.Equal("A", vm.Rows[0].Name);
+            Assert.Equal("A", vm.RowById(id).Name);
         }
 
         [Fact]
@@ -51,9 +53,10 @@ namespace DshController.Tests
             var vm = new ProviderPresetsViewModel(new ProviderPresetStore(_file));
             vm.TryAdd("旧名", "deepseek", "", "", "", true, out string id, out _);
             Assert.True(vm.TryUpdate(id, "新名", "deepseek", "https://x.com/v1", "", "", true, out _));
-            Assert.Equal("新名", vm.Rows[0].Name);
+            Assert.Equal("新名", vm.RowById(id).Name);
             Assert.True(vm.TryDelete(id));
-            Assert.Empty(vm.Rows);
+            Assert.Single(vm.Rows);                          // 内置官方仍在
+            Assert.True(vm.Rows[0].IsBuiltin);
             Assert.Equal("", vm.SelectedId);
         }
 
@@ -63,9 +66,9 @@ namespace DshController.Tests
             var vm1 = new ProviderPresetsViewModel(new ProviderPresetStore(_file));
             vm1.TryAdd("持久", "deepseek", "", "", "", true, out string id, out _);
             var vm2 = new ProviderPresetsViewModel(new ProviderPresetStore(_file));
-            Assert.Single(vm2.Rows);
-            Assert.Equal("持久", vm2.Rows[0].Name);
-            Assert.Equal(id, vm2.Rows[0].Id);
+            Assert.Equal(2, vm2.Rows.Count);
+            Assert.Equal("持久", vm2.RowById(id).Name);
+            Assert.True(vm2.Rows[0].IsBuiltin);
         }
     }
 }

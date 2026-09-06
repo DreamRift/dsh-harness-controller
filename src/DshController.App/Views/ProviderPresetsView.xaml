@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ============================================================================
-     ProviderPresetsView — API 页供应商预设编辑（改版·API 预设页 / 供应商编辑页）
-     列表+新建/编辑/删除；弹窗在 App 层 DialogService；页面零直读/直写实例。
+     ProviderPresetsView — API 页详情区（照 dsh 官方模型设置页逻辑适配）
+     未选中=空态引导；选中=编辑卡（API 密钥主字段 + 自定义设置 + 模型目录 + 页脚）；
+     新建=dsh 自定义提供方卡（Provider ID/协议/地址/密钥/模型目录全必填校验）。
+     字段与文案逐项对齐 dsh-client-ui-settings-models；弹窗在 App 层 DialogService。
      ============================================================================ -->
 <UserControl
     x:Class="DshController.Views.ProviderPresetsView"
@@ -9,72 +11,229 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:views="using:DshController.Views"
     xmlns:vm="using:DshController.ViewModels"
     mc:Ignorable="d">
 
+    <UserControl.Resources>
+        <views:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <views:InverseBoolToVisibilityConverter x:Key="InverseBoolVis" />
+    </UserControl.Resources>
+
     <Grid Background="{ThemeResource BgBaseBrush}">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="34,28,34,12" Spacing="4">
-            <TextBlock Text="PROVIDER PRESETS" Style="{StaticResource PageEyebrow}" />
+            <TextBlock Text="API PROVIDERS" Style="{StaticResource PageEyebrow}" />
             <TextBlock Text="供应商预设" Style="{StaticResource PageTitle}" AutomationProperties.AutomationId="PresetsHost" />
-            <TextBlock Text="全局预设（非实例级）：编辑后经「供应商同步」按预览确认写入实例。" Style="{StaticResource PageSubtitle}" />
+            <TextBlock Text="填入各提供方的 API 密钥并配置模型目录；「同步到实例」按预览确认写入实例 settings.yaml。"
+                       Style="{StaticResource PageSubtitle}" />
         </StackPanel>
 
-        <Border Grid.Row="1" Style="{StaticResource DshToolbarCard}" Margin="34,0,34,12" Padding="10,6">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-                <Button x:Name="BtnPresetAdd" Content="新建预设" Style="{StaticResource BtnCompact}"
-                        Click="BtnPresetAdd_Click" AutomationProperties.AutomationId="BtnPresetAdd" />
-                <Button x:Name="BtnPresetEdit" Content="编辑" Style="{StaticResource BtnCompact}"
-                        Click="BtnPresetEdit_Click" AutomationProperties.AutomationId="BtnPresetEdit" IsEnabled="False" />
-                <Button x:Name="BtnPresetDelete" Content="删除" Style="{StaticResource BtnCompact}"
-                        Click="BtnPresetDelete_Click" AutomationProperties.AutomationId="BtnPresetDelete" IsEnabled="False" />
-                <Button x:Name="BtnPresetSync" Content="同步到实例…" Style="{StaticResource BtnCompact}"
-                        Click="BtnPresetSync_Click" AutomationProperties.AutomationId="BtnPresetSync" IsEnabled="False" />
-            </StackPanel>
-        </Border>
+        <!-- 空态：未选中任何提供方（dsh 首次姿态的等价物） -->
+        <StackPanel Grid.Row="1" Spacing="10" MaxWidth="460" HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="选择左侧提供方进行配置" Style="{StaticResource PageTitle}" FontSize="18"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="填入各提供方的 API 密钥即可使用其模型。还没有提供方时，先添加一个自定义提供方。"
+                       Style="{StaticResource HelperText}" HorizontalAlignment="Center" TextAlignment="Center"
+                       TextWrapping="Wrap" />
+            <Button x:Name="BtnPresetAdd" Content="＋ 添加提供方" Style="{StaticResource BtnCompact}"
+                    HorizontalAlignment="Center" Click="BtnPresetAdd_Click"
+                    AutomationProperties.AutomationId="BtnPresetAddEmpty" Margin="0,4,0,0" />
+        </StackPanel>
 
-        <ListView x:Name="PresetList" Grid.Row="2" Margin="34,0,34,24" SelectionMode="Single"
-                  SelectionChanged="PresetList_SelectionChanged"
-                  AutomationProperties.AutomationId="PresetList">
-            <ListView.Resources>
-                <SolidColorBrush x:Key="ListViewItemBackgroundSelected" Color="{ThemeResource BrandSoftColor}" />
-                <SolidColorBrush x:Key="ListViewItemBackgroundSelectedPointerOver" Color="{ThemeResource BrandSoftColor}" />
-                <SolidColorBrush x:Key="ListViewItemForegroundSelected" Color="{ThemeResource BrandPrimaryColor}" />
-            </ListView.Resources>
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="MinHeight" Value="0" />
-                    <Setter Property="Padding" Value="10,6" />
-                    <Setter Property="Margin" Value="0,2" />
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                </Style>
-            </ListView.ItemContainerStyle>
-            <ListView.ItemTemplate>
-                <DataTemplate x:DataType="vm:ProviderPresetRow">
-                    <Grid ColumnSpacing="10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <Border Grid.Column="0" VerticalAlignment="Center" CornerRadius="4" Padding="6,1"
-                                Background="{ThemeResource BrandSoftBrush}">
-                            <TextBlock Text="{x:Bind Kind}" FontSize="10.5" Foreground="{ThemeResource LabelSecondaryBrush}" />
-                        </Border>
-                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind Name}" FontSize="12.5" FontWeight="SemiBold"
-                                       Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Text="{x:Bind MetaText}" FontSize="10.5"
-                                       Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+        <!-- 编辑卡：新建（自定义提供方卡）/ 编辑（既有预设卡）共用一套字段 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="34,4,34,24"
+                      Visibility="{x:Bind ViewModel.HasEditor, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+            <StackPanel MaxWidth="780" HorizontalAlignment="Left" Spacing="14">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="自定义提供方" Style="{StaticResource PageTitle}" FontSize="16"
+                               Visibility="{x:Bind ViewModel.Editor.IsNew, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                    <TextBlock Grid.Column="0" Text="编辑供应商预设" Style="{StaticResource PageTitle}" FontSize="16"
+                               Visibility="{x:Bind ViewModel.Editor.IsNew, Mode=OneWay, Converter={StaticResource InverseBoolVis}}" />
+                    <Button x:Name="BtnPresetSync" Grid.Column="1" Content="同步到实例…" Style="{StaticResource BtnCompact}"
+                            Click="BtnPresetSync_Click" AutomationProperties.AutomationId="BtnPresetSync"
+                            IsEnabled="{x:Bind ViewModel.HasSelection, Mode=OneWay}" />
+                    <Button x:Name="BtnPresetDelete" Grid.Column="2" Content="删除提供方" Style="{StaticResource BtnDangerGhost}"
+                            Click="BtnPresetDelete_Click" AutomationProperties.AutomationId="BtnPresetDelete"
+                            IsEnabled="{x:Bind ViewModel.CanDeleteSelected, Mode=OneWay}"
+                            ToolTipService.ToolTip="内置官方提供方不可删除" />
+                </Grid>
+
+                <!-- 密钥主字段（dsh：只写不读；空=保持已存） -->
+                <StackPanel Spacing="4">
+                    <TextBlock Text="API 密钥" Style="{StaticResource SettingHint}" />
+                    <TextBox x:Name="PresetApiKey" MinWidth="320" MaxWidth="480" HorizontalAlignment="Left"
+                             PlaceholderText="{x:Bind ViewModel.Editor.KeyPlaceholder, Mode=OneWay}"
+                             Text="{x:Bind ViewModel.Editor.ApiKeyDraft, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.AutomationId="PresetApiKey" />
+                    <TextBlock Text="{x:Bind ViewModel.Editor.KeyMessage, Mode=OneWay}" FontSize="11.5"
+                               Foreground="{ThemeResource DangerBrush}" TextWrapping="Wrap"
+                               Visibility="{x:Bind NonEmpty(ViewModel.Editor.KeyMessage), Mode=OneWay}" />
+                </StackPanel>
+
+                <!-- 自定义设置（dsh customized 折叠区，默认展开便于一次看全） -->
+                <Expander Header="自定义设置" IsExpanded="True" HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Stretch">
+                    <StackPanel Spacing="12" Margin="2,6">
+                        <StackPanel Spacing="4"
+                                    Visibility="{x:Bind ViewModel.Editor.IsNew, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="Provider ID" Style="{StaticResource SettingHint}" />
+                            <TextBox x:Name="PresetRoute" MinWidth="320" MaxWidth="480" HorizontalAlignment="Left"
+                                     PlaceholderText="acme-gateway"
+                                     Text="{x:Bind ViewModel.Editor.Route, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="PresetRoute" />
+                            <TextBlock Text="以小写字母开头的标识，在请求中唯一标识该提供方，并用于派生凭据名。"
+                                       FontSize="11.5" Foreground="{ThemeResource LabelTertiaryBrush}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind Empty(ViewModel.Editor.RouteError), Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.Editor.RouteError, Mode=OneWay}" FontSize="11.5"
+                                       Foreground="{ThemeResource DangerBrush}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind NonEmpty(ViewModel.Editor.RouteError), Mode=OneWay}" />
                         </StackPanel>
-                    </Grid>
-                </DataTemplate>
-            </ListView.ItemTemplate>
-        </ListView>
+                        <StackPanel Spacing="4"
+                                    Visibility="{x:Bind ViewModel.Editor.IsNew, Mode=OneWay, Converter={StaticResource InverseBoolVis}}">
+                            <TextBlock Text="Provider ID（创建后不可改）" Style="{StaticResource SettingHint}" />
+                            <TextBox Text="{x:Bind ViewModel.Editor.Route, Mode=OneWay}" IsReadOnly="True"
+                                     MinWidth="320" MaxWidth="480" HorizontalAlignment="Left"
+                                     AutomationProperties.AutomationId="PresetRouteView" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="显示名称" Style="{StaticResource SettingHint}" />
+                            <TextBox x:Name="PresetName" MinWidth="320" MaxWidth="480" HorizontalAlignment="Left"
+                                     Text="{x:Bind ViewModel.Editor.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="PresetName" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="API 协议" Style="{StaticResource SettingHint}" />
+                            <ComboBox x:Name="PresetKind" MinWidth="240" HorizontalAlignment="Left"
+                                      ItemsSource="{x:Bind ViewModel.Editor.Protocols, Mode=OneWay}"
+                                      SelectedItem="{x:Bind ViewModel.Editor.Protocol, Mode=TwoWay}"
+                                      AutomationProperties.AutomationId="PresetKind" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="API 地址" Style="{StaticResource SettingHint}" />
+                            <TextBox x:Name="PresetBaseUrl" MinWidth="420" MaxWidth="560" HorizontalAlignment="Left"
+                                     PlaceholderText="提供方默认"
+                                     Text="{x:Bind ViewModel.Editor.BaseUrl, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.AutomationId="PresetBaseUrl" />
+                        </StackPanel>
+
+                        <CheckBox x:Name="PresetEnabled" Content="启用"
+                                  IsChecked="{x:Bind ViewModel.Editor.Enabled, Mode=TwoWay}"
+                                  AutomationProperties.AutomationId="PresetEnabled" />
+
+                        <!-- 模型目录（dsh ModelListEditor：行编辑 + 获取可用模型） -->
+                        <StackPanel Spacing="6">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="模型目录" Style="{StaticResource SettingHint}"
+                                           VerticalAlignment="Center" />
+                                <Button x:Name="PresetFetch" Grid.Column="1"
+                                        Content="{x:Bind ViewModel.Editor.FetchLabel, Mode=OneWay}"
+                                        IsEnabled="{x:Bind ViewModel.Editor.FetchEnabled, Mode=OneWay}"
+                                        Style="{StaticResource BtnCompact}" Click="PresetFetch_Click"
+                                        AutomationProperties.AutomationId="PresetFetch" />
+                            </Grid>
+                            <TextBlock Text="{x:Bind ViewModel.Editor.FetchError, Mode=OneWay}" FontSize="11.5"
+                                       Foreground="{ThemeResource DangerBrush}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind NonEmpty(ViewModel.Editor.FetchError), Mode=OneWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.Editor.ModelsHint, Mode=OneWay}" FontSize="11.5"
+                                       Foreground="{ThemeResource LabelTertiaryBrush}" TextWrapping="Wrap"
+                                       Visibility="{x:Bind NonEmpty(ViewModel.Editor.ModelsHint), Mode=OneWay}" />
+                            <Grid ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="110" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="34" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="模型 ID" FontSize="10.5" Foreground="{ThemeResource LabelTertiaryBrush}" />
+                                <TextBlock Grid.Column="1" Text="显示名称" FontSize="10.5" Foreground="{ThemeResource LabelTertiaryBrush}" />
+                                <TextBlock Grid.Column="2" Text="上下文窗口" FontSize="10.5" Foreground="{ThemeResource LabelTertiaryBrush}" />
+                                <TextBlock Grid.Column="3" Text="最大输出 token 数" FontSize="10.5" Foreground="{ThemeResource LabelTertiaryBrush}" />
+                                <TextBlock Grid.Column="4" Text="多模态" FontSize="10.5" Foreground="{ThemeResource LabelTertiaryBrush}" />
+                            </Grid>
+                            <ItemsControl x:Name="ModelRows" ItemsSource="{x:Bind ViewModel.Editor.Models, Mode=OneWay}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DraftModelRow">
+                                        <Grid ColumnSpacing="6" Margin="0,2">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="110" />
+                                                <ColumnDefinition Width="72" />
+                                                <ColumnDefinition Width="34" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" PlaceholderText="如 deepseek-chat"
+                                                     Text="{x:Bind Id, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.AutomationId="PresetModel" FontSize="12" />
+                                            <TextBox Grid.Column="1" PlaceholderText="留空时使用模型 ID"
+                                                     Text="{x:Bind Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.AutomationId="PresetModelName" FontSize="12" />
+                                            <TextBox Grid.Column="2" PlaceholderText="提供方默认"
+                                                     Text="{x:Bind ContextWindowText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.AutomationId="PresetModelContext" FontSize="12" />
+                                            <TextBox Grid.Column="3" PlaceholderText="提供方默认"
+                                                     Text="{x:Bind MaxTokensText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.AutomationId="PresetModelMaxTokens" FontSize="12" />
+                                            <CheckBox Grid.Column="4" IsThreeState="True" MinWidth="0"
+                                                      IsChecked="{x:Bind Multimodal, Mode=TwoWay}"
+                                                      ToolTipService.ToolTip="输入模态三态：未知/纯文本/图文；同步时写入 input 字段"
+                                                      AutomationProperties.AutomationId="PresetModelMultimodal" />
+                                            <Button Grid.Column="5" Content="✕" Padding="6,2" MinWidth="30"
+                                                    Click="RemoveModelRow_Click" ToolTipService.ToolTip="删除模型"
+                                                    AutomationProperties.AutomationId="PresetModelRemove" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Button x:Name="PresetModelAdd" Content="＋ 添加模型" Style="{StaticResource BtnCompact}"
+                                    Padding="8,3" HorizontalAlignment="Left" Click="PresetModelAdd_Click"
+                                    AutomationProperties.AutomationId="PresetModelAdd" />
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- 页脚（dsh EditorFooter：左取消、右提交） -->
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="PresetCancel" Grid.Column="0" Content="取消" Style="{StaticResource BtnCompact}"
+                            Click="PresetCancel_Click" AutomationProperties.AutomationId="PresetCancel" />
+                    <Button x:Name="PresetSave" Grid.Column="1" HorizontalAlignment="Right" MinWidth="120"
+                            Content="{x:Bind ViewModel.Editor.SaveLabel, Mode=OneWay}"
+                            IsEnabled="{x:Bind ViewModel.Editor.SaveReady, Mode=OneWay}"
+                            Style="{StaticResource BtnPrimary}" Click="PresetSave_Click"
+                            AutomationProperties.AutomationId="PresetSave" />
+                </Grid>
+                <TextBlock Text="{x:Bind ViewModel.Editor.HintText, Mode=OneWay}" FontSize="11.5"
+                           Foreground="{ThemeResource LabelTertiaryBrush}" TextWrapping="Wrap"
+                           Visibility="{x:Bind NonEmpty(ViewModel.Editor.HintText), Mode=OneWay}" />
+                <TextBlock Text="{x:Bind ViewModel.Editor.SaveError, Mode=OneWay}" FontSize="11.5"
+                           Foreground="{ThemeResource DangerBrush}" TextWrapping="Wrap"
+                           Visibility="{x:Bind NonEmpty(ViewModel.Editor.SaveError), Mode=OneWay}" />
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

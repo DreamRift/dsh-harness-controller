@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ============================================================================
-     ArchiveMetaView — 档案页主区的「元信息一览」（改版·元信息一览）
+     ArchiveMetaView — 档案页主区「单实例档案详情」（元信息 + 完整用量）
      随左栏选中呈现单份档案的镜像字段（代际/runtime/退役时间…）；
+     2026-09-06 二次改版：单实例完整用量并入本页（大数卡/四桶堆叠/按天钻取/
+     模型排行/会话明细），取代原用量看板的"聚焦视图"；无实例/时间切换。
      数据只经视图模型读档案（AllUsage 内存快照），页面零取数。
      独立成 UserControl 是 x:Bind 的形状要求（UsageView/InstancesRailView 同型）。
      ============================================================================ -->
@@ -12,7 +14,13 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:vm="using:DshController.ViewModels"
+    xmlns:local="using:DshController.Views"
     mc:Ignorable="d">
+
+    <UserControl.Resources>
+        <local:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <local:InverseBoolToVisibilityConverter x:Key="InverseBoolVis" />
+    </UserControl.Resources>
 
     <ScrollViewer Background="{ThemeResource BgBaseBrush}" VerticalScrollBarVisibility="Auto"
                   AutomationProperties.AutomationId="ArchiveMetaPanel">
@@ -54,6 +62,225 @@
                     </ItemsControl>
                 </StackPanel>
             </Border>
+
+            <!-- ==================== 用量区（2026-09-06 二次改版：单实例完整用量） ==================== -->
+            <StackPanel Spacing="14" AutomationProperties.AutomationId="MetaUsageArea"
+                        Visibility="{x:Bind ViewModel.HasArchive, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="用量" Style="{StaticResource CardTitle}" />
+                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.UsageUpdatedText, Mode=OneWay}"
+                               Style="{StaticResource HelperText}" VerticalAlignment="Center" />
+                    <Button Grid.Column="2" Style="{StaticResource BtnCompact}"
+                            Command="{x:Bind ViewModel.RefreshUsageCommand}"
+                            IsEnabled="{x:Bind ViewModel.UsageRefreshEnabled, Mode=OneWay}"
+                            AutomationProperties.AutomationId="MetaUsageRefresh"
+                            ToolTipService.ToolTip="重新采集该实例的用量（退役档案没有实例可采）">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
+                            <TextBlock Text="重采" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <!-- 空态：该档案还没有用量数据 -->
+                <Border Style="{StaticResource DshCard}"
+                        Visibility="{x:Bind ViewModel.HasUsage, Mode=OneWay, Converter={StaticResource InverseBoolVis}}">
+                    <StackPanel Spacing="6" Padding="0,16" HorizontalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.UsageEmptyText, Mode=OneWay}" Style="{StaticResource HelperText}"
+                                   HorizontalAlignment="Center" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 有数据：大数卡 + 按天钻取 + 模型排行 + 会话明细（面板窄于看板：KPI 分两行、明细上下整宽） -->
+                <StackPanel Spacing="12"
+                            Visibility="{x:Bind ViewModel.HasUsage, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource DshCardTight}" Width="380">
+                            <StackPanel Spacing="6" ToolTipService.ToolTip="projcache 总账口径；点击柱子可钻取当天">
+                                <TextBlock Text="总 tokens" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.TotalTokensText, Mode=OneWay}" FontSize="28" FontWeight="SemiBold"
+                                           AutomationProperties.AutomationId="MetaUsageTotal"
+                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Height="10" Spacing="2">
+                                    <Border Width="{x:Bind ViewModel.BarWUncached, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.35" CornerRadius="4,0,0,4" />
+                                    <Border Width="{x:Bind ViewModel.BarWCacheRead, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" />
+                                    <Border Width="{x:Bind ViewModel.BarWCacheWrite, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.55" />
+                                    <Border Width="{x:Bind ViewModel.BarWOutput, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.2" CornerRadius="0,4,4,0" />
+                                </StackPanel>
+                                <TextBlock Text="{x:Bind ViewModel.HeroSubText, Mode=OneWay}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource DshCardTight}" MinWidth="120">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="缓存命中率" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.HitRateText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource BrandPrimaryBrush}" />
+                                <TextBlock Text="缓存读 / 输入合计" Style="{StaticResource HelperText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="请求次数" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.RequestsText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                <TextBlock Text="来自会话日志" Style="{StaticResource HelperText}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="会话数" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.SessionsText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                <TextBlock Text="会话总账口径" Style="{StaticResource HelperText}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="活跃天数" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.ActiveDaysText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource DshCardTight}" MinWidth="180">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="用得最多的模型" Style="{StaticResource HelperText}" />
+                                <TextBlock Text="{x:Bind ViewModel.TopModelText, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+
+                    <Border Style="{StaticResource DshCard}">
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock Text="按天用量" Style="{StaticResource CardTitle}" />
+                                <Button HorizontalAlignment="Right" Style="{StaticResource BtnCompact}" Content="清除"
+                                        Command="{x:Bind ViewModel.ClearUsageDayCommand}"
+                                        Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{x:Bind ViewModel.DailyBars, Mode=OneWay}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UsageDayBar">
+                                        <StackPanel VerticalAlignment="Bottom" Spacing="4" ToolTipService.ToolTip="{x:Bind ToolTip}">
+                                            <Button Background="Transparent" BorderThickness="0" Padding="2" Command="{x:Bind ToggleCommand}">
+                                                <Grid Height="130" VerticalAlignment="Bottom">
+                                                    <Border Width="10" Height="{x:Bind BarHeight}" CornerRadius="3" VerticalAlignment="Bottom"
+                                                            Background="{ThemeResource BrandPrimaryBrush}" />
+                                                    <Border Width="16" Height="{x:Bind BarHeight, Mode=OneWay}" CornerRadius="5" VerticalAlignment="Bottom"
+                                                            BorderThickness="2" BorderBrush="{ThemeResource SystemAccentColor}"
+                                                            Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                                                </Grid>
+                                            </Button>
+                                            <TextBlock Text="{x:Bind ShortDay}" FontSize="9" HorizontalAlignment="Center" Style="{StaticResource HelperText}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <!-- W3：详情卡取最后 30 天，超出不再静默截断，这里给标注 -->
+                            <TextBlock Text="{x:Bind ViewModel.UsageBarsNote, Mode=OneWay}" Style="{StaticResource HelperText}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{x:Bind NonEmpty(ViewModel.UsageBarsNote), Mode=OneWay}" />
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="14,10"
+                                    Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{x:Bind ViewModel.DayStripText, Mode=OneWay}" FontSize="13" Foreground="{ThemeResource LabelPrimaryBrush}" TextWrapping="Wrap" />
+                                    <TextBlock Text="{x:Bind ViewModel.DayModelsText, Mode=OneWay}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource DshCard}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="模型排行" Style="{StaticResource CardTitle}" />
+                            <!-- W6：ItemsControl→ListView，启用虚拟化 + 列表自带滚动 -->
+                            <ListView ItemsSource="{x:Bind ViewModel.Models, Mode=OneWay}" MaxHeight="300"
+                                      SelectionMode="None" Padding="0">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UsageModelRow">
+                                        <Grid ColumnSpacing="10" Padding="0,6" ToolTipService.ToolTip="{x:Bind ToolTip}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="66" />
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="64" />
+                                                <ColumnDefinition Width="46" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="{x:Bind Model}" FontWeight="SemiBold" Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{x:Bind Provider}" Style="{StaticResource HelperText}" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Height="7" CornerRadius="3" VerticalAlignment="Center" HorizontalAlignment="Left"
+                                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                                <Border Height="7" Width="{x:Bind ShareBarW}" CornerRadius="3" Background="{ThemeResource BrandPrimaryBrush}" HorizontalAlignment="Left" />
+                                            </Border>
+                                            <TextBlock Grid.Column="2" Text="{x:Bind RequestsText}" VerticalAlignment="Center" Style="{StaticResource HelperText}" />
+                                            <TextBlock Grid.Column="3" Text="{x:Bind TotalText}" VerticalAlignment="Center" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                            <TextBlock Grid.Column="4" Text="{x:Bind ShareText}" VerticalAlignment="Center" Style="{StaticResource HelperText}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource DshCard}">
+                        <StackPanel Spacing="10">
+                            <Grid>
+                                <TextBlock Text="会话明细" Style="{StaticResource CardTitle}" />
+                                <TextBlock HorizontalAlignment="Right" Text="已钻取到所选日" Style="{StaticResource HelperText}"
+                                           Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                            </Grid>
+                            <!-- W6：ItemsControl→ListView，启用虚拟化 + 列表自带滚动 -->
+                            <ListView ItemsSource="{x:Bind ViewModel.Sessions, Mode=OneWay}" MaxHeight="340"
+                                      SelectionMode="None" Padding="0">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UsageSessionRow">
+                                        <StackPanel Padding="0,4" ToolTipService.ToolTip="{x:Bind ToolTip}">
+                                            <Grid ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="60" />
+                                                    <ColumnDefinition Width="86" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{x:Bind Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                                <TextBlock Grid.Column="1" Text="{x:Bind CreatedText}" VerticalAlignment="Center" Style="{StaticResource HelperText}" />
+                                                <TextBlock Grid.Column="2" Text="{x:Bind TurnsText}" VerticalAlignment="Center" Style="{StaticResource HelperText}" />
+                                                <TextBlock Grid.Column="3" Text="{x:Bind TotalText}" VerticalAlignment="Center" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                                                <Button Grid.Column="4" Style="{StaticResource BtnCompact}" Content="详情"
+                                                        Command="{x:Bind ExpandCommand}" />
+                                            </Grid>
+                                            <StackPanel Margin="12,6,0,4" Spacing="4" Visibility="{x:Bind IsExpanded, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                                <TextBlock Text="{x:Bind ExactDetailText}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{x:Bind SessionId}" FontFamily="Consolas" FontSize="11" Opacity="0.75"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="360" />
+                                                    <Button Style="{StaticResource BtnCompact}" Content="复制 ID" Click="CopySessionId_Click" Tag="{x:Bind SessionId}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

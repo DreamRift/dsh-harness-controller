@@ -37,18 +37,24 @@ namespace DshController.Core
             }
         }
 
-        /// <summary>GET 文本；失败（网络/超时/非 2xx）返回 null，不抛异常。</summary>
-        public static async Task<string> GetStringAsync(string url, int timeoutMs = 20000)
+        /// <summary>GET 文本；失败（网络/超时/非 2xx）返回 null，不抛异常。
+        /// bearerToken 非空时随请求携带 Authorization: Bearer 头（模型目录探针用）。</summary>
+        public static async Task<string> GetStringAsync(string url, int timeoutMs = 20000, string bearerToken = null)
         {
             if (string.IsNullOrWhiteSpace(url)) return null;
             try
             {
                 using (var cts = new CancellationTokenSource(timeoutMs))
-                using (var resp = await Client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cts.Token)
-                    .ConfigureAwait(false))
+                using (var req = new HttpRequestMessage(HttpMethod.Get, url))
                 {
-                    if (!resp.IsSuccessStatusCode) return null;
-                    return await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(bearerToken))
+                        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+                    using (var resp = await Client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, cts.Token)
+                        .ConfigureAwait(false))
+                    {
+                        if (!resp.IsSuccessStatusCode) return null;
+                        return await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    }
                 }
             }
             catch

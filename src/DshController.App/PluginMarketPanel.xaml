@@ -69,7 +69,8 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <TextBlock Grid.Column="2" Text="profile" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Text="配置档案" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                               ToolTipService.ToolTip="dsh 实例 HOME 下的 profiles/&lt;配置档案&gt;/ 目录，插件装进这个档案。web 是 dsh 官方默认档案，一般不用改。" />
                     <TextBox Grid.Column="3" x:Name="TxtProfile" Style="{StaticResource InputBox}" Text="web" />
                     <Button Grid.Column="4" x:Name="BtnOpenHome" Style="{StaticResource BtnCompact}" Click="BtnOpenHome_Click"
                             Content="打开 HOME" ToolTipService.ToolTip="打开所选实例的 DSH_HOME 目录" />

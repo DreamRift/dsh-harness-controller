@@ -41,6 +41,15 @@ namespace DshController
             foreach (InstanceDef def in InstancesOfEnv()) WireInstance(def);
         }
 
+        /// <summary>为清单内本环境、尚未接线的实例补接线。跨面板新增实例（如 WIN 面板
+        /// 扫描发现 WSL 实例/已安装发行版）后由 UpdateFooter 汇聚点统一调用；
+        /// WireInstance 内部有 _wired 去重，重复调用无副作用。</summary>
+        public void EnsureWired()
+        {
+            if (_closing) return;
+            WireAll();
+        }
+
         private void WireInstance(InstanceDef def)
         {
             if (!_wired.Add(def.Id)) return;

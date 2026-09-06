@@ -109,3 +109,32 @@
 - **ViewModels**：UsageViewModel 增选中日钻取状态、统一视图实例卡集合（名称/retired/运行徽标/无数据态/单源 Summarize）；UsageRows 增实例卡行模型、UsageSessionRow 暴露 SessionId（复制钮）。
 - **App**：UsageView.xaml 按线框重排（code-behind 仍只注入+生命周期转发）；IArchiveFacade/ArchiveHub 加 liveness 透出只读方法（仍是档案读，不新采集）。
 - **不变量**：档案四不变量、分面 TTL、RefreshCommand 语义不动；门禁+单测+GUI 冒烟照常。
+---
+
+# 二次改版（2026-09-06，用户指令，已实施）
+
+> 方向变更：**看板去实例轴、恒显合并口径；单实例完整用量移入档案详情页**。
+> 一轮方案的 D2（实例卡网格 + 合计条）整体废止，D1/D3/D4 形态保留并复用。
+
+## 变更对照
+
+| 一轮定稿 | 二次改版 |
+|---|---|
+| 统计范围 = 实例 × 时间 两级切换 | 只留时间切换（7/30/全部）；实例轴移除，恒为全部非空用量合并（含已删除档案） |
+| 统一视图 = 实例卡网格 + 合计条 | 废止；实例对比入口收进档案页左栏（选中单实例 → 详情页） |
+| 聚焦视图 = hero 大数卡 + 图表明细 | 保留，整体迁入 ArchiveMetaView（档案详情页），面板窄幅下 KPI 分两行、明细上下整宽 |
+| 实例细节 = 点卡进聚焦视图 | 档案页左栏选中真实档案 → 详情页（元信息 + 完整用量 + 单档案重采）；总计行 → 看板。主区两页互斥 |
+| 会话行标注 | 看板会话行加来源实例前缀；详情页会话行不加（单实例语境） |
+| 重采 | 看板"刷新"= 全部未退役实例；详情页"重采"= 仅当前档案（退役禁用） |
+
+## 落点（实施事实）
+
+- `UsageViewModel`：CollectSources 恒取全部；Scopes/SelectedScope/IsAllView/ShowFocus/
+  InstanceCards/GrandTotalText 删除；BuildSessionLabels 提供会话行实例前缀。
+- `ArchiveMetaViewModel.Usage.cs`（新 partial）：单实例 Summarize（全期口径）、四桶 ×330、
+  按天 30 根钻取、会话 Take(200)、RefreshUsageCommand（单档案，退役禁用）。
+- `UsageView.xaml`：工具栏简化 + 副标题；`ArchiveMetaView.xaml`：用量区（MetaUsageArea/
+  MetaUsageTotal/MetaUsageRefresh 锚点）；`MainWindow.PageHost.cs`：ShowArchiveMeta 互斥，
+  SyncUsageScope 删除。
+- 性能欠账 W6：首开 Reload 在 UI 线程同步 + 明细非虚拟化，数据 ~5 倍后首开 UIA 可见 ~13s
+  （终态正确，见 TEST-RESULTS）。

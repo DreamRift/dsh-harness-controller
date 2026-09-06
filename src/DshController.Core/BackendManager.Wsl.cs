@@ -198,6 +198,13 @@ namespace DshController.Core
             string wslenv = psi.EnvironmentVariables.ContainsKey("WSLENV")
                 ? psi.EnvironmentVariables["WSLENV"] : "";
             psi.EnvironmentVariables["WSLENV"] = WslTools.AppendWslenv(wslenv, "DSH_HOME/u");
+            // 供应商预设凭据：值注入环境并经 WSLENV 透传进 WSL（同步只写 env 名）
+            foreach ((string envName, string envValue) in PresetCredentialEnvPairs())
+            {
+                psi.EnvironmentVariables[envName] = envValue;
+                psi.EnvironmentVariables["WSLENV"] = WslTools.AppendWslenv(
+                    psi.EnvironmentVariables["WSLENV"], envName + "/u");
+            }
 
             SetState(BackendState.Starting, false, 0);
             ClearRing();

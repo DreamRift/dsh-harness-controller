@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- ============================================================================
-     InstancesRailView — 实例页左边栏的「启动序列表」（改版·启动序列表）
+     InstancesRailView — 实例页左边栏（改版·启动序列表 + 新建/扫描入口）
      行=状态点+名称+端口+运行态；数据只经视图模型读档案（清单+liveness 结论）。
+     顶部按钮行只做事件转发（NewInstanceRequested / ScanRequested），环境/发行版
+     选择由 MainWindow 层完成后再进面板表单。
      独立成 UserControl 是 x:Bind ItemTemplate 的形状要求（UsageView 同型）。
      ============================================================================ -->
 <UserControl
@@ -21,7 +23,13 @@
     </UserControl.Resources>
 
     <StackPanel>
-        <TextBlock x:Name="TxtRailHeader" Text="实例 · 按最近启动" Style="{StaticResource NavCaption}" Margin="4,2,0,2" />
+        <!-- 改版：新建/扫描入口上移到左栏（View 只转发事件，环境/发行版选择在 MainWindow 层完成） -->
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,2,0,6">
+            <Button x:Name="BtnRailNew" Content="＋ 新建实例" Style="{StaticResource BtnCompact}"
+                    Click="BtnRailNew_Click" AutomationProperties.AutomationId="BtnRailNew" />
+            <Button x:Name="BtnRailScan" Content="扫描" Style="{StaticResource BtnCompact}"
+                    Click="BtnRailScan_Click" AutomationProperties.AutomationId="BtnRailScan" />
+        </StackPanel>
         <ListView x:Name="RailList" SelectionMode="Single" BorderThickness="0" Background="Transparent"
                   Padding="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
                   SelectionChanged="RailList_SelectionChanged">

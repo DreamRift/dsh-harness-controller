@@ -3,8 +3,11 @@
 #  (sub-task "two-item primary rail"). Proves:
 #    1) both rail items present & clickable; each click flips the host exactly
 #    2) round-trip keeps state: ListPlugins element survives (residents, no
-#       rebuild => no flicker) and target ComboBox selection value is identical
-#    3) screenshots of both selected states for the human eye
+#       rebuild => no flicker) and the market page combo selection is identical
+#    3) manage page: per-page CmbInstance defaults to the first instance and
+#       switching it re-targets the installed list (PluginTargetTree was
+#       removed in the rework; each sub-page owns its instance combo now)
+#    4) screenshots of the selected states for the human eye
 #  ASCII-only (PS 5.1 GBK pitfall); CJK strings via char codes where needed.
 #  Usage: powershell -ExecutionPolicy Bypass -File verify\gui-plugin-rail-check.ps1 -Exe <exe> -Out <dir>
 # ============================================================================
@@ -88,37 +91,45 @@ function Wait-Manage([long]$hwnd, [int]$ms) {
     }
     return -1
 }
-function Get-TreeRows([long]$hwnd) {
-    $lv = Find-ById $hwnd 'PluginTargetTree'
-    if ($null -eq $lv) { return @() }
+function Get-ComboItems([long]$hwnd, [string]$id) {
+    # enumerate combo item names (WinUI exposes dropdown items only while expanded)
+    $el = Find-ById $hwnd $id
+    if ($null -eq $el) { return @() }
+    $exp = $null
+    $hasExp = $el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)
     $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
-    $condTx = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
-    $out = @()
-    foreach ($i in $lv.FindAll($TS::Descendants, $condLI)) {
-        $txt = ''
-        foreach ($tx in $i.FindAll($TS::Descendants, $condTx)) { $txt = $tx.Current.Name; break }
-        $out += [pscustomobject]@{ El = $i; Text = ([string]$txt).Trim() }
+    for ($try = 0; $try -lt 10; $try++) {
+        if ($hasExp) { try { $exp.Expand() } catch { } }
+        Start-Sleep -Milliseconds 300
+        $names = @()
+        foreach ($i in $el.FindAll($TS::Descendants, $condLI)) { $names += $i.Current.Name }
+        if ($hasExp) { try { $exp.Collapse() } catch { } }
+        if ($names.Count -ge 1) { return $names }
     }
-    return $out
+    return @()
 }
-function Get-TreeSelectedText([long]$hwnd) {
-    $lv = Find-ById $hwnd 'PluginTargetTree'
-    if ($null -eq $lv) { return '' }
-    $sp = $null
-    if (-not $lv.TryGetCurrentPattern([System.Windows.Automation.SelectionPattern]::Pattern, [ref]$sp)) { return '' }
-    $condTx = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text)
-    foreach ($s in $sp.Current.GetSelection()) {
-        foreach ($tx in $s.FindAll($TS::Descendants, $condTx)) { return $tx.Current.Name }
-        break
-    }
-    return ''
-}
-function Select-TreeRow([long]$hwnd, [string]$prefix) {
-    foreach ($r in @(Get-TreeRows $hwnd)) {
-        if ($r.Text.StartsWith($prefix)) {
-            $pat = $null
-            if ($r.El.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); return $true }
+function Select-ComboItem([long]$hwnd, [string]$id, [string]$token) {
+    # select the first item whose Name contains the token; retries cover the
+    # transient disabled state while a page reload is busy
+    for ($try = 1; $try -le 5; $try++) {
+        $el = Find-ById $hwnd $id
+        if ($null -ne $el) {
+            $exp = $null
+            $hasExp = $el.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)
+            if ($hasExp) { try { $exp.Expand() } catch { } }
+            Start-Sleep -Milliseconds 400
+            $condLI = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
+            $ok = $false
+            foreach ($i in $el.FindAll($TS::Descendants, $condLI)) {
+                if (($i.Current.Name).Contains($token)) {
+                    $pat = $null
+                    if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { try { $pat.Select(); $ok = $true } catch { }; break }
+                }
+            }
+            if ($hasExp) { try { $exp.Collapse() } catch { } }
+            if ($ok) { return $true }
         }
+        Start-Sleep -Milliseconds 600
     }
     return $false
 }
@@ -183,74 +194,60 @@ try {
     Add-Result $stable 'roundtrips-stable' ('5 round trips, rid=' + $ridNow)
 
     Save-Shot $hwnd 'plugin-rail-market'
-    Invoke-Click $hwnd 'BtnSubManage' | Out-Null; [void](Wait-Manage $hwnd 3000)
+    Invoke-Click $hwnd 'BtnSubManage' | Out-Null
+    $msM2 = Wait-Manage $hwnd 3000
     Save-Shot $hwnd 'plugin-rail-manage'
 
-    # ---- management instance tree (sub-task instance-tree-nodes) ----
-    $tv = Test-Visible $hwnd 'PluginTargetTree'
-    $rowsA = @(Get-TreeRows $hwnd)
-    $allNamed = $true
-    foreach ($r in $rowsA) { if ($r.Text -notmatch '^(windows|wsl):[0-9]+') { $allNamed = $false } }
-    Add-Result ($tv -and $rowsA.Count -ge 1 -and $allNamed) 'tree-expanded' ('visible=' + $tv + ' rows=' + $rowsA.Count + ' texts=' + (($rowsA | ForEach-Object { $_.Text }) -join ','))
+    # ---- manage page: per-page instance combo (PluginTargetTree removed in rework) ----
+    $cmbVis = Test-Visible $hwnd 'CmbInstance'
+    Add-Result (($msM2 -ge 0) -and $cmbVis) 'manage-panel-visible' ('manage shown in ' + $msM2 + 'ms combo-visible=' + $cmbVis)
 
-    $meta0 = Get-ComboValue $hwnd 'CmbInstance'
-    $targetRow = ''
-    foreach ($r in $rowsA) { if ($r.Text.StartsWith('wsl:') -and $r.Text -ne $meta0) { $targetRow = $r.Text } }
-    if ($targetRow -eq '') { foreach ($r in $rowsA) { if ($r.Text -ne $meta0) { $targetRow = $r.Text } } }
-    $clicked = Select-TreeRow $hwnd $targetRow
+    # the page combo defaults to the first instance
+    $itemsA = @(Get-ComboItems $hwnd 'CmbInstance')
+    $val0 = Get-ComboValue $hwnd 'CmbInstance'
+    $first = ''
+    if ($itemsA.Count -ge 1) { $first = $itemsA[0] }
+    Add-Result (($itemsA.Count -ge 1) -and ($val0 -eq $first)) 'manage-combo-default' ('items=' + $itemsA.Count + ' first=[' + $first + '] selected=[' + $val0 + ']')
+
+    # switch to another instance via the page combo -> selection syncs fast
+    $target = ''
+    foreach ($n in $itemsA) { if ($n -ne $val0) { $target = $n; break } }
+    if ($target -eq '') { $target = $first }
+    $picked = Select-ComboItem $hwnd 'CmbInstance' $target
     $t0 = [Diagnostics.Stopwatch]::StartNew()
     $comboNow = ''
     while ($t0.ElapsedMilliseconds -lt 3000) {
         $comboNow = Get-ComboValue $hwnd 'CmbInstance'
-        if ($comboNow -eq $targetRow) { break }
+        if ($comboNow -eq $target) { break }
         Start-Sleep -Milliseconds 25
     }
-    $flipMs = $t0.ElapsedMilliseconds
-    Add-Result ($clicked -and $comboNow -eq $targetRow -and $flipMs -lt 1000) 'tree-to-combo-sync' ('row=' + $targetRow + ' combo=[' + $comboNow + '] ms=' + $flipMs)
-    # plugin list refresh: manage meta must mention the new target instance
+    Add-Result ($picked -and $comboNow -eq $target -and $t0.ElapsedMilliseconds -lt 1000) 'combo-switch-sync' ('target=[' + $target + '] combo=[' + $comboNow + '] ms=' + $t0.ElapsedMilliseconds)
+
+    # list-follow evidence: meta re-renders and the installed list is released from busy
     $metaTxt = ''
+    $listOk = $false
     $mt = [Diagnostics.Stopwatch]::StartNew()
-    while ($mt.ElapsedMilliseconds -lt 3000) {
+    while ($mt.ElapsedMilliseconds -lt 5000) {
         $elM = Find-ById $hwnd 'TxtInstanceMeta'
         if ($null -ne $elM) { try { $metaTxt = $elM.Current.Name } catch { } }
-        if ($metaTxt.Length -gt 0) { break }
+        $elL = Find-ById $hwnd 'ListPlugins'
+        if ($null -ne $elL) { try { $listOk = $elL.Current.IsEnabled } catch { $listOk = $false } }
+        if ($metaTxt.Length -gt 0 -and $listOk) { break }
         Start-Sleep -Milliseconds 50
     }
-    Add-Result ($metaTxt.Length -gt 0) 'tree-refresh-meta' ('meta=[' + $metaTxt.Substring(0, [Math]::Min(60, $metaTxt.Length)) + ']')
-    Save-Shot $hwnd 'plugin-tree-expanded'
+    Add-Result ($metaTxt.Length -gt 0 -and $listOk) 'combo-switch-refresh' ('meta=[' + $metaTxt.Substring(0, [Math]::Min(60, $metaTxt.Length)) + '] list-enabled=' + $listOk)
+    Save-Shot $hwnd 'plugin-manage-combo'
 
-    # reverse sync: pick another instance via top combo -> tree selection follows
-    $rowsB = @(Get-TreeRows $hwnd)
-    $back = ''
-    foreach ($r in $rowsB) { if ($r.Text -ne $comboNow) { $back = $r.Text } }
-    $cmb = Find-ById $hwnd 'CmbInstance'
-    $picked = $false
-    if ($null -ne $cmb) {
-        $exp = $null
-        if ($cmb.TryGetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern, [ref]$exp)) { $exp.Expand(); Start-Sleep -Milliseconds 400 }
-        $condLI2 = New-Object System.Windows.Automation.PropertyCondition($AE::ControlTypeProperty, [System.Windows.Automation.ControlType]::ListItem)
-        foreach ($i in $cmb.FindAll($TS::Descendants, $condLI2)) {
-            if ($i.Current.Name -eq $back) {
-                $pat = $null
-                if ($i.TryGetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern, [ref]$pat)) { $pat.Select(); $picked = $true }
-                break
-            }
-        }
-        if ($null -ne $exp) { try { $exp.Collapse() } catch { } }
-    }
+    # switch back via the same combo (reverse direction, was combo->tree sync)
+    $pickedB = Select-ComboItem $hwnd 'CmbInstance' $val0
     $t1 = [Diagnostics.Stopwatch]::StartNew()
-    $treeSel = ''
+    $comboBack = ''
     while ($t1.ElapsedMilliseconds -lt 3000) {
-        $treeSel = Get-TreeSelectedText $hwnd
-        if ($treeSel -eq $back) { break }
+        $comboBack = Get-ComboValue $hwnd 'CmbInstance'
+        if ($comboBack -eq $val0) { break }
         Start-Sleep -Milliseconds 25
     }
-    Add-Result ($picked -and $treeSel -eq $back -and $t1.ElapsedMilliseconds -lt 1000) 'combo-to-tree-sync' ('combo picked=' + $back + ' tree selected=' + $treeSel + ' ms=' + $t1.ElapsedMilliseconds)
-
-    # market collapses the tree
-    Invoke-Click $hwnd 'BtnSubMarket' | Out-Null; [void](Wait-Market $hwnd 3000)
-    Add-Result (-not (Test-Visible $hwnd 'PluginTargetTree')) 'tree-collapses-on-market' 'tree hidden in market view'
-    Invoke-Click $hwnd 'BtnSubManage' | Out-Null; [void](Wait-Manage $hwnd 3000)
+    Add-Result ($pickedB -and $comboBack -eq $val0 -and $t1.ElapsedMilliseconds -lt 1000) 'combo-switch-back' ('back=[' + $val0 + '] combo=[' + $comboBack + '] ms=' + $t1.ElapsedMilliseconds)
 
     $p.Refresh(); [void]$p.CloseMainWindow()
     $closed = $p.WaitForExit(15000)

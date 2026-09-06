@@ -5,8 +5,9 @@
 //    - 实例列表按运行环境过滤（Windows 标签只列 windows 实例，WSL 标签只列 wsl）；
 //    - 每面板独立记忆选中实例、独立状态轮询、独立设置字段（WSL 显示发行版/
 //      WSL DSH_HOME，Windows 显示 DSH_HOME）；
-//    - harness 版本：实例默认跟随当前环境主实例版本，也可指定任意版本
-//      （经 npx 拉取该版本启动）；新建实例默认跟随当前环境检测到的版本；
+//    - harness 版本：实例默认跟随当前环境主实例版本（改版·去版本化：设置卡不再
+//      展示/编辑版本）；新建弹窗仍可指定版本（经 npx 拉取该版本启动），其版本
+//      下拉的异步填充在 Instances/InstancePanel.Create.Steps.cs；
 //    - 启动失败报告由核心层生成（BackendManager.FailStart → ErrorReporter），
 //      本面板只负责把报告路径打到控制台并弹窗让用户打开/定位。
 // ============================================================================
@@ -49,25 +50,18 @@ namespace DshController
 
 
         private string _selectedId = "";
-        private bool _loadingList;
-        private bool _loadingSettings;
         private bool _closing;
         private int _externalPidCache;
         private string _cachedSelectedId = "";
         private BackendState _uiState = BackendState.Stopped;
         private bool _uiMine;
-        private string _detectedVersion = "";          // 当前环境 harness 主实例版本（检测缓存）
-        private bool _versionDetectDone;               // 是否已执行过一次版本检测
-        private string _detectedFor = "";              // 版本检测对应的环境键（windows / wsl:<发行版>）
-        private List<string> _publishedVersions = new List<string>();  // npm registry 拉取到的版本
+        private List<string> _publishedVersions = new List<string>();  // npm registry 拉取到的版本（新建弹窗版本下拉用）
+        private string _pendingCreateDistro = null;    // 左栏「＋ 新建实例」传入的预填 WSL 发行版（MainWindow 选定，一次性消费）
         private string _lastReportPath = "";           // 最近一次失败报告路径（InfoBar 按钮用）
 
         public bool IsWslPanel { get { return _env == "wsl"; } }
         public string EnvironmentName { get { return _env; } }
         public string SelectedId { get { return _selectedId; } }
-
-        /// <summary>本环境检测到的 harness 主实例版本（供 MainWindow 页脚展示）。</summary>
-        public string DetectedVersion { get { return _detectedVersion; } }
 
         /// <summary>本环境当前处于运行状态的实例数（供 MainWindow 标签页头显示）。</summary>
         public int RunningCount()
@@ -112,9 +106,10 @@ namespace DshController
             RowWslHome.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             RowWslPolicy.Visibility = IsWslPanel ? Visibility.Visible : Visibility.Collapsed;
             EnvBadgeText.Text = IsWslPanel ? "WSL2" : "WINDOWS";
+            // 改版：新建/扫描入口移到左栏（InstancesRailView），空态文案指向左栏按钮
             EmptyHintText.Text = IsWslPanel
-                ? "本环境暂无 WSL 实例。点击「新建实例」创建；点「扫描」可发现发行版内正在运行的 dsh web（含终端手动启动），以及已安装 dsh 但未运行的发行版（询问后添加）"
-                : "本环境暂无 Windows 实例。点击「新建实例」创建；若本机已有运行中的 dsh web，点「扫描」即可加入列表";
+                ? "本环境暂无 WSL 实例。点左栏「＋ 新建实例」创建（会先选环境/发行版）；「扫描」可发现运行中的 dsh 与已安装 dsh 的发行版。"
+                : "本环境暂无 Windows 实例。点左栏「＋ 新建实例」创建；「扫描」可发现运行中的 dsh web（Windows 与 WSL 都会探测）。";
             TxtWorkspaceHint.Text = IsWslPanel
                 ? "填 ~/xxx 或 /xxx = 发行版内原生路径（完全隔离）；填 Windows 路径（C:\\…）= 经 /mnt/c 按需共享"
                 : "";
@@ -130,7 +125,6 @@ namespace DshController
             // 采集，这里只订阅结果；用户操作后仍会立即主动探一次，反馈不变慢。
             if (_archive != null) _archive.Service.Changed += OnArchiveFacetChanged;
 
-            _ = DetectVersionAsync(show: false);
             _ = ProbeTickAsync();
         }
 
@@ -176,31 +170,16 @@ namespace DshController
         }
 
 
-        // ==================== 实例选择器 ====================
+        // ==================== 实例列表 ====================
+        // （改版：左栏 InstancesRailView 是唯一实例切换器，详情区"当前实例"下拉已移除；
+        //   实例选择统一走 SelectInstance，左栏高亮由其 SyncSelection 回设。）
 
         private void RefreshInstanceList()
         {
             List<InstanceDef> instances = InstancesOfEnv().ToList();
-            _loadingList = true;
-            try
-            {
-                CmbInstance.ItemsSource = instances;
-                string ver = _detectedVersion.Length > 0
-                    ? " · 当前环境 harness v" + _detectedVersion
-                    : (_versionDetectDone ? " · 当前环境未检测到 harness" : "");
-                TxtInstanceHint.Text = (IsWslPanel
-                    ? "共 " + instances.Count + " 个 WSL 实例 · 在发行版内运行"
-                    : "共 " + instances.Count + " 个 Windows 实例 · 本机直接运行") + ver;
-            }
-            finally { _loadingList = false; }
-        }
-
-        private void CmbInstance_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_loadingList || _loadingSettings || _closing) return;
-            InstanceDef def = CmbInstance.SelectedItem as InstanceDef;
-            if (def != null && !string.Equals(def.Id, _selectedId, StringComparison.OrdinalIgnoreCase))
-                SelectInstance(def.Id);
+            TxtInstanceHint.Text = IsWslPanel
+                ? "共 " + instances.Count + " 个 WSL 实例 · 在发行版内运行"
+                : "共 " + instances.Count + " 个 Windows 实例 · 本机直接运行";
         }
 
         private void SelectInstance(string id)
@@ -210,49 +189,17 @@ namespace DshController
             else
                 _selectedId = id;
 
-            // 同步 ComboBox 选中项（引用匹配 + 索引兜底）
-            SyncPickerSelection();
-
             _externalPidCache = 0;
             _cachedSelectedId = _selectedId;
             RefreshSelectedControls();
             _ = ProbeTickAsync();
-        }
-
-        /// <summary>把实例下拉的选中项对齐到 _selectedId（引用匹配优先，索引兜底）。</summary>
-        private void SyncPickerSelection()
-        {
-            _loadingSettings = true;
-            try
-            {
-                InstanceDef target = SelectedDef();
-                if (target != null) CmbInstance.SelectedItem = target;
-                if (CmbInstance.SelectedItem is InstanceDef cur && string.Equals(cur.Id, _selectedId, StringComparison.OrdinalIgnoreCase))
-                {
-                    /* 已匹配 */
-                }
-                else if (CmbInstance.ItemsSource is System.Collections.IList items)
-                {
-                    for (int i = 0; i < items.Count; i++)
-                    {
-                        if (items[i] is InstanceDef itemDef &&
-                            string.Equals(itemDef.Id, _selectedId, StringComparison.OrdinalIgnoreCase))
-                        {
-                            CmbInstance.SelectedIndex = i;
-                            break;
-                        }
-                    }
-                }
-            }
-            finally { _loadingSettings = false; }
+            try { RefreshUpgradeCard(); }   // 升级卡随选中实例刷新（版本列表/当前已装标注按环境重拉）
+            catch { /* 理由: 升级卡未就绪时跳过，下次选中再试 */ }
         }
 
         private void RefreshSelectedControls()
         {
             InstanceDef def = SelectedDef();
-            _loadingSettings = true;
-            try
-            {
                 if (def == null)
                 {
                     TxtHost.Text = "";
@@ -270,12 +217,9 @@ namespace DshController
                     HomeText.Text = IsWslPanel ? "WSL 实例 · DSH_HOME(Linux): —" : "DSH_HOME: —";
                     StatusText.Text = "无实例";
                     PidText.Text = "—";
-                    VersionText.Text = "harness 版本未知";
-                    LaunchModeText.Text = "";
                     TxtSettingsSubtitle.Text = "";
                     TxtAnnounced.Visibility = Visibility.Collapsed;
                     TxtAnnounced.Text = "";
-                    PopulateVersionCombo(null);
                     UpdateUiState(BackendState.Stopped, false, 0);
                     EmptyHint.Visibility = InstancesOfEnv().Count() == 0 ? Visibility.Visible : Visibility.Collapsed;
                     return;
@@ -292,13 +236,18 @@ namespace DshController
                 TxtWslHome.Text = def.WslHome ?? "";
                 TxtSettingsSubtitle.Text = "· " + (def.Name ?? "") + "（" + def.Id + "）";
                 EmptyHint.Visibility = Visibility.Collapsed;
-                PopulateVersionCombo(def);
                 UpdateHomeLabel(def);
                 UpdateUrl(def);
-                UpdateVersionText(def);
                 UpdateUiState(CurrentStateFor(def), CurrentMineFor(def), CurrentPidFor(def));
-            }
-            finally { _loadingSettings = false; }
+                try
+                {
+                    // 选中瞬间用档案 liveness 结论纠偏：管理器状态对外部实例恒为 Stopped，
+                    // 不初始化会闪现"已停止"，要等探测/分面推送才纠正（等间隔竞态）。
+                    if (CurrentStateFor(def) == BackendState.Stopped && _archive != null
+                        && _archive.IsRunning(def.Id))
+                        UpdateUiState(BackendState.Running, CurrentMineFor(def), CurrentPidFor(def));
+                }
+                catch { /* 理由: 档案 liveness 未就绪时保留管理器状态显示，下一次分面推送会纠正 */ }
         }
 
         private void UpdateHomeLabel(InstanceDef def)
@@ -333,6 +282,16 @@ namespace DshController
                         !string.Equals(announced, url, StringComparison.OrdinalIgnoreCase);
             TxtAnnounced.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             if (show) TxtAnnounced.Text = "公告: " + announced;
+        }
+
+        // ==================== 左栏入口（改版·分步流程） ====================
+
+        /// <summary>左栏"＋ 新建实例"流程的环境/发行版选择已在 MainWindow 完成，这里直接打开表单。</summary>
+        public Task OpenCreateAsync(string wslDistro = null)
+        {
+            if (_closing) return Task.CompletedTask;
+            _pendingCreateDistro = wslDistro;   // 一次性消费：ShowCreateInstanceDialogAsync 读取后置回 null
+            return ShowCreateInstanceDialogAsync(cloneMode: false);
         }
 
     }

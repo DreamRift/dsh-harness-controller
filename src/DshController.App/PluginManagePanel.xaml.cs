@@ -126,17 +126,6 @@ namespace DshController
 
         public void Shutdown() => _closing = true;
 
-        /// <summary>共享目标视图模型（改版·管理实例树：左栏树与本页面同一份状态）。</summary>
-        public DshController.ViewModels.PluginTargetViewModel Target => _target;
-
-        /// <summary>左栏树选中实例：写共享 VM（combo 经 SyncPicker 自动跟随），随后刷新已装列表。</summary>
-        public void SelectFromTree(InstanceDef def)
-        {
-            if (_closing || _target == null || def == null || def == _target.SelectedInstance) return;
-            _target.SelectedInstance = def;           // PropertyChanged → SyncPicker + Meta
-            _ = _target.ReloadAsync();                // 命中档案秒回，未命中走采集
-        }
-
         /// <summary>MainWindow 切到本页时调用：刷新实例列表与已装状态（命中档案时秒回）。</summary>
         public void OnShown()
         {
