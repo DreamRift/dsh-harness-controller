@@ -527,7 +527,9 @@ dsh-harness-controller/
 ├── docs/ARCHITECTURE.md           # 架构说明（分层/数据流/落盘/门禁/UI 迭代方式）
 ├── docs/adr/                      # 架构决策记录（一页一决策）
 ├── legacy/DshController.cs        # v0.1.0 WinForms 源码留档
-├── docs/                          # 重构方案（含 REFACTOR-2.0-PLAN.md）、调研笔记、测试记录
+├── docs/TEST-RESULTS.md           # 测试账与开放票（唯一记录处；文档地图见 DEVELOPMENT.md 开头）
+├── docs/DEVELOPMENT.md            # 开发规则（分层/门禁/落点/发布流程）
+├── docs/provider-sync-alignment.md # 供应商同步格式契约
 ├── build.ps1                      # 构建/发布脚本（内置约定机检 + 单测门禁）
 ├── README.md / CHANGELOG.md / LICENSE
 └── .gitignore
