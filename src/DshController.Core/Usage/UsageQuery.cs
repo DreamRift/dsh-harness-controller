@@ -24,6 +24,7 @@ namespace DshController.Core.Usage
         public string TopModel { get; set; } = "";
         public List<UsageModelStat> Models { get; set; } = new List<UsageModelStat>();
         public List<UsageSessionStat> Sessions { get; set; } = new List<UsageSessionStat>();
+        public UsageLatencyStats Latency { get; set; } = new UsageLatencyStats();
 
         /// <summary>按天升序的每日总量（key = yyyy-MM-dd）。</summary>
         public SortedDictionary<string, TokenBuckets> Daily { get; set; } =
@@ -31,6 +32,9 @@ namespace DshController.Core.Usage
 
         public SortedDictionary<string, long> DailyRequests { get; set; } =
             new SortedDictionary<string, long>(StringComparer.Ordinal);
+
+        public SortedDictionary<string, UsageLatencyStats> DailyLatency { get; set; } =
+            new SortedDictionary<string, UsageLatencyStats>(StringComparer.Ordinal);
 
         /// <summary>输入侧缓存命中率；无输入返回 -1。</summary>
         public double CacheHitRate => Totals.CacheHitRate;
@@ -60,12 +64,27 @@ namespace DshController.Core.Usage
 
                 foreach (UsageSessionStat s in data.Sessions ?? new List<UsageSessionStat>())
                 {
+                    if (s == null || !s.HasTokenUsage) continue;
                     if (ranged && !InRange(UsageParser.DayKey(s.CreatedAtMs), fromKey, toKey)) continue;
                     summary.Sessions.Add(s);
                     summary.SessionCount++;
                     if (ranged) summary.Totals.Add(s.Totals);
                 }
                 if (!ranged) summary.Totals.Add(data.Totals);
+                if (!ranged) summary.Latency.Add(data.Latency);
+
+                foreach (KeyValuePair<string, UsageLatencyStats> latency in data.DailyLatency ??
+                    new Dictionary<string, UsageLatencyStats>())
+                {
+                    if (ranged && !InRange(latency.Key, fromKey, toKey)) continue;
+                    if (!summary.DailyLatency.TryGetValue(latency.Key, out UsageLatencyStats target))
+                    {
+                        target = new UsageLatencyStats();
+                        summary.DailyLatency[latency.Key] = target;
+                    }
+                    target.Add(latency.Value);
+                    if (ranged) summary.Latency.Add(latency.Value);
+                }
 
                 foreach (UsageModelStat m in data.Models ?? new List<UsageModelStat>())
                 {
@@ -213,7 +232,7 @@ namespace DshController.Core.Usage
             if (string.IsNullOrEmpty(dayKey) || sessions == null) return list;
             foreach (UsageSessionStat s in sessions)
             {
-                if (s == null) continue;
+                if (s == null || !s.HasTokenUsage) continue;
                 if (UsageParser.DayKey(s.CreatedAtMs) == dayKey) list.Add(s);
             }
             list.Sort((x, y) => y.CreatedAtMs.CompareTo(x.CreatedAtMs));

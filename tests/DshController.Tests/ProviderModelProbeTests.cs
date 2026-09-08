@@ -87,8 +87,8 @@ namespace DshController.Tests
                 "{\"id\":\"b\",\"inputModalities\":[\"text\"]}]";
             var models = ProviderModelProbe.Parse(json);
             Assert.Equal(2, models.Count);
-            Assert.True(models[0].Multimodal);
-            Assert.False(models[1].Multimodal);
+            Assert.True(models[0].SupportImage);
+            Assert.False(models[1].SupportImage);
         }
 
         [Fact]
@@ -98,7 +98,7 @@ namespace DshController.Tests
                 "\"architecture\":{\"input_modalities\":[\"text\",\"image\"]}}]}";
             var models = ProviderModelProbe.Parse(json);
             Assert.Single(models);
-            Assert.True(models[0].Multimodal);
+            Assert.True(models[0].SupportImage);
         }
 
         [Fact]
@@ -107,8 +107,8 @@ namespace DshController.Tests
             string json = "[{\"id\":\"a\",\"input\":[\"text\",\"image\"]}," +
                 "{\"id\":\"b\",\"modalities\":\"text,image\"}]";
             var models = ProviderModelProbe.Parse(json);
-            Assert.True(models[0].Multimodal);
-            Assert.True(models[1].Multimodal);
+            Assert.True(models[0].SupportImage);
+            Assert.True(models[1].SupportImage);
         }
 
         [Fact]
@@ -117,8 +117,8 @@ namespace DshController.Tests
             string json = "[{\"id\":\"a\",\"supports_vision\":true}," +
                 "{\"id\":\"b\",\"supportsImage\":false}]";
             var models = ProviderModelProbe.Parse(json);
-            Assert.True(models[0].Multimodal);
-            Assert.False(models[1].Multimodal);
+            Assert.True(models[0].SupportImage);
+            Assert.False(models[1].SupportImage);
         }
 
         [Fact]
@@ -127,10 +127,11 @@ namespace DshController.Tests
             string json = "[{\"id\":\"a\"},{\"id\":\"b\",\"input\":[]},{\"id\":\"c\",\"modalities\":[]}," +
                 "{\"id\":\"d\",\"input\":[\"audio\"]}]";
             var models = ProviderModelProbe.Parse(json);
-            Assert.Null(models[0].Multimodal);
-            Assert.Null(models[1].Multimodal);   // 空列表=未声明
-            Assert.Null(models[2].Multimodal);
-            Assert.Null(models[3].Multimodal);   // 无 text 无 image 的陌生词表不下结论
+            Assert.Null(models[0].SupportImage);
+            Assert.Null(models[1].SupportImage);   // 空列表=未声明
+            Assert.Null(models[2].SupportImage);
+            Assert.Null(models[3].SupportImage);   // 只有audio，没有明确说明image，所以为null
+            Assert.True(models[3].SupportAudio);    // audio明确为true
         }
     }
 }

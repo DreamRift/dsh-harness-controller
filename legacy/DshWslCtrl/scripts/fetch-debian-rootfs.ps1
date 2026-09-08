@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$iso = "C:\Users\cty05\Downloads\debian-trixie-rootfs.tar.gz"
+$iso = Join-Path $env:USERPROFILE "Downloads\debian-trixie-rootfs.tar.gz"
 $repo = "library/debian"
 $tag = "trixie"
 $authBase = "https://auth.docker.io/token"

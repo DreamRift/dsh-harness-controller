@@ -24,10 +24,10 @@
 
     <StackPanel>
         <!-- 改版：新建/扫描入口上移到左栏（View 只转发事件，环境/发行版选择在 MainWindow 层完成） -->
-        <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,2,0,6">
-            <Button x:Name="BtnRailNew" Content="＋ 新建实例" Style="{StaticResource BtnCompact}"
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="6,4,6,10">
+            <Button x:Name="BtnRailNew" Content="＋ 新建实例" Style="{StaticResource BtnSecondaryEnhanced}"
                     Click="BtnRailNew_Click" AutomationProperties.AutomationId="BtnRailNew" />
-            <Button x:Name="BtnRailScan" Content="扫描" Style="{StaticResource BtnCompact}"
+            <Button x:Name="BtnRailScan" Content="扫描" Style="{StaticResource BtnGhostEnhanced}"
                     Click="BtnRailScan_Click" AutomationProperties.AutomationId="BtnRailScan" />
         </StackPanel>
         <ListView x:Name="RailList" SelectionMode="Single" BorderThickness="0" Background="Transparent"
@@ -41,33 +41,34 @@
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="MinHeight" Value="0" />
-                    <Setter Property="Padding" Value="6,4" />
-                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="Padding" Value="10,8" />
+                    <Setter Property="Margin" Value="4,2" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="vm:InstanceRailRow">
-                    <Grid ColumnSpacing="8">
+                    <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Grid Grid.Column="0" Width="10" VerticalAlignment="Center">
-                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        <Grid Grid.Column="0" Width="12" VerticalAlignment="Center">
+                            <Ellipse Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                                      Fill="{ThemeResource StateRunBrush}" Visibility="{x:Bind Running, Converter={StaticResource RailBoolToVis}}" />
-                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            <Ellipse Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                                      Fill="{ThemeResource StateStopBrush}" Visibility="{x:Bind Running, Converter={StaticResource RailInverseBoolToVis}}" />
                         </Grid>
-                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center"
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center"
                                     ToolTipService.ToolTip="{x:Bind TooltipText}">
-                            <TextBlock Text="{x:Bind Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                            <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                        Foreground="{ThemeResource LabelPrimaryBrush}" />
-                            <TextBlock Text="{x:Bind SubText}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                            <TextBlock Text="{x:Bind SubText}" FontSize="11" TextTrimming="CharacterEllipsis"
                                        Foreground="{ThemeResource LabelTertiaryBrush}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="2" Text="{x:Bind StateText}" FontSize="10.5" VerticalAlignment="Center"
+                        <TextBlock Grid.Column="2" Text="{x:Bind StateText}" FontSize="11" VerticalAlignment="Center"
                                    Foreground="{ThemeResource LabelTertiaryBrush}" />
                     </Grid>
                 </DataTemplate>

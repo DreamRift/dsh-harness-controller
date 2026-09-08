@@ -5,12 +5,16 @@
 > **按实例指定 harness 版本**（默认跟随当前环境主实例版本），
 > 内置**插件市场**（按 DSH 官方方式把社区插件装到指定实例）与**插件管理**
 > （升级/卸载，实例间隔离）。
-> WinUI 3 原生界面（侧边栏导航 + Mica 材质），DeepSeek Harness 同款设计语言与鲸鱼图标。
+> WinUI 3 原生界面（侧边栏导航 + Mica 材质）。内置实例档案工作台：总量与单实例用量、
+> Token 趋势、TTFT、模型排行和会话明细都从持久档案读取，适合长期管理多实例与历史会话。
+
+> **v2.1.1**：档案页升级为统一用量工作台——总量与单实例详情共享五张 KPI、日期范围、
+> 平滑趋势图、Tooltip、会话钻取与数据表；会话明细自动忽略零 Token 空会话。
 
 ![License](https://img.shields.io/github/license/DreamRift/dsh-harness-controller)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2017763%2B-blue)
-![.NET](https://img.shields.io/badge/.NET-6.0-512BD4)
-![WinUI](https://img.shields.io/badge/WinUI-3--WASDK%201.5-5C2D91)
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)
+![WinUI](https://img.shields.io/badge/WinUI-3--WASDK%202.4-5C2D91)
 
 ---
 

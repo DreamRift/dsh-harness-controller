@@ -75,6 +75,17 @@ namespace DshController.ViewModels
         [ObservableProperty] public partial string TopModelText { get; set; } = "—";
         [ObservableProperty] public partial string HeroSubText { get; set; } = "";
 
+        // Cockpit 风格档案趋势区：范围与指标均只作用于已加载的档案快照。
+        [ObservableProperty] public partial string UsageRangeKey { get; set; } = "7";
+        [ObservableProperty] public partial string UsageRangeLabel { get; set; } = "近 7 天";
+        [ObservableProperty] public partial DateTimeOffset? UsageRangeStart { get; set; }
+        [ObservableProperty] public partial DateTimeOffset? UsageRangeEnd { get; set; }
+        [ObservableProperty] public partial string UsageRangeError { get; set; } = "";
+        [ObservableProperty] public partial string TrendMetric { get; set; } = "tokens";
+        [ObservableProperty] public partial string AverageTtftText { get; set; } = "—";
+        [ObservableProperty] public partial string TtftSampleText { get; set; } = "无有效步骤样本";
+        [ObservableProperty] public partial string TrendTotalText { get; set; } = "—";
+
         // hero 四桶堆叠条像素宽（与 UsageViewModel.BuildHeroBars 同口径，比例×330）
         [ObservableProperty] public partial double BarWUncached { get; set; }
         [ObservableProperty] public partial double BarWCacheRead { get; set; }

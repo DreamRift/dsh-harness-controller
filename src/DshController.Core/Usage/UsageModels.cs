@@ -62,6 +62,38 @@ namespace DshController.Core.Usage
         };
     }
 
+    /// <summary>从完整 DSH 步时序折叠的延迟统计；Samples=0 表示尚无可审计数据。</summary>
+    public sealed class UsageLatencyStats
+    {
+        [JsonPropertyName("samples")]
+        public int Samples { get; set; }
+
+        [JsonPropertyName("ttftMs")]
+        public long TtftMs { get; set; }
+
+        [JsonPropertyName("modelMs")]
+        public long ModelMs { get; set; }
+
+        [JsonIgnore]
+        public double AverageTtftMs => Samples > 0 ? (double)TtftMs / Samples : -1;
+
+        public void Add(long ttftMs, long modelMs)
+        {
+            if (ttftMs < 0 || modelMs < 0) return;
+            Samples++;
+            TtftMs += ttftMs;
+            ModelMs += modelMs;
+        }
+
+        public void Add(UsageLatencyStats other)
+        {
+            if (other == null || other.Samples <= 0) return;
+            Samples += other.Samples;
+            TtftMs += other.TtftMs;
+            ModelMs += other.ModelMs;
+        }
+    }
+
     /// <summary>会话日志里一条去重后的请求样本（同一 (turn,step) 保留最后一条）。</summary>
     public sealed class UsageSample
     {
@@ -72,6 +104,16 @@ namespace DshController.Core.Usage
         public long CacheRead { get; set; }
         public long CacheWrite { get; set; }
         public long Output { get; set; }
+    }
+
+    /// <summary>一份解压会话日志的纯解析结果，供 Windows/WSL 缓存共同复用。</summary>
+    public sealed class UsageSessionScan
+    {
+        public string SessionId { get; set; } = "";
+        public List<UsageSample> Samples { get; set; } = new List<UsageSample>();
+        public UsageLatencyStats Latency { get; set; } = new UsageLatencyStats();
+        public Dictionary<string, UsageLatencyStats> DailyLatency { get; set; } =
+            new Dictionary<string, UsageLatencyStats>(StringComparer.Ordinal);
     }
 
     /// <summary>单会话用量（来自 storages/session_projcache.json，权威总账）。</summary>
@@ -94,6 +136,13 @@ namespace DshController.Core.Usage
 
         [JsonPropertyName("totals")]
         public TokenBuckets Totals { get; set; } = new TokenBuckets();
+
+        [JsonPropertyName("latency")]
+        public UsageLatencyStats Latency { get; set; } = new UsageLatencyStats();
+
+        /// <summary>只有至少一桶真实 token 时才是需要保留/展示的用量会话。</summary>
+        [JsonIgnore]
+        public bool HasTokenUsage => Totals != null && Totals.Total > 0;
     }
 
     /// <summary>按 (provider, model) 聚合的用量（来自会话日志解析）。</summary>
@@ -166,6 +215,15 @@ namespace DshController.Core.Usage
         /// <summary>会话明细（按创建时间倒序，最多保留 MaxSessions 条，避免档案无限膨胀）。</summary>
         [JsonPropertyName("sessions")]
         public List<UsageSessionStat> Sessions { get; set; } = new List<UsageSessionStat>();
+
+        /// <summary>从所有已解析会话日志聚合；缺字段的旧档案保持 Samples=0。</summary>
+        [JsonPropertyName("latency")]
+        public UsageLatencyStats Latency { get; set; } = new UsageLatencyStats();
+
+        /// <summary>按完成消息本地日期聚合的 TTFT，供范围查询和趋势图使用。</summary>
+        [JsonPropertyName("dailyLatency")]
+        public Dictionary<string, UsageLatencyStats> DailyLatency { get; set; } =
+            new Dictionary<string, UsageLatencyStats>(StringComparer.Ordinal);
 
         /// <summary>会话明细的保留上限。</summary>
         public const int MaxSessions = 500;

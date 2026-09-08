@@ -20,9 +20,10 @@ namespace DshController.Views
 
         public UsageViewModel ViewModel { get; private set; }
 
-        /// <summary>x:Bind 函数：非空串 → Visible（截断标注等辅助文案显隐用，与 ProviderPresetsView 同款）。</summary>
-        public Microsoft.UI.Xaml.Visibility NonEmpty(string s) =>
-            string.IsNullOrEmpty(s) ? Microsoft.UI.Xaml.Visibility.Collapsed : Microsoft.UI.Xaml.Visibility.Visible;
+        public Microsoft.UI.Xaml.Visibility NonEmpty(string value) =>
+            string.IsNullOrEmpty(value)
+                ? Microsoft.UI.Xaml.Visibility.Collapsed
+                : Microsoft.UI.Xaml.Visibility.Visible;
 
         /// <summary>MainWindow 构造后注入依赖。</summary>
         public void Init(UsageViewModel viewModel)

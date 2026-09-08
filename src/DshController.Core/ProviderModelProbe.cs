@@ -19,14 +19,16 @@ using System.Threading.Tasks;
 namespace DshController.Core
 {
     /// <summary>探针发现的一个候选模型（容量 null=端点未提供，采纳后保持继承；
-    /// Multimodal 三态：null=端点未披露、false=明确纯文本、true=图文输入）。</summary>
+    /// 模态支持三态：null=端点未披露、false=明确不支持、true=支持该模态）。</summary>
     public sealed class DiscoveredModel
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public long? ContextWindow { get; set; }
         public long? MaxTokens { get; set; }
-        public bool? Multimodal { get; set; }
+        public bool? SupportImage { get; set; }
+        public bool? SupportVideo { get; set; }
+        public bool? SupportAudio { get; set; }
     }
 
     /// <summary>探针结果：Ok=true 时 Models 可能为空列表（视为 fetchEmpty）。</summary>
@@ -106,7 +108,10 @@ namespace DshController.Core
                 else if (TryString(item, "display_name") is string dn && dn.Length > 0) m.Name = dn;
                 m.ContextWindow = FirstNumber(item, ContextAliases);
                 m.MaxTokens = FirstNumber(item, MaxTokensAliases);
-                m.Multimodal = MultimodalOf(item);
+                var modalities = ModalitiesOf(item);
+                m.SupportImage = modalities.Image;
+                m.SupportVideo = modalities.Video;
+                m.SupportAudio = modalities.Audio;
                 result.Add(m);
             }
             return result;
@@ -160,51 +165,91 @@ namespace DshController.Core
             return null;
         }
 
-        /// <summary>多模态判定（纯函数）：输入模态列表/布尔位披露了图片输入能力才给三态值，
+        /// <summary>模态支持结果。</summary>
+        public struct ModalitySupport
+        {
+            public bool? Image;
+            public bool? Video;
+            public bool? Audio;
+        }
+
+        /// <summary>模态判定（纯函数）：从输入模态列表/布尔位中提取图片/视频/音频支持。
         /// 什么都不说= null（对齐插件"不做模型知识库推测"的取向）。空列表视为未声明。
         /// 别名覆盖 OpenRouter 的 architecture.input_modalities 嵌套。</summary>
-        public static bool? MultimodalOf(JsonElement item)
+        public static ModalitySupport ModalitiesOf(JsonElement item)
         {
-            if (item.ValueKind != JsonValueKind.Object) return null;
+            var result = new ModalitySupport();
+            if (item.ValueKind != JsonValueKind.Object) return result;
+
+            // 尝试从 input_modalities 等字段读取
             foreach (string alias in InputModalityAliases)
             {
                 if (!item.TryGetProperty(alias, out JsonElement el)) continue;
-                bool? verdict = VerdictFromModalities(el);
-                if (verdict.HasValue) return verdict;
+                var support = ParseModalityList(el);
+                if (support.Image.HasValue || support.Video.HasValue || support.Audio.HasValue)
+                    return support;
             }
+
+            // 尝试从 architecture.input_modalities 读取
             if (item.TryGetProperty("architecture", out JsonElement arch) && arch.ValueKind == JsonValueKind.Object)
             {
                 foreach (string alias in InputModalityAliases)
                 {
                     if (!arch.TryGetProperty(alias, out JsonElement el)) continue;
-                    bool? verdict = VerdictFromModalities(el);
-                    if (verdict.HasValue) return verdict;
+                    var support = ParseModalityList(el);
+                    if (support.Image.HasValue || support.Video.HasValue || support.Audio.HasValue)
+                        return support;
                 }
             }
+
+            // 尝试布尔标记位（仅能判断图片支持）
             foreach (string alias in MultimodalFlagAliases)
             {
                 if (!item.TryGetProperty(alias, out JsonElement el)) continue;
-                if (el.ValueKind == JsonValueKind.True) return true;
-                if (el.ValueKind == JsonValueKind.False) return false;
+                if (el.ValueKind == JsonValueKind.True)
+                {
+                    result.Image = true;
+                    return result;
+                }
+                if (el.ValueKind == JsonValueKind.False)
+                {
+                    result.Image = false;
+                    return result;
+                }
             }
-            return null;
+
+            return result;
         }
 
-        /// <summary>从模态声明取三态：含 image → true；非空且只 text → false；空/不可读 → null。</summary>
-        private static bool? VerdictFromModalities(JsonElement el)
+        /// <summary>从模态声明解析各模态支持：提取 image/video/audio。</summary>
+        private static ModalitySupport ParseModalityList(JsonElement el)
         {
+            var result = new ModalitySupport();
             List<string> tokens = ModalityTokens(el);
-            if (tokens.Count == 0) return null;
+            if (tokens.Count == 0) return result;
+
+            bool hasImage = false, hasVideo = false, hasAudio = false, hasText = false;
+
             foreach (string t in tokens)
             {
                 string s = t.Trim().ToLowerInvariant();
-                if (s == "image" || s == "vision" || s == "image_url") return true;
+                if (s == "image" || s == "vision" || s == "image_url") hasImage = true;
+                else if (s == "video") hasVideo = true;
+                else if (s == "audio") hasAudio = true;
+                else if (s == "text") hasText = true;
             }
-            foreach (string t in tokens)
-            {
-                if (t.Trim().ToLowerInvariant() == "text") return false;
-            }
-            return null;
+
+            // 只有声明了才给出明确的值
+            if (hasImage) result.Image = true;
+            else if (hasText && tokens.Count > 0) result.Image = false;  // 明确只支持文本
+
+            if (hasVideo) result.Video = true;
+            else if (hasText && tokens.Count > 0) result.Video = false;
+
+            if (hasAudio) result.Audio = true;
+            else if (hasText && tokens.Count > 0) result.Audio = false;
+
+            return result;
         }
 
         /// <summary>模态声明收词：数组取字符串元素；字符串按逗号/空白拆分；其余不认。</summary>

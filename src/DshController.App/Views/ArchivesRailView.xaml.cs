@@ -15,6 +15,8 @@ namespace DshController.Views
         private ArchivesRailViewModel _vm;
         private bool _syncing;
 
+        public ArchivesRailViewModel ViewModel { get; private set; }
+
         /// <summary>用户点选了一行（代码回设选中不会触发）。</summary>
         public event Action<ArchivesRailRow> RowSelected;
 
@@ -26,7 +28,16 @@ namespace DshController.Views
         public void Bind(ArchivesRailViewModel vm)
         {
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
+            ViewModel = _vm;
             RailList.ItemsSource = _vm.Rows;
+            Bindings.Update();
+        }
+
+        public void Refresh()
+        {
+            if (_vm == null) return;
+            _vm.Refresh();
+            Bindings.Update();
         }
 
         private void RailList_SelectionChanged(object sender, SelectionChangedEventArgs e)

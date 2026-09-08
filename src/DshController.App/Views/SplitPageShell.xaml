@@ -22,14 +22,15 @@
         </Grid.ColumnDefinitions>
 
         <!-- 左边栏：上下文列表/树容器（固定宽，不随窗口档挤压主区） -->
-        <Border Grid.Column="0" Style="{StaticResource DshSidebarCard}" Margin="18,14,8,14">
+        <Border Grid.Column="0" Style="{StaticResource DshSidebarCard}" Margin="18,14,8,14" CornerRadius="18"
+                BorderBrush="{ThemeResource BorderBrushToken}" BorderThickness="1">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <TextBlock Grid.Row="0" Text="{Binding LeftEyebrow, ElementName=ShellRoot}"
-                           Style="{StaticResource PageEyebrow}" Margin="4,2,4,9" />
+                           Style="{StaticResource PageEyebrow}" Margin="8,8,8,10" />
                 <ScrollViewer Grid.Row="1" AutomationProperties.AutomationId="RailScroll"
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <ContentControl Content="{Binding LeftContent, ElementName=ShellRoot}"

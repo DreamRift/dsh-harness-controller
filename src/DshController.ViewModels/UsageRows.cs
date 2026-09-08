@@ -56,6 +56,8 @@ namespace DshController.ViewModels
     public sealed partial class UsageSessionRow : ObservableObject
     {
         public string Title { get; set; } = "";
+        /// <summary>未截断的原始会话标题；列表只显示 Title 的可见开头，详情显示此字段。</summary>
+        public string FullTitle { get; set; } = "";
         public string CreatedText { get; set; } = "";
         public string TurnsText { get; set; } = "";
         public string TotalText { get; set; } = "";
@@ -76,12 +78,14 @@ namespace DshController.ViewModels
             return new UsageSessionRow
             {
                 Title = title,
+                FullTitle = title,
                 CreatedText = when,
                 TurnsText = s.Turns > 0 ? s.Turns + " 轮" : "—",
                 TotalText = UsageQuery.FormatTokens(s.Totals.Total),
                 Cwd = s.Cwd ?? "",
                 SessionId = s.SessionId ?? "",
-                ExactDetailText = "未缓存输入 " + s.Totals.UncachedInput.ToString("N0") +
+                ExactDetailText = "完整标题：" + title + "\n" +
+                                  "未缓存输入 " + s.Totals.UncachedInput.ToString("N0") +
                                   " · 缓存读 " + s.Totals.CacheRead.ToString("N0") +
                                   " · 缓存写 " + s.Totals.CacheWrite.ToString("N0") +
                                   " · 输出 " + s.Totals.Output.ToString("N0") +

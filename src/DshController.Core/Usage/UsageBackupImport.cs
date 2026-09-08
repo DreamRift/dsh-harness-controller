@@ -11,6 +11,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json.Serialization;
 using DshController.Core.Archive;
 using DshController.Core.Storage;
@@ -116,7 +117,8 @@ namespace DshController.Core.Usage
                 var data = new UsageFacetData
                 {
                     Home = inst.HomeDisplay ?? "",
-                    Sessions = inst.Sessions ?? new List<UsageSessionStat>(),
+                    Sessions = (inst.Sessions ?? new List<UsageSessionStat>())
+                        .Where(s => s != null && s.HasTokenUsage).ToList(),
                     Models = inst.Models ?? new List<UsageModelStat>(),
                     ModelsComplete = inst.ModelsComplete,
                     ModelScanError = inst.ModelScanError ?? ""

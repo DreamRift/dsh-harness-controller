@@ -181,8 +181,8 @@ namespace DshController.Tests
         p.ProviderId = "acme";
         p.Models = new System.Collections.Generic.List<PresetModel>
         {
-            new PresetModel { Id = "vlm", Multimodal = true },
-            new PresetModel { Id = "txt", Multimodal = false },
+            new PresetModel { Id = "vlm", SupportImage = true },
+            new PresetModel { Id = "txt", SupportImage = false },
             new PresetModel { Id = "unk" }
         };
         var models = ProviderConfigMapper.ToEntry(p).Entry.Models;

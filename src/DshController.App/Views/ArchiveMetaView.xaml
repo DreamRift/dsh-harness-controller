@@ -20,11 +20,14 @@
     <UserControl.Resources>
         <local:BoolToVisibilityConverter x:Key="BoolToVis" />
         <local:InverseBoolToVisibilityConverter x:Key="InverseBoolVis" />
+        <local:UsageKpiAccentConverter x:Key="UsageKpiAccent" />
+        <local:UsageRangeBrushConverter x:Key="UsageRangeBrush" />
     </UserControl.Resources>
 
-    <ScrollViewer Background="{ThemeResource BgBaseBrush}" VerticalScrollBarVisibility="Auto"
+    <ScrollViewer Background="{ThemeResource BgBaseBrush}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" VerticalScrollBarVisibility="Auto"
                   AutomationProperties.AutomationId="ArchiveMetaPanel">
-        <StackPanel MaxWidth="760" HorizontalAlignment="Left" Margin="34,28,34,30" Spacing="14">
+        <!-- 主区随右侧内容宿主拉伸；不再使用左对齐 MaxWidth，避免单实例详情右侧出现整块空白。 -->
+        <StackPanel HorizontalAlignment="Stretch" Margin="34,28,18,30" Spacing="14">
             <StackPanel Spacing="5">
                 <TextBlock Text="档案元信息" Style="{StaticResource PageEyebrow}" />
                 <TextBlock x:Name="MetaTitle" AutomationProperties.AutomationId="MetaTitle" Text="{x:Bind ViewModel.Title}"
@@ -42,24 +45,17 @@
 
             <Border Style="{StaticResource DshCard}">
                 <StackPanel Spacing="10">
-                    <TextBlock Text="档案镜像字段" Style="{StaticResource CardTitle}" />
-                    <ItemsControl ItemsSource="{x:Bind ViewModel.Rows}">
-                        <ItemsControl.ItemTemplate>
+                    <Grid><TextBlock Text="档案概览" Style="{StaticResource CardTitle}" /><TextBlock HorizontalAlignment="Right" Text="{x:Bind ViewModel.StateLine}" Style="{StaticResource HelperText}" /></Grid>
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Rows}">
+                        <ItemsRepeater.Layout><UniformGridLayout MinItemWidth="180" MinItemHeight="62" MaximumRowsOrColumns="3" MinRowSpacing="8" MinColumnSpacing="8" /></ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
                             <DataTemplate x:DataType="vm:ArchiveMetaRow">
-                                <Grid ColumnSpacing="14" Padding="0,4">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="130" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{x:Bind Label}" Style="{StaticResource HelperText}"
-                                               VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{x:Bind Value}" FontSize="12.5"
-                                               Foreground="{ThemeResource LabelPrimaryBrush}"
-                                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                </Grid>
+                                <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="10" Padding="12,9" BorderBrush="{ThemeResource BorderBrushToken}" BorderThickness="1">
+                                    <StackPanel Spacing="3"><TextBlock Text="{x:Bind Label}" Style="{StaticResource HelperText}" /><TextBlock Text="{x:Bind Value}" FontSize="12.5" Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" /></StackPanel>
+                                </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
                 </StackPanel>
             </Border>
 
@@ -73,7 +69,10 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="用量" Style="{StaticResource CardTitle}" />
+                    <StackPanel Grid.Column="0" Spacing="2">
+                        <TextBlock Text="用量统计" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{x:Bind ViewModel.UsageRangeLabel, Mode=OneWay}" Style="{StaticResource HelperText}" />
+                    </StackPanel>
                     <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.UsageUpdatedText, Mode=OneWay}"
                                Style="{StaticResource HelperText}" VerticalAlignment="Center" />
                     <Button Grid.Column="2" Style="{StaticResource BtnCompact}"
@@ -101,105 +100,59 @@
                 <StackPanel Spacing="12"
                             Visibility="{x:Bind ViewModel.HasUsage, Mode=OneWay, Converter={StaticResource BoolToVis}}">
 
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource DshCardTight}" Width="380">
-                            <StackPanel Spacing="6" ToolTipService.ToolTip="projcache 总账口径；点击柱子可钻取当天">
-                                <TextBlock Text="总 tokens" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.TotalTokensText, Mode=OneWay}" FontSize="28" FontWeight="SemiBold"
-                                           AutomationProperties.AutomationId="MetaUsageTotal"
-                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
-                                <StackPanel Orientation="Horizontal" Height="10" Spacing="2">
-                                    <Border Width="{x:Bind ViewModel.BarWUncached, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.35" CornerRadius="4,0,0,4" />
-                                    <Border Width="{x:Bind ViewModel.BarWCacheRead, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" />
-                                    <Border Width="{x:Bind ViewModel.BarWCacheWrite, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.55" />
-                                    <Border Width="{x:Bind ViewModel.BarWOutput, Mode=OneWay}" Background="{ThemeResource BrandPrimaryBrush}" Opacity="0.2" CornerRadius="0,4,4,0" />
-                                </StackPanel>
-                                <TextBlock Text="{x:Bind ViewModel.HeroSubText, Mode=OneWay}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DshCardTight}" MinWidth="120">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="缓存命中率" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.HitRateText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{ThemeResource BrandPrimaryBrush}" />
-                                <TextBlock Text="缓存读 / 输入合计" Style="{StaticResource HelperText}" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="请求次数" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.RequestsText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
-                                <TextBlock Text="来自会话日志" Style="{StaticResource HelperText}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                    <Border Style="{StaticResource DshCardTight}" AutomationProperties.AutomationId="MetaUsageRange">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Button Content="日" Style="{StaticResource BtnCompact}" Background="{x:Bind ViewModel.UsageRangeKey, Mode=OneWay, Converter={StaticResource UsageRangeBrush}, ConverterParameter=day}" Command="{x:Bind ViewModel.SetUsageRangeCommand}" CommandParameter="day" />
+                            <Button Content="近 7 天" Style="{StaticResource BtnCompact}" Background="{x:Bind ViewModel.UsageRangeKey, Mode=OneWay, Converter={StaticResource UsageRangeBrush}, ConverterParameter=7}" Command="{x:Bind ViewModel.SetUsageRangeCommand}" CommandParameter="7" />
+                            <Button Content="周" Style="{StaticResource BtnCompact}" Background="{x:Bind ViewModel.UsageRangeKey, Mode=OneWay, Converter={StaticResource UsageRangeBrush}, ConverterParameter=week}" Command="{x:Bind ViewModel.SetUsageRangeCommand}" CommandParameter="week" />
+                            <Button Content="月" Style="{StaticResource BtnCompact}" Background="{x:Bind ViewModel.UsageRangeKey, Mode=OneWay, Converter={StaticResource UsageRangeBrush}, ConverterParameter=month}" Command="{x:Bind ViewModel.SetUsageRangeCommand}" CommandParameter="month" />
+                            <Button Content="自定义" Style="{StaticResource BtnCompact}" Background="{x:Bind ViewModel.UsageRangeKey, Mode=OneWay, Converter={StaticResource UsageRangeBrush}, ConverterParameter=custom}" Command="{x:Bind ViewModel.SetUsageRangeCommand}" CommandParameter="custom" />
+                            <CalendarDatePicker Date="{x:Bind ViewModel.UsageRangeStart, Mode=TwoWay}" Width="146" />
+                            <TextBlock Text="—" VerticalAlignment="Center" Style="{StaticResource HelperText}" />
+                            <CalendarDatePicker Date="{x:Bind ViewModel.UsageRangeEnd, Mode=TwoWay}" Width="146" />
+                            <Button Content="应用" Style="{StaticResource BtnCompact}" Command="{x:Bind ViewModel.ApplyCustomUsageRangeCommand}" />
+                            <TextBlock Text="{x:Bind ViewModel.UsageRangeError, Mode=OneWay}" Foreground="{ThemeResource DangerBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
 
-                    <StackPanel Orientation="Horizontal" Spacing="10">
-                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="会话数" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.SessionsText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
-                                <TextBlock Text="会话总账口径" Style="{StaticResource HelperText}" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DshCardTight}" MinWidth="110">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="活跃天数" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.ActiveDaysText, Mode=OneWay}" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{ThemeResource LabelPrimaryBrush}" />
-                            </StackPanel>
-                        </Border>
-                        <Border Style="{StaticResource DshCardTight}" MinWidth="180">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="用得最多的模型" Style="{StaticResource HelperText}" />
-                                <TextBlock Text="{x:Bind ViewModel.TopModelText, Mode=OneWay}" FontSize="16" FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis" Foreground="{ThemeResource LabelPrimaryBrush}" />
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
+                    <ItemsRepeater ItemsSource="{x:Bind ViewModel.Kpis, Mode=OneWay}" HorizontalAlignment="Stretch" AutomationProperties.AutomationId="MetaUsageKpis">
+                        <!-- 固定五列：桌面端“平均首 Token”始终紧随“估算价值”。 -->
+                        <ItemsRepeater.Layout><UniformGridLayout MinItemWidth="0" MinItemHeight="126" MaximumRowsOrColumns="5" MinRowSpacing="10" MinColumnSpacing="10" ItemsStretch="Fill" /></ItemsRepeater.Layout>
+                        <ItemsRepeater.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UsageKpiRow">
+                                <Border Style="{StaticResource DshCardTight}" BorderBrush="{x:Bind Kind, Converter={StaticResource UsageKpiAccent}}">
+                                    <Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="12" /></TransitionCollection></Border.Transitions>
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{x:Bind Label}" Style="{StaticResource HelperText}" />
+                                        <TextBlock Text="{x:Bind Value}" FontSize="28" FontWeight="SemiBold" FontFamily="Consolas" Foreground="{x:Bind Kind, Converter={StaticResource UsageKpiAccent}}" />
+                                        <TextBlock Text="{x:Bind Detail}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsRepeater.ItemTemplate>
+                    </ItemsRepeater>
 
-                    <Border Style="{StaticResource DshCard}">
+                    <Border Style="{StaticResource DshCard}" AutomationProperties.AutomationId="MetaUsageTrend">
+                        <Border.Transitions><TransitionCollection><EntranceThemeTransition FromVerticalOffset="12" /></TransitionCollection></Border.Transitions>
                         <StackPanel Spacing="10">
-                            <Grid>
-                                <TextBlock Text="按天用量" Style="{StaticResource CardTitle}" />
-                                <Button HorizontalAlignment="Right" Style="{StaticResource BtnCompact}" Content="清除"
-                                        Command="{x:Bind ViewModel.ClearUsageDayCommand}"
-                                        Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
-                            </Grid>
-                            <ItemsControl ItemsSource="{x:Bind ViewModel.DailyBars, Mode=OneWay}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Bottom" /></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="vm:UsageDayBar">
-                                        <StackPanel VerticalAlignment="Bottom" Spacing="4" ToolTipService.ToolTip="{x:Bind ToolTip}">
-                                            <Button Background="Transparent" BorderThickness="0" Padding="2" Command="{x:Bind ToggleCommand}">
-                                                <Grid Height="130" VerticalAlignment="Bottom">
-                                                    <Border Width="10" Height="{x:Bind BarHeight}" CornerRadius="3" VerticalAlignment="Bottom"
-                                                            Background="{ThemeResource BrandPrimaryBrush}" />
-                                                    <Border Width="16" Height="{x:Bind BarHeight, Mode=OneWay}" CornerRadius="5" VerticalAlignment="Bottom"
-                                                            BorderThickness="2" BorderBrush="{ThemeResource SystemAccentColor}"
-                                                            Visibility="{x:Bind IsSelected, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
-                                                </Grid>
-                                            </Button>
-                                            <TextBlock Text="{x:Bind ShortDay}" FontSize="9" HorizontalAlignment="Center" Style="{StaticResource HelperText}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <!-- W3：详情卡取最后 30 天，超出不再静默截断，这里给标注 -->
-                            <TextBlock Text="{x:Bind ViewModel.UsageBarsNote, Mode=OneWay}" Style="{StaticResource HelperText}"
-                                       TextWrapping="Wrap"
-                                       Visibility="{x:Bind NonEmpty(ViewModel.UsageBarsNote), Mode=OneWay}" />
-                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="14,10"
-                                    Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="{x:Bind ViewModel.DayStripText, Mode=OneWay}" FontSize="13" Foreground="{ThemeResource LabelPrimaryBrush}" TextWrapping="Wrap" />
-                                    <TextBlock Text="{x:Bind ViewModel.DayModelsText, Mode=OneWay}" Style="{StaticResource HelperText}" TextWrapping="Wrap" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Text="用量统计" Style="{StaticResource CardTitle}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="6">
+                                    <TextBlock Text="{x:Bind ViewModel.TrendTotalText, Mode=OneWay}" FontWeight="SemiBold" Foreground="{ThemeResource BrandPrimaryBrush}" VerticalAlignment="Center" />
+                                    <Button Content="总 Token 数" Style="{StaticResource BtnCompact}" Command="{x:Bind ViewModel.SetTrendMetricCommand}" CommandParameter="tokens" />
+                                    <Button Content="总请求数" Style="{StaticResource BtnCompact}" Command="{x:Bind ViewModel.SetTrendMetricCommand}" CommandParameter="requests" />
+                                    <Button Content="估算价值" Style="{StaticResource BtnCompact}" IsEnabled="False" ToolTipService.ToolTip="等待价格表接入" />
                                 </StackPanel>
+                            </Grid>
+                            <local:UsageTrendChart Points="{x:Bind ViewModel.TrendPoints, Mode=OneWay}" Metric="{x:Bind ViewModel.TrendMetric, Mode=OneWay}" />
+                            <Button Content="清除日期筛选" Style="{StaticResource BtnCompact}" HorizontalAlignment="Left" Command="{x:Bind ViewModel.ClearUsageDayCommand}" Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}" />
+                            <Border Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" CornerRadius="8" Padding="14,10" Visibility="{x:Bind ViewModel.HasDay, Mode=OneWay, Converter={StaticResource BoolToVis}}">
+                                <StackPanel Spacing="4"><TextBlock Text="{x:Bind ViewModel.DayStripText, Mode=OneWay}" FontSize="13" Foreground="{ThemeResource LabelPrimaryBrush}" TextWrapping="Wrap" /><TextBlock Text="{x:Bind ViewModel.DayModelsText, Mode=OneWay}" Style="{StaticResource HelperText}" TextWrapping="Wrap" /></StackPanel>
                             </Border>
+                            <Expander Header="查看趋势数据表">
+                                <ListView ItemsSource="{x:Bind ViewModel.TrendPoints, Mode=OneWay}" SelectionMode="None"><ListView.ItemTemplate><DataTemplate x:DataType="vm:UsageTrendPoint"><Grid ColumnSpacing="16" Padding="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="110" /><ColumnDefinition Width="90" /><ColumnDefinition Width="120" /></Grid.ColumnDefinitions><TextBlock Text="{x:Bind Label}" /><TextBlock Grid.Column="1" Text="{x:Bind TokensText}" /><TextBlock Grid.Column="2" Text="{x:Bind RequestsText}" /><TextBlock Grid.Column="3" Text="{x:Bind TtftText}" /></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+                            </Expander>
                         </StackPanel>
                     </Border>
 

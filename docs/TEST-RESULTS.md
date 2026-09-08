@@ -6,15 +6,14 @@
 > （`docs/evidence/` 已 gitignore，需要证据时重跑 `verify/gui-*.ps1` 现生成）。
 > 新开对话：读「一、当前状态」和「二、开放票」即可接手。
 
-## 一、当前状态（2026-09-06 · v2.1.0 已发布）
+## 一、当前状态（2026-09-08 · v2.1.1 已发布）
 
-> **v2.1.0 正式发布**：tag `v2.1.0` 已推 GitHub（历史重写后强推，老 release/下载数完好）；
-> `应用\`、`源码\` 已覆盖至 2.1.0 并带版本说明。
+> **v2.1.1 正式发布**：档案用量工作台、TTFT、零 Token 会话清理与模型能力三态已同步至 `应用\`、`源码\`、Git tag 与 GitHub Release。
 
 | 项 | 现值 |
 |---|---|
-| 离线单测 | **407/407**（只增不减；逐轮增量见 git log 对应提交） |
-| 约定机检 | 157 文件 0 违规（R1 台账例外见开放票 W1） |
+| 离线单测 | **418/418**（只增不减；总量/详情统一 Cockpit 风格面板与零 Token 会话过滤覆盖） |
+| 约定机检 | 164 文件 0 违规（R1 台账例外见开放票 W1） |
 | 构建 | 无增量 `--no-incremental` 0 警告 0 错误 |
 | GUI 探针最近全绿记录 | uia **35/35**（W6 修复后 switch-arch-usage 462/390ms，MAX-SWITCH-LATENCY 462ms）、archives-rail **22/22**、api-presets **10/10**、new-instance-sync **4/4**、detail-panel **15/16**（唯一红=ext-still-running，环境性）、width 42/42（09-05 基线） |
 
@@ -31,7 +30,7 @@
 ## 三、怎么跑（原样可复制）
 
 ```powershell
-cd C:\Users\cty05\Documents\AI\DshController\dev
+cd <项目根>\dev
 powershell -ExecutionPolicy Bypass -File tools\check-conventions.ps1     # PASS
 dotnet test tests\DshController.Tests\DshController.Tests.csproj         # 全绿
 dotnet build DshController.slnx -nologo --no-incremental                 # 0 警告 0 错误
@@ -57,6 +56,10 @@ powershell -ExecutionPolicy Bypass -File verify\gui-<name>-check.ps1 -Exe src\Ds
 | 09-05 | 左栏实例列表闪烁修复 + 用量二次改版 | 恒聚合看板 + 单实例用量入详情页 + 两页互斥 | 382 |
 | 09-06 | API 页 llm-pi-ai 同步迁移 | 同步目标迁 `llm-pi-ai.providers`（根级 providers 证实为死配置）+ 增补式合并 + 非官方自动思考档四档 + 探针多模态三态 + 官方仅送 key + 启动注入 `DSH_PRESET_*`；契约见 `provider-sync-alignment.md` | 404 |
 | 09-06 | 挂账清偿 | W6 首开 ~13s→~0.5s（Reload 异步帧 + ListView 虚拟化）、W3 柱图截断标注（60/30）、W2 残留 Debug.WriteLine、N7-WSL 写入通道（/mnt/c 中转+备份；顺带修 WSL 实例误写 Windows HOME）；用户真实 settings.yaml 根级死段清理（备份留存） | 407 |
+| 09-07 | 档案详情用量 Cockpit 风格改版 | 详情页五 KPI、自定义日期范围、平滑渐变趋势图/Tooltip/竖线/节点高亮/数据表；Usage 采集器同次扫描折叠 DSH sessionStats TTFT 并写入档案与按日聚合；图片请求与估算价值保持诚实占位 | 415 |
+| 09-07 | 档案页整体统一 Cockpit 风格 | 总量聚合页与单档案详情页共用五 KPI、日期范围、趋势图、Tooltip、数据表与动画；档案左栏和元信息改为统计工作台卡片；总量默认近 7 天，退役历史与刷新权限保持原语义 | 417 |
+| 09-08 | 趋势算法与会话明细修正 | 曲线按 Cockpit `CodexUsageTrend` 的坐标归一化与 Catmull-Rom 等价 Bézier 重绘，静态层与 hover 层分离；零 Token 会话不再落档、导入或展示 | 418 |
+| 09-08 | v2.1.1 发布 | 档案总量/详情工作台统一、TTFT、零 Token 会话清理、会话标题展示修正、模型图片/视频/音频能力三态；正式产物/源码/tag/GitHub 同步 | 418 |
 
 ## 五、历史存档（v0.2.0 当轮，2026-08-16）
 

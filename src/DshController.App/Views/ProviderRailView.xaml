@@ -19,7 +19,7 @@
         <views:InverseBoolToVisibilityConverter x:Key="RailInverseBoolToVis" />
     </UserControl.Resources>
 
-    <Grid RowSpacing="8">
+    <Grid RowSpacing="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -27,11 +27,11 @@
         </Grid.RowDefinitions>
 
         <Button x:Name="BtnProviderAdd" Grid.Row="0" Content="＋ 添加提供方"
-                Style="{StaticResource BtnCompact}" HorizontalAlignment="Stretch"
-                Click="BtnProviderAdd_Click" AutomationProperties.AutomationId="BtnProviderAdd" />
+                Style="{StaticResource BtnSecondaryEnhanced}" HorizontalAlignment="Stretch"
+                Click="BtnProviderAdd_Click" AutomationProperties.AutomationId="BtnProviderAdd" Margin="6,4" />
 
         <TextBlock x:Name="TxtRailEmpty" Grid.Row="1" Text="还没有提供方，先添加一个。"
-                   Style="{StaticResource NavCaption}" Margin="4,0,0,0" TextWrapping="Wrap" />
+                   Style="{StaticResource BodySm}" Margin="10,0,10,0" TextWrapping="Wrap" />
 
         <ListView x:Name="ProviderList" Grid.Row="2" SelectionMode="Single" BorderThickness="0"
                   Background="Transparent" Padding="0" ScrollViewer.VerticalScrollBarVisibility="Disabled"
@@ -45,39 +45,39 @@
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
                     <Setter Property="MinHeight" Value="0" />
-                    <Setter Property="Padding" Value="6,4" />
-                    <Setter Property="Margin" Value="0,1" />
+                    <Setter Property="Padding" Value="10,8" />
+                    <Setter Property="Margin" Value="4,2" />
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="CornerRadius" Value="{StaticResource RadiusSm}" />
                 </Style>
             </ListView.ItemContainerStyle>
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="vm:ProviderPresetRow">
-                    <Grid ColumnSpacing="8">
+                    <Grid ColumnSpacing="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Grid Grid.Column="0" Width="10" VerticalAlignment="Center">
-                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        <Grid Grid.Column="0" Width="12" VerticalAlignment="Center">
+                            <Ellipse Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                                      Fill="{ThemeResource StateRunBrush}"
                                      Visibility="{x:Bind ConfiguredVisible, Converter={StaticResource RailBoolToVis}}" />
-                            <Ellipse Width="9" Height="9" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            <Ellipse Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"
                                      Fill="{ThemeResource StateStopBrush}"
                                      Visibility="{x:Bind MissingVisible, Converter={StaticResource RailBoolToVis}}" />
                         </Grid>
-                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center"
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center"
                                     ToolTipService.ToolTip="{x:Bind KeyStateText}">
-                            <StackPanel Orientation="Horizontal" Spacing="5">
-                                <TextBlock Text="{x:Bind Name}" FontSize="12" TextTrimming="CharacterEllipsis"
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{x:Bind Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                                            Foreground="{ThemeResource LabelPrimaryBrush}" />
-                                <Border VerticalAlignment="Center" CornerRadius="3" Padding="4,0"
-                                        Background="{ThemeResource BrandSoftBrush}"
+                                <Border VerticalAlignment="Center" Style="{StaticResource BadgePrimary}" Padding="6,2"
                                         Visibility="{x:Bind IsBuiltin, Converter={StaticResource RailBoolToVis}}">
-                                    <TextBlock Text="{x:Bind TagText}" FontSize="9.5"
+                                    <TextBlock Text="{x:Bind TagText}" FontSize="10"
                                                Foreground="{ThemeResource BrandPrimaryBrush}" />
                                 </Border>
                             </StackPanel>
-                            <TextBlock Text="{x:Bind MetaText}" FontSize="10.5" TextTrimming="CharacterEllipsis"
+                            <TextBlock Text="{x:Bind MetaText}" FontSize="11" TextTrimming="CharacterEllipsis"
                                        Foreground="{ThemeResource LabelTertiaryBrush}" />
                         </StackPanel>
                     </Grid>

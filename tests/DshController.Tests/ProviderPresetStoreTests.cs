@@ -271,15 +271,15 @@ namespace DshController.Tests
             p.ProviderId = "acme";
             p.Models = new System.Collections.Generic.List<PresetModel>
             {
-                new PresetModel { Id = "vlm", Multimodal = true },
-                new PresetModel { Id = "txt", Multimodal = false },
+                new PresetModel { Id = "vlm", SupportImage = true },
+                new PresetModel { Id = "txt", SupportImage = false },
                 new PresetModel { Id = "unk" }
             };
             Assert.True(s1.TryAdd(p, out string id, out string err), "err=" + err);
             ProviderPreset back = new ProviderPresetStore(_file).Get(id);
-            Assert.True(back.Models[0].Multimodal);
-            Assert.False(back.Models[1].Multimodal);
-            Assert.Null(back.Models[2].Multimodal);   // 旧档案缺字段 = 未知
+            Assert.True(back.Models[0].SupportImage);
+            Assert.False(back.Models[1].SupportImage);
+            Assert.Null(back.Models[2].SupportImage);   // 旧档案缺字段 = 未知
         }
 
         [Fact]
@@ -288,8 +288,8 @@ namespace DshController.Tests
             var s = new ProviderPresetStore(_file);
             ProviderPreset b = s.All().Single(p => p.IsBuiltin);
             PresetModel vision = b.Models.Single(m => m.Id == "deepseek-v4-flash-vision-exp");
-            Assert.True(vision.Multimodal);
-            Assert.All(b.Models.Where(m => m.Id != vision.Id), m => Assert.Null(m.Multimodal));
+            Assert.True(vision.SupportImage);
+            Assert.All(b.Models.Where(m => m.Id != vision.Id), m => Assert.Null(m.SupportImage));
         }
 
         [Fact]

@@ -170,21 +170,18 @@ namespace DshController.Tests
         // ---- llm-pi-ai 迁移轮：多模态三态进出草稿 --------------------------------
 
         [Fact]
-        public void 多模态_编辑卡带出_物化回写_状态文案()
+        public void 多模态_编辑卡带出_物化回写()
         {
             var stored = Stored();
-            stored.Models[0].Multimodal = true;
-            stored.Models[1].Multimodal = false;
+            stored.Models[0].SupportImage = true;
+            stored.Models[1].SupportImage = false;
             var edit = ProviderEditorDraft.ForEdit(stored, _ => false);
-            Assert.True(edit.Models[0].Multimodal);
-            Assert.False(edit.Models[1].Multimodal);
-            Assert.Equal("图文", edit.Models[0].MultimodalText);
-            Assert.Equal("文本", edit.Models[1].MultimodalText);
-            edit.Models[0].Multimodal = null;                 // 三态可改回未知
-            Assert.Equal("未知", edit.Models[0].MultimodalText);
+            Assert.True(edit.Models[0].SupportImage);
+            Assert.False(edit.Models[1].SupportImage);
+            edit.Models[0].SupportImage = null;                 // 三态可改回未知
             Assert.True(edit.TryBuild(out ProviderPreset p, out _));
-            Assert.Null(p.Models[0].Multimodal);
-            Assert.False(p.Models[1].Multimodal);
+            Assert.Null(p.Models[0].SupportImage);
+            Assert.False(p.Models[1].SupportImage);
         }
 
         [Fact]
@@ -193,13 +190,13 @@ namespace DshController.Tests
             var edit = ProviderEditorDraft.ForEdit(Stored(), _ => false);
             edit.ApplyFetched(new List<DiscoveredModel>
             {
-                new DiscoveredModel { Id = "acme-vlm", Multimodal = true },
-                new DiscoveredModel { Id = "acme-txt", Multimodal = false },
+                new DiscoveredModel { Id = "acme-vlm", SupportImage = true },
+                new DiscoveredModel { Id = "acme-txt", SupportImage = false },
                 new DiscoveredModel { Id = "acme-q" }
             });
-            Assert.True(edit.Models.Single(m => m.Id == "acme-vlm").Multimodal);
-            Assert.False(edit.Models.Single(m => m.Id == "acme-txt").Multimodal);
-            Assert.Null(edit.Models.Single(m => m.Id == "acme-q").Multimodal);
+            Assert.True(edit.Models.Single(m => m.Id == "acme-vlm").SupportImage);
+            Assert.False(edit.Models.Single(m => m.Id == "acme-txt").SupportImage);
+            Assert.Null(edit.Models.Single(m => m.Id == "acme-q").SupportImage);
         }
 
         // ---- VM 主从状态机 ------------------------------------------------------

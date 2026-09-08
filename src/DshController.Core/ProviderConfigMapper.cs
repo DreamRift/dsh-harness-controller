@@ -128,10 +128,24 @@ namespace DshController.Core
                     var cfg = new ProviderModelConfig { Id = m.Id.Trim(), Name = (m.Name ?? "").Trim() };
                     if (m.ContextWindow.HasValue) cfg.Extra["contextWindow"] = m.ContextWindow.Value;
                     if (m.MaxTokens.HasValue) cfg.Extra["maxTokens"] = m.MaxTokens.Value;
-                    if (m.Multimodal == true)
-                        cfg.InputModalities = new List<string> { "text", "image" };
-                    else if (m.Multimodal == false)
-                        cfg.InputModalities = new List<string> { "text" };
+
+                    // 根据三个模态字段构建 InputModalities 列表
+                    var modalities = new List<string> { "text" };
+                    bool hasExplicitModality = false;
+
+                    if (m.SupportImage == true) { modalities.Add("image"); hasExplicitModality = true; }
+                    else if (m.SupportImage == false) { hasExplicitModality = true; }
+
+                    if (m.SupportVideo == true) { modalities.Add("video"); hasExplicitModality = true; }
+                    else if (m.SupportVideo == false) { hasExplicitModality = true; }
+
+                    if (m.SupportAudio == true) { modalities.Add("audio"); hasExplicitModality = true; }
+                    else if (m.SupportAudio == false) { hasExplicitModality = true; }
+
+                    // 如果有任何明确的模态声明（不管是true还是false），就写入input字段
+                    if (hasExplicitModality)
+                        cfg.InputModalities = modalities;
+
                     // 思考档四档：非官方来源一律自动补（官方模型由实例 llm-deepseek 适配器原生提供档位）
                     cfg.WriteReasoningEfforts = !preset.IsBuiltin;
                     result.Entry.Models.Add(cfg);

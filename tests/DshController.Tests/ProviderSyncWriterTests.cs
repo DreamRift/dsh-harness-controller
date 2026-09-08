@@ -43,8 +43,8 @@ namespace DshController.Tests
                 ApiKey = "sk-1",
                 Models =
                 {
-                    new PresetModel { Id = "acme-chat", Name = "Chat", ContextWindow = 128000, MaxTokens = 8192, Multimodal = true },
-                    new PresetModel { Id = "acme-plain", Multimodal = false }
+                    new PresetModel { Id = "acme-chat", Name = "Chat", ContextWindow = 128000, MaxTokens = 8192, SupportImage = true },
+                    new PresetModel { Id = "acme-plain", SupportImage = false }
                 }
             };
         }

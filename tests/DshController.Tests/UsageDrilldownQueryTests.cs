@@ -108,7 +108,7 @@ namespace DshController.Tests
         // ==================== ③ 会话按日 SessionsOnDay ====================
 
         private static UsageSessionStat Session(string id, long ms) =>
-            new UsageSessionStat { SessionId = id, CreatedAtMs = ms };
+            new UsageSessionStat { SessionId = id, CreatedAtMs = ms, Totals = new TokenBuckets { Output = 1 } };
 
         [Fact]
         public void 会话按日_空输入与非法键返回空()

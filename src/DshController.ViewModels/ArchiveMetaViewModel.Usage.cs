@@ -70,11 +70,16 @@ namespace DshController.ViewModels
             Models.Clear();
             Sessions.Clear();
             DailyBars.Clear();
+            TrendPoints.Clear();
+            Kpis.Clear();
             UsageBarsNote = "";
             SelectedDay = "";
             HasDay = false;
             DayStripText = "";
             DayModelsText = "";
+            AverageTtftText = "—";
+            TtftSampleText = "无有效步骤样本";
+            TrendTotalText = "—";
         }
 
         /// <summary>用 Show 捕获的快照重建单实例用量区（纯内存）。</summary>
@@ -90,32 +95,14 @@ namespace DshController.ViewModels
             UsageRefreshEnabled = HasArchive && !IsRetired && !UsageBusy;
 
             if (_currentUsage == null ||
-                (_currentUsage.Totals.Total <= 0 && _currentUsage.Sessions.Count == 0))
+                (_currentUsage.Totals.Total <= 0 && !_currentUsage.Sessions.Any(s => s != null && s.HasTokenUsage)))
             {
                 ResetUsageNumbers();                     // KPI/条宽/集合/钻取清空，保留 UsageUpdatedText
                 UsageEmptyText = "该档案还没有用量数据。活跃实例产生会话并采集后，这里会显示统计。";
                 return;
             }
 
-            // 全期口径 = projcache 权威总账（与看板 Reload 一致）
-            UsageSummary s = UsageQuery.Summarize(new[] { _currentUsage }, null, null);
-            _usageSummary = s;
-
-            TotalTokensText = UsageQuery.FormatTokens(s.Totals.Total);
-            RequestsText = s.ModelsComplete ? s.RequestCount.ToString("N0") : s.RequestCount.ToString("N0") + "+";
-            SessionsText = s.SessionCount.ToString("N0");
-            HitRateText = s.CacheHitRate < 0 ? "—" : (s.CacheHitRate * 100).ToString("0.#") + "%";
-            ActiveDaysText = s.ActiveDays.ToString("N0");
-            TopModelText = string.IsNullOrEmpty(s.TopModel) ? "—" : s.TopModel;
-            BuildMetaHeroBars(s);
-            BuildMetaBars(s);
-
-            Models.Clear();
-            long grand = s.Models.Sum(m => m.Totals.Total);
-            foreach (UsageModelStat m in s.Models.Take(30))
-                Models.Add(UsageModelRow.From(m, grand));
-
-            ResetUsageDrill();                           // 重建即清钻取，会话回到全量
+            SetUsageRange(UsageRangeKey);                // 只重算当前档案内存快照，默认近 7 天
             HasUsage = true;
         }
 
@@ -189,6 +176,8 @@ namespace DshController.ViewModels
             HasDay = false;
             DayStripText = "";
             DayModelsText = "";
+            _selectedFrom = null;
+            _selectedTo = null;
             foreach (UsageDayBar bar in DailyBars) bar.IsSelected = false;   // 柱子的选中环一并摘掉
             RebuildMetaSessions(filtered: false);
         }
@@ -199,6 +188,11 @@ namespace DshController.ViewModels
             if (SelectedDay == day) { ResetUsageDrill(); return; }   // 再点同柱 = 退出
 
             SelectedDay = day;
+            if (DateTime.TryParse(day, out DateTime selected))
+            {
+                _selectedFrom = selected.Date;
+                _selectedTo = selected.Date;
+            }
             HasDay = true;
             TokenBuckets b = _usageSummary.Daily.TryGetValue(day, out TokenBuckets d) ? d : new TokenBuckets();
             DayStripText = day + " 当日：未缓存输入 " + UsageQuery.FormatTokens(b.UncachedInput) +
@@ -219,8 +213,10 @@ namespace DshController.ViewModels
         private void RebuildMetaSessions(bool filtered)
         {
             Sessions.Clear();
-            IEnumerable<UsageSessionStat> src = filtered && !string.IsNullOrEmpty(SelectedDay)
-                ? UsageQuery.SessionsOnDay(_usageSummary.Sessions, SelectedDay)
+            IEnumerable<UsageSessionStat> src = filtered && _selectedFrom.HasValue && _selectedTo.HasValue
+                ? _usageSummary.Sessions.Where(s => s != null && s.HasTokenUsage &&
+                    UsageParser.DayKey(s.CreatedAtMs).CompareTo(_selectedFrom.Value.ToString("yyyy-MM-dd")) >= 0 &&
+                    UsageParser.DayKey(s.CreatedAtMs).CompareTo(_selectedTo.Value.ToString("yyyy-MM-dd")) <= 0)
                 : (IEnumerable<UsageSessionStat>)(_usageSummary.Sessions ?? new List<UsageSessionStat>());
             foreach (UsageSessionStat st in src.Take(200))
             {

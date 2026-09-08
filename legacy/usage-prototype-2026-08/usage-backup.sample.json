@@ -10,7 +10,7 @@
         "host": "127.0.0.1",
         "port": 3080,
         "trustedHosts": [],
-        "workspace": "C:\\Users\\cty05\\Documents",
+        "workspace": "C:\\Users\\sample-user\\Documents",
         "autoOpenBrowser": true,
         "stopOnExit": true,
         "createdAt": "2026-08-29T08:45:06.3883402Z",
@@ -22,7 +22,7 @@
       },
       "status": 1,
       "statusText": "58 \u4E2A\u4F1A\u8BDD",
-      "homeDisplay": "C:\\Users\\cty05\\.dsh",
+      "homeDisplay": "C:\\Users\\sample-user\\.dsh",
       "modelsComplete": true,
       "modelScanError": "",
       "snapshotAtUtc": "2026-09-01T09:13:14.4640879Z",
@@ -33,7 +33,7 @@
           "sessionId": "session-50872a64-3b7d-4f93-886f-062a4e6a70f4",
           "title": "\u8C03\u7814\u5E76\u91CD\u6784 DeepSeek Harness \u63D2\u4EF6",
           "createdAtMs": 1787028858174,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 5,
           "totals": {
             "UncachedInput": 2139314,
@@ -50,7 +50,7 @@
           "sessionId": "session-e973c7b4-537b-4317-845d-e8b3aba27584",
           "title": "\u5B89\u88C5\u4E09\u4E2AGitHub\u63D2\u4EF6\u6559\u7A0B",
           "createdAtMs": 1787028875031,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 2,
           "totals": {
             "UncachedInput": 66976,
@@ -67,7 +67,7 @@
           "sessionId": "ae8aa11b-da2d-4d23-abdd-4d2430c0bf8d",
           "title": "\u4F60\u662F\u72EC\u7ACB\u7814\u7A76\u5458\u3002\u8BF7\u56F4\u7ED5\u7528\u6237",
           "createdAtMs": 1787033790354,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 1,
           "totals": {
             "UncachedInput": 104855,
@@ -84,7 +84,7 @@
           "sessionId": "c1fb1eec-6759-4d41-b55a-e28e44bf3b2e",
           "title": "\u4F60\u662F\u672C\u5730\u6E90\u7801\u5BA1\u67E5\u5458\u3002\u5DE5\u4F5C\u76EE",
           "createdAtMs": 1787033790358,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 1,
           "totals": {
             "UncachedInput": 202632,
@@ -101,7 +101,7 @@
           "sessionId": "b0c036c4-0d18-48c7-8cb8-969ddb9912c8",
           "title": "\u4F60\u662F\u67B6\u6784\u7814\u7A76\u5458\u3002\u8BF7\u8C03\u7814 GitHub",
           "createdAtMs": 1787033790359,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 1,
           "totals": {
             "UncachedInput": 51064,
@@ -118,7 +118,7 @@
           "sessionId": "session-0d18a4f5-96bd-4ed2-8393-77ee15051f85",
           "title": "Session Title: Plugin Refactoring \u0026 Upgrade According to RC7 Design Spec",
           "createdAtMs": 1787036609570,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 14,
           "totals": {
             "UncachedInput": 4171100,
@@ -135,7 +135,7 @@
           "sessionId": "session-c1f23b92-21a6-4d08-b3d2-aa631b8d1329",
           "title": "DeepSeek Harness \u601D\u8003\u6863\u4F4D\u66F4\u65B0\u4E0E\u63D2\u4EF6\u65B9\u6848",
           "createdAtMs": 1787045145137,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 5,
           "totals": {
             "UncachedInput": 3806798,
@@ -152,7 +152,7 @@
           "sessionId": "session-ecdbaec4-6995-4da1-a6d0-a5e335060556",
           "title": "deepseek harness\u66F4\u65B0\u4E86\uFF0C\u8BF7\u4F60\u53C2\u8003",
           "createdAtMs": 1787046261579,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 9,
           "totals": {
             "UncachedInput": 402650,
@@ -169,7 +169,7 @@
           "sessionId": "session-c1b30c02-cfa5-41bc-96d6-734b5e0db266",
           "title": "\u6392\u67E5DshController\u591A\u5B9E\u4F8B\u4F4E\u7F13\u5B58\u547D\u4E2D",
           "createdAtMs": 1787046293131,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 3848276,
@@ -186,7 +186,7 @@
           "sessionId": "session-92c99a1b-c716-4212-b3f8-2c85f8df7cd6",
           "title": "\u8BF7\u4F7F\u7528 web_search \u5DE5\u5177\u641C\u7D22\uFF1AGitH",
           "createdAtMs": 1787051175472,
-          "cwd": "C:\\Users\\cty05\\Documents",
+          "cwd": "C:\\Users\\sample-user\\Documents",
           "turns": 1,
           "totals": {
             "UncachedInput": 11566,
@@ -203,7 +203,7 @@
           "sessionId": "session-0c6e4039-9f52-48b1-9255-187cf85a909c",
           "title": "\u4ECEgithub\u4E0A\u627E\u627Edeepseek harness\u7684\u63D2",
           "createdAtMs": 1787058026634,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 2,
           "totals": {
             "UncachedInput": 23592,
@@ -220,7 +220,7 @@
           "sessionId": "session-375ff826-0564-4d80-b319-d4f59165ad54",
           "title": "\u5229\u7528deepseek\u7684\u5BF9\u8BDD\u524D\u7F00\u7EED\u5199\uFF0C",
           "createdAtMs": 1787065061538,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 118763,
@@ -237,7 +237,7 @@
           "sessionId": "session-72ffbf30-5e33-4635-801b-17db8926dace",
           "title": "DeepSeek Harness \u5F3A\u5236\u601D\u7EF4\u94FE\u524D\u7F00\u7EED\u5199\u5B9E\u73B0\u65B9\u6848\u8C03\u7814",
           "createdAtMs": 1787065696675,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 41350,
@@ -254,7 +254,7 @@
           "sessionId": "session-16dbc20d-a5c7-4379-9230-7d898615aa7a",
           "title": "## Session Title **DshController Multi-Instance Cache Hit Rate Issue Investigati",
           "createdAtMs": 1787065978316,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 279608,
@@ -271,7 +271,7 @@
           "sessionId": "session-5589e8bf-c645-4221-aa86-9b8ba1203573",
           "title": "\u65B0\u9879\u76EE\u5F00\u53D1\uFF1A\u57FA\u4E8E prefix research \u542F\u52A8\u5F00\u53D1",
           "createdAtMs": 1787107825504,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 5,
           "totals": {
             "UncachedInput": 114639,
@@ -288,7 +288,7 @@
           "sessionId": "session-e1cf5a37-871e-49c7-a667-80dba0615db2",
           "title": "\u521B\u5EFA\u4E00\u4E2A\u6587\u4EF6\u5939\uFF0Chttps://github.c",
           "createdAtMs": 1787110346716,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\Harness\u63D2\u4EF6",
           "turns": 7,
           "totals": {
             "UncachedInput": 258044,
@@ -305,7 +305,7 @@
           "sessionId": "session-0a132c8f-f0a2-4c0e-8cb2-2f290390a6e1",
           "title": "\u4ECEgithub\u4E0A\u641C\u7D22\u4E00\u4E0B\u4F1A\u8BDD\u7BA1\u7406\u548C",
           "createdAtMs": 1787110567651,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 932,
@@ -322,7 +322,7 @@
           "sessionId": "session-5575831e-a009-4eff-82c3-341d80f601ff",
           "title": "\u4ECEgitub\u4E0A\u641C\u7D22\u4E00\u4E0B\u4F1A\u8BDD\u7BA1\u7406\u548C",
           "createdAtMs": 1787110662482,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 2,
           "totals": {
             "UncachedInput": 68958,
@@ -339,7 +339,7 @@
           "sessionId": "session-973278ef-279d-44dc-a978-0bf3adda8cd5",
           "title": "\u589E\u52A0\u4E00\u4E0Bdeepseek harness\u7684\u91CD\u8FDE\u8F6E",
           "createdAtMs": 1787112401844,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 150727,
@@ -356,7 +356,7 @@
           "sessionId": "session-246cda1c-13b1-4ca4-b72a-480ddd81ba24",
           "title": "DshController\u8DE8\u5E73\u53F0\u5B9E\u4F8B\u7BA1\u7406\u5347\u7EA7",
           "createdAtMs": 1787132154478,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -373,7 +373,7 @@
           "sessionId": "session-48c75b1c-3af2-47dd-abcb-5bc74b91028e",
           "title": "\u5347\u7EA7DshController \u5206\u79BB\u5B9E\u4F8B\u4E0E\u62A5\u9519",
           "createdAtMs": 1787226251099,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -390,7 +390,7 @@
           "sessionId": "session-cdb7580f-efd5-47e9-9221-b8a773b7d15b",
           "title": "\u5347\u7EA7DshController\u591A\u529F\u80FD\u4F18\u5316",
           "createdAtMs": 1787226259157,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -407,7 +407,7 @@
           "sessionId": "session-8a6b550e-4788-425a-8ee8-8d927eece75f",
           "title": "\u5347\u7EA7DshController\u5E76\u4F18\u5316\u754C\u9762",
           "createdAtMs": 1787226505571,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -424,7 +424,7 @@
           "sessionId": "session-89fb6af7-7a1b-4c19-a43b-4f4cbfe52893",
           "title": "\u5347\u7EA7DshController\u5E76\u4F18\u5316\u754C\u9762",
           "createdAtMs": 1787226510927,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -441,7 +441,7 @@
           "sessionId": "session-7d36a4cb-da2c-4f1a-ac09-88eabca17f79",
           "title": "\u5347\u7EA7 DshController \u5E76\u4F18\u5316\u754C\u9762",
           "createdAtMs": 1787226516215,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -458,7 +458,7 @@
           "sessionId": "session-b5334458-5f7c-43b8-9926-f669602fde55",
           "title": "DshController\u5347\u7EA7\u4E0E\u754C\u9762\u4F18\u5316",
           "createdAtMs": 1787226526815,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -475,7 +475,7 @@
           "sessionId": "session-48655f28-3942-433b-9c86-cc87adef700b",
           "title": "\u5347\u7EA7DshController\u591A\u5B9E\u4F8B\u4E0E\u62A5\u9519",
           "createdAtMs": 1787226533802,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -492,7 +492,7 @@
           "sessionId": "session-b66d2a3e-bdb9-47f3-8227-c97791cc74c6",
           "title": "\u5347\u7EA7DshController\u5206\u79BB\u53CC\u73AF\u5883\u5E76\u652F\u6301\u7248\u672C",
           "createdAtMs": 1787226942939,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -509,7 +509,7 @@
           "sessionId": "session-89b8c96b-0aa5-4ab8-acc5-9b52a02d8e7e",
           "title": "\u5347\u7EA7\u4F18\u5316DshController\u5B9E\u4F8B\u7BA1\u7406\u529F\u80FD",
           "createdAtMs": 1787226948987,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -526,7 +526,7 @@
           "sessionId": "session-3360746b-3908-4f3c-ad89-b0950370ba10",
           "title": "\u5347\u7EA7DshController\u754C\u9762\u4E0E\u542F\u52A8\u5B9E\u4F8B",
           "createdAtMs": 1787227276496,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -543,7 +543,7 @@
           "sessionId": "session-2a0275c1-4c40-4569-a3cd-fe738c5a20cf",
           "title": "\u5347\u7EA7DshController\u53CC\u5E73\u53F0\u5B9E\u4F8B\u4E0E\u62A5\u9519",
           "createdAtMs": 1787227283441,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 36,
@@ -560,7 +560,7 @@
           "sessionId": "session-02dd0e2c-cf16-4559-b323-925a08303ea5",
           "title": "DshController\u5347\u7EA7\u9700\u6C42\u5B9E\u73B0",
           "createdAtMs": 1787227294339,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -577,7 +577,7 @@
           "sessionId": "session-a70ac1b7-e560-40b3-8123-1a2848f33faa",
           "title": "\u5347\u7EA7DshController\u529F\u80FD\u754C\u9762",
           "createdAtMs": 1787227300257,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -594,7 +594,7 @@
           "sessionId": "session-ffa69bd8-5331-43b5-b962-71b5ffd4fd71",
           "title": "\u5347\u7EA7DshController\u591A\u5E73\u53F0\u5B9E\u4F8B\u7BA1\u7406",
           "createdAtMs": 1787227309550,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -611,7 +611,7 @@
           "sessionId": "session-4a627381-ec37-4b1a-97cb-127c4340e239",
           "title": "\u5347\u7EA7DshController\u652F\u6301\u7248\u672C\u7BA1\u7406\u4E0E\u62A5\u9519",
           "createdAtMs": 1787227315516,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -628,7 +628,7 @@
           "sessionId": "session-3b52c223-9842-4087-abc7-71572a5abe5f",
           "title": "\u5347\u7EA7DshController\u652F\u6301Win\u4E0EWSL\u5206\u79BB\u548C\u62A5\u9519\u62A5\u544A",
           "createdAtMs": 1787227322329,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -645,7 +645,7 @@
           "sessionId": "session-d6e1f483-a2db-4735-9829-c6fbf05ef15d",
           "title": "DshController \u5347\u7EA7\u53CA\u754C\u9762\u4F18\u5316",
           "createdAtMs": 1787227327659,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -662,7 +662,7 @@
           "sessionId": "session-2abe9e7f-1a44-4a57-bf38-7da20894ea89",
           "title": "DshController \u5347\u7EA7\u4E0E\u754C\u9762\u4F18\u5316",
           "createdAtMs": 1787227334328,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -679,7 +679,7 @@
           "sessionId": "session-e024e1d1-ce63-41b6-949c-4860e7b06425",
           "title": "\u5347\u7EA7DshController\u53CC\u5E73\u53F0\u5B9E\u4F8B\u7BA1\u7406",
           "createdAtMs": 1787227340064,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -696,7 +696,7 @@
           "sessionId": "session-4cbcda30-33cf-42c1-ac3c-9f8ee33609e7",
           "title": "\u5347\u7EA7DshController\u5B9E\u4F8B\u7BA1\u7406\u4E0E\u62A5\u9519",
           "createdAtMs": 1787227345457,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -713,7 +713,7 @@
           "sessionId": "session-58f6c894-c3fb-4aa4-b784-2044aa6956b1",
           "title": "\u5347\u7EA7DshController\u5E76\u4F18\u5316\u754C\u9762",
           "createdAtMs": 1787227350403,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -730,7 +730,7 @@
           "sessionId": "session-a0696a20-f6fd-4875-89db-c072b7eaf49b",
           "title": "\u8BFB\u53D6\u4E00\u4E0B\u201CDshController\u201D\u9879\u76EE\uFF0C",
           "createdAtMs": 1787273463983,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -747,7 +747,7 @@
           "sessionId": "session-50878ee3-eb53-4a9a-a054-d994be23dc1e",
           "title": "\u8BFB\u53D6\u4E00\u4E0B\u201CDshController\u201D\u9879\u76EE\uFF0C",
           "createdAtMs": 1787273835962,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -764,7 +764,7 @@
           "sessionId": "session-b0b4c9f0-3fdd-4a4a-bda1-ebc69bd238fe",
           "title": "\u8BFB\u53D6\u4E00\u4E0B\u201CDshController\u201D\u9879\u76EE\uFF0C",
           "createdAtMs": 1787275746675,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 0,
@@ -781,7 +781,7 @@
           "sessionId": "session-e2801ce6-7793-4fd3-9b5a-820620c40d1a",
           "title": "\u8BFB\u53D6\u4E00\u4E0B\u201CDshController\u201D\u9879\u76EE\uFF0C",
           "createdAtMs": 1787276156632,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 16,
           "totals": {
             "UncachedInput": 927261,
@@ -796,9 +796,9 @@
           "instanceId": "default",
           "instanceName": "\u4E3B\u5B9E\u4F8B",
           "sessionId": "session-157f3260-de89-4ab1-ab4d-1e2784484d29",
-          "title": "@\u0022C:\\Users\\cty05\\Documents\\AI\\deepseek H",
+          "title": "@\u0022C:\\Users\\sample-user\\Documents\\AI\\deepseek H",
           "createdAtMs": 1787287228805,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 701181,
@@ -813,9 +813,9 @@
           "instanceId": "default",
           "instanceName": "\u4E3B\u5B9E\u4F8B",
           "sessionId": "session-2158f747-2410-4cf5-acc8-15cc9a8c2450",
-          "title": "@\u0022C:\\Users\\cty05\\Documents\\AI\\deepseek H",
+          "title": "@\u0022C:\\Users\\sample-user\\Documents\\AI\\deepseek H",
           "createdAtMs": 1787291215737,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 163060,
@@ -830,9 +830,9 @@
           "instanceId": "default",
           "instanceName": "\u4E3B\u5B9E\u4F8B",
           "sessionId": "session-4cc4fa24-cda1-43cc-b027-8b56906b33ca",
-          "title": "@\u0022C:\\Users\\cty05\\Documents\\AI\\deepseek H",
+          "title": "@\u0022C:\\Users\\sample-user\\Documents\\AI\\deepseek H",
           "createdAtMs": 1787292257250,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 6,
           "totals": {
             "UncachedInput": 326791,
@@ -849,7 +849,7 @@
           "sessionId": "session-2f1d7613-1397-454c-804b-412ae0841626",
           "title": "\u6211\u5728wsl\u91CC\u9762\u5B89\u88C5\u7684deepseek harness",
           "createdAtMs": 1787296468784,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 8,
           "totals": {
             "UncachedInput": 633193,
@@ -864,9 +864,9 @@
           "instanceId": "default",
           "instanceName": "\u4E3B\u5B9E\u4F8B",
           "sessionId": "session-5c4d417e-36be-4832-bc33-6c3285bc66b8",
-          "title": "@\u0022C:\\Users\\cty05\\Documents\\AI\\deepseek H",
+          "title": "@\u0022C:\\Users\\sample-user\\Documents\\AI\\deepseek H",
           "createdAtMs": 1787296572623,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 21,
           "totals": {
             "UncachedInput": 870389,
@@ -883,7 +883,7 @@
           "sessionId": "session-61c2f1ba-b108-4316-8981-a63eb00788a1",
           "title": "wsl\u91CC\u9762\u7684deepseek harness\u62A5\u9519\u201C400",
           "createdAtMs": 1787305662744,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 2,
           "totals": {
             "UncachedInput": 192426,
@@ -900,7 +900,7 @@
           "sessionId": "session-fc01caeb-10ca-4749-8587-f9d5ae066fd0",
           "title": "\u66F4\u65B0dsh\u7248\u672C\u81F3\u6700\u65B0",
           "createdAtMs": 1787401859416,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 33693,
@@ -917,7 +917,7 @@
           "sessionId": "session-a756df89-70f2-4ade-abeb-ae73907d2e26",
           "title": "pwsh \u63D0\u793A injector/lib \u7F3A\u5931\u7684\u9ED8\u8BA4\u4F4D\u7F6E\u4E0E\u6062\u590D\u65B9\u6CD5",
           "createdAtMs": 1787403012032,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 63974,
@@ -934,7 +934,7 @@
           "sessionId": "session-77d76b1a-7110-4a06-9fb7-ec1638a3e4d4",
           "title": "\u5982\u4F55\u66F4\u65B0npm\uFF1F",
           "createdAtMs": 1787404092945,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 2,
           "totals": {
             "UncachedInput": 23822,
@@ -951,7 +951,7 @@
           "sessionId": "session-1bfddaf7-e371-4b2a-bef9-b3b68178f7a9",
           "title": "Troubleshooting dsh-routing-suite installation failures (injector EPERM \u0026 missin",
           "createdAtMs": 1787404517556,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 138220,
@@ -968,7 +968,7 @@
           "sessionId": "session-99282845-948d-415c-b8b1-dee55fb06dd0",
           "title": "\u201CDeepSeek DSH \u5B89\u88C5\u7ED3\u679C\u786E\u8BA4\u201D",
           "createdAtMs": 1787404554776,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 1,
           "totals": {
             "UncachedInput": 42189,
@@ -985,7 +985,7 @@
           "sessionId": "session-9d9d0083-1430-4902-8e12-297b3a38c419",
           "title": "\u68C0\u67E5 dsh-routing-suite \u672C\u5730\u5B89\u88C5\u60C5\u51B5\u4E0E\u529F\u80FD\u5B8C\u6574\u6027",
           "createdAtMs": 1787406504679,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 3,
           "totals": {
             "UncachedInput": 560803,
@@ -1002,7 +1002,7 @@
           "sessionId": "session-6d2e3450-cc71-447e-a1b2-5fb18cd7b575",
           "title": "\u4E3A\u9879\u76EE\u68C0\u67E5\u9690\u79C1\u5E76\u63D0\u4EA4\u81F3GitHub",
           "createdAtMs": 1787461252020,
-          "cwd": "C:\\Users\\cty05\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
+          "cwd": "C:\\Users\\sample-user\\Documents\\AI\\deepseek Harness\\\u6742\u9879",
           "turns": 2,
           "totals": {
             "UncachedInput": 60942,

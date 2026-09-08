@@ -116,6 +116,9 @@ namespace DshController.Core.Archive.Collectors
             if (!UsageParser.TryParseProjCache(projJson, out List<UsageSessionStat> sessions, out string error))
                 return "session_projcache.json 解析失败（可能正被 harness 写入）：" + error;
 
+            // projcache 会预先登记新建但尚未发送请求的会话；零四桶不是用量记录，
+            // 不落档、不计会话数，下一次成功采集会自然清除旧快照中的同类项。
+            sessions = sessions.Where(s => s != null && s.HasTokenUsage).ToList();
             sessions.Sort((x, y) => y.CreatedAtMs.CompareTo(x.CreatedAtMs));
             data.SessionCount = sessions.Count;
             foreach (UsageSessionStat s in sessions) data.Totals.Add(s.Totals);
@@ -131,6 +134,30 @@ namespace DshController.Core.Archive.Collectors
             data.ModelsComplete = scan.Complete;
             data.ModelScanError = scan.Error ?? "";
             data.RequestCount = data.Models.Sum(m => m.Requests);
+            data.Latency = new UsageLatencyStats();
+            data.DailyLatency.Clear();
+
+            var sessions = (data.Sessions ?? new List<UsageSessionStat>())
+                .Where(s => s != null && !string.IsNullOrEmpty(s.SessionId))
+                .ToDictionary(s => s.SessionId, StringComparer.Ordinal);
+            foreach (UsageSessionScan scanSession in scan.Sessions ?? new List<UsageSessionScan>())
+            {
+                if (scanSession == null) continue;
+                data.Latency.Add(scanSession.Latency);
+                if (!string.IsNullOrEmpty(scanSession.SessionId) &&
+                    sessions.TryGetValue(scanSession.SessionId, out UsageSessionStat stored))
+                    stored.Latency = scanSession.Latency ?? new UsageLatencyStats();
+                foreach (KeyValuePair<string, UsageLatencyStats> day in scanSession.DailyLatency ??
+                    new Dictionary<string, UsageLatencyStats>())
+                {
+                    if (!data.DailyLatency.TryGetValue(day.Key, out UsageLatencyStats aggregate))
+                    {
+                        aggregate = new UsageLatencyStats();
+                        data.DailyLatency[day.Key] = aggregate;
+                    }
+                    aggregate.Add(day.Value);
+                }
+            }
         }
 
         private static FacetResult Finish(UsageFacetData data, string source)

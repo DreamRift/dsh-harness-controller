@@ -21,14 +21,16 @@ using DshController.Core;
 namespace DshController.ViewModels
 {
     /// <summary>模型目录草稿一行（文本形态；行内校验错误由草稿实时刷新；
-    /// Multimodal 三态：null=未知、false=纯文本、true=图文，对应同步时的 input 字段）。</summary>
+    /// 模态支持三态：null=未知、false=不支持、true=支持，分别对应图片/视频/音频）。</summary>
     public sealed partial class DraftModelRow : ObservableObject
     {
         [ObservableProperty] public partial string Id { get; set; } = "";
         [ObservableProperty] public partial string Name { get; set; } = "";
         [ObservableProperty] public partial string ContextWindowText { get; set; } = "";
         [ObservableProperty] public partial string MaxTokensText { get; set; } = "";
-        [ObservableProperty] public partial bool? Multimodal { get; set; }
+        [ObservableProperty] public partial bool? SupportImage { get; set; }
+        [ObservableProperty] public partial bool? SupportVideo { get; set; }
+        [ObservableProperty] public partial bool? SupportAudio { get; set; }
         [ObservableProperty] public partial string RowError { get; set; } = "";
 
         public event Action Changed;
@@ -36,10 +38,9 @@ namespace DshController.ViewModels
         partial void OnIdChanged(string value) => Changed?.Invoke();
         partial void OnContextWindowTextChanged(string value) => Changed?.Invoke();
         partial void OnMaxTokensTextChanged(string value) => Changed?.Invoke();
-        partial void OnMultimodalChanged(bool? value) => Changed?.Invoke();
-
-        /// <summary>多模态状态文案（三态开关旁的说明）。</summary>
-        public string MultimodalText => Multimodal.HasValue ? (Multimodal.Value ? "图文" : "文本") : "未知";
+        partial void OnSupportImageChanged(bool? value) => Changed?.Invoke();
+        partial void OnSupportVideoChanged(bool? value) => Changed?.Invoke();
+        partial void OnSupportAudioChanged(bool? value) => Changed?.Invoke();
     }
 
     /// <summary>详情区一张编辑卡（新建=自定义提供方卡；编辑=既有预设卡）。</summary>
@@ -120,7 +121,9 @@ namespace DshController.ViewModels
                         Name = m.Name ?? "",
                         ContextWindowText = m.ContextWindow.HasValue ? ProviderPresetRules.FormatCapacity(m.ContextWindow.Value) : "",
                         MaxTokensText = m.MaxTokens.HasValue ? ProviderPresetRules.FormatCapacity(m.MaxTokens.Value) : "",
-                        Multimodal = m.Multimodal
+                        SupportImage = m.SupportImage,
+                        SupportVideo = m.SupportVideo,
+                        SupportAudio = m.SupportAudio
                     });
                 }
             }
@@ -239,7 +242,10 @@ namespace DshController.ViewModels
             };
             foreach (DraftModelRow row in Models)
             {
-                var m = new PresetModel { Id = (row.Id ?? "").Trim(), Name = (row.Name ?? "").Trim(), Multimodal = row.Multimodal };
+                var m = new PresetModel { Id = (row.Id ?? "").Trim(), Name = (row.Name ?? "").Trim() };
+                m.SupportImage = row.SupportImage;
+                m.SupportVideo = row.SupportVideo;
+                m.SupportAudio = row.SupportAudio;
                 if (ProviderPresetRules.TryParseCapacity(row.ContextWindowText, out long? cw) && cw.HasValue)
                     m.ContextWindow = cw.Value;
                 if (ProviderPresetRules.TryParseCapacity(row.MaxTokensText, out long? mt) && mt.HasValue)
@@ -250,7 +256,7 @@ namespace DshController.ViewModels
         }
 
         /// <summary>采纳探针候选（dsh adoptPicked：按 id 合并，已有行原样保留——
-        /// 容量可读的新行自动填入上下文/最大输出）。</summary>
+        /// 容量可读的新行自动填入上下文/最大输出/模态支持）。</summary>
         public void ApplyFetched(IEnumerable<DiscoveredModel> picked)
         {
             if (picked == null) return;
@@ -265,7 +271,9 @@ namespace DshController.ViewModels
                     Name = c.Name ?? "",
                     ContextWindowText = c.ContextWindow.HasValue ? ProviderPresetRules.FormatCapacity(c.ContextWindow.Value) : "",
                     MaxTokensText = c.MaxTokens.HasValue ? ProviderPresetRules.FormatCapacity(c.MaxTokens.Value) : "",
-                    Multimodal = c.Multimodal
+                    SupportImage = c.SupportImage,
+                    SupportVideo = c.SupportVideo,
+                    SupportAudio = c.SupportAudio
                 };
                 row.Changed += RefreshDerived;
                 Models.Add(row);

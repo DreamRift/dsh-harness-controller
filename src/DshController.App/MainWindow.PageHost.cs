@@ -105,7 +105,7 @@ namespace DshController
                 string alias = (tb.Text ?? "").Trim();
                 _aliasStore.Set(archiveId, alias);
                 InstanceDisplayName.SetAlias(archiveId, alias);
-                _archRail.Refresh();
+                RailArch.Refresh();
                 RailArch.SyncSelection(_archRail.SelectedId);
                 ShowArchiveMeta(archiveId);
                 AppendLog("[改名] " + archiveId + " → " + (alias.Length > 0 ? alias : "（清除别名）"));
@@ -153,7 +153,7 @@ namespace DshController
             // 档案页前置：左栏三类行重排（总计/活跃/退役）并恢复选中（缺省/回落总计）
             if (_primary == "arch" && _archRail != null)
             {
-                _archRail.Refresh();
+                RailArch.Refresh();
                 RailArch.SyncSelection(_archRail.SelectedId);
                 ShowArchiveMeta(_archRail.SelectedId);
             }

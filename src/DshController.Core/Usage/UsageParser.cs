@@ -20,7 +20,7 @@ using System.Text.Json;
 
 namespace DshController.Core.Usage
 {
-    public static class UsageParser
+    public static partial class UsageParser
     {
         /// <summary>解析 session_projcache.json；返回 false 表示文件损坏（error 带原因）。</summary>
         public static bool TryParseProjCache(string json, out List<UsageSessionStat> sessions, out string error)

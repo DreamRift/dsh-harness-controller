@@ -94,6 +94,8 @@ namespace DshController.Tests
             var vm = new UsageViewModel(fake);
             vm.OnShown();
 
+            vm.SetRangeCommand.Execute("0");
+
             Assert.Equal(60, vm.DailyBars.Count);                   // 只画最近 60 根
             Assert.Contains("60", vm.BarsNote);                     // W3：不再静默截断
             Assert.Contains("70", vm.BarsNote);
@@ -170,11 +172,11 @@ namespace DshController.Tests
             fake.Add("a", "实例A", false, data);
             var vm = new UsageViewModel(fake);
             vm.OnShown();
-            Assert.Equal("1,000", vm.TotalTokensText);                     // 全期 = projcache 权威总账
+            Assert.Equal("600", vm.TotalTokensText);                       // 默认近 7 天
 
             vm.SetRangeCommand.Execute("7");
             Assert.Equal(7, vm.RangeDays);
-            Assert.Equal("最近 7 天", vm.RangeLabel);
+            Assert.Equal("近 7 天", vm.RangeLabel);
             Assert.Single(vm.DailyBars);                                   // 今天有数据
             Assert.Equal("600", vm.TotalTokensText);                       // 范围口径 = 会话日志按天聚合
 
@@ -218,7 +220,7 @@ namespace DshController.Tests
         }
 
         [Fact]
-        public void 聚合会话行带实例来源前缀()
+        public void 聚合会话行显示原始标题并保留完整标题详情()
         {
             var fake = new FakeArchiveFacade();
             fake.Add("a", "实例A", false, Usage(1000));
@@ -227,12 +229,44 @@ namespace DshController.Tests
             vm.OnShown();
 
             Assert.Equal(2, vm.Sessions.Count);
-            string labelA = InstanceDisplayName.ForArchive(fake.Items[0].Archive);
-            string labelB = InstanceDisplayName.ForArchive(fake.Items[1].Archive);
-            Assert.All(vm.Sessions, row => Assert.True(
-                row.Title.StartsWith(labelA + " · ", StringComparison.Ordinal) ||
-                row.Title.StartsWith(labelB + " · ", StringComparison.Ordinal),
-                "会话行应带实例显示名前缀：" + row.Title));
+            Assert.All(vm.Sessions, row =>
+            {
+                Assert.StartsWith("会话 ", row.Title);
+                Assert.Equal(row.Title, row.FullTitle);
+                Assert.Contains("完整标题：", row.ExactDetailText);
+            });
+        }
+
+        [Fact]
+        public void 总量页默认近七天生成与详情一致的五KPI()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a", "实例A", false, Usage(1000));
+            var vm = new UsageViewModel(fake);
+            vm.OnShown();
+
+            Assert.Equal("近 7 天", vm.RangeLabel);
+            Assert.Equal(5, vm.Kpis.Count);
+            Assert.Equal(new[] { "总请求数", "图片请求", "总 Token 数", "估算价值", "平均首 Token" },
+                vm.Kpis.Select(k => k.Label));
+            Assert.Equal(7, vm.TrendPoints.Count);
+        }
+
+        [Fact]
+        public void 总量页自定义范围非法时保留现有趋势()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a", "实例A", false, Usage(1000));
+            var vm = new UsageViewModel(fake);
+            vm.OnShown();
+            int prior = vm.TrendPoints.Count;
+            vm.UsageRangeStart = DateTimeOffset.Now.Date;
+            vm.UsageRangeEnd = DateTimeOffset.Now.Date.AddDays(-1);
+
+            vm.ApplyCustomUsageRangeCommand.Execute(null);
+
+            Assert.NotEmpty(vm.UsageRangeError);
+            Assert.Equal(prior, vm.TrendPoints.Count);
         }
     }
 }

@@ -31,6 +31,8 @@ namespace DshController.ViewModels
             HasDay = false;
             DayStripText = "";
             DayModelsText = "";
+            _selectedFrom = null;
+            _selectedTo = null;
             foreach (UsageDayBar bar in DailyBars) bar.IsSelected = false;   // 柱子的选中环一并摘掉
             RebuildSessions(filtered: false);
         }
@@ -41,6 +43,11 @@ namespace DshController.ViewModels
             if (SelectedDay == day) { ResetDrill(); return; }   // 再点同柱 = 退出
 
             SelectedDay = day;
+            if (DateTime.TryParse(day, out DateTime selected))
+            {
+                _selectedFrom = selected.Date;
+                _selectedTo = selected.Date;
+            }
             HasDay = true;
             TokenBuckets b = _summary.Daily.TryGetValue(day, out TokenBuckets d) ? d : new TokenBuckets();
             DayStripText = day + " 当日：未缓存输入 " + UsageQuery.FormatTokens(b.UncachedInput) +
@@ -61,14 +68,14 @@ namespace DshController.ViewModels
         private void RebuildSessions(bool filtered)
         {
             Sessions.Clear();
-            IEnumerable<UsageSessionStat> src = filtered && !string.IsNullOrEmpty(SelectedDay)
-                ? UsageQuery.SessionsOnDay(_summary.Sessions, SelectedDay)
+            IEnumerable<UsageSessionStat> src = filtered && _selectedFrom.HasValue && _selectedTo.HasValue
+                ? _summary.Sessions.Where(s => s != null && s.HasTokenUsage &&
+                    UsageParser.DayKey(s.CreatedAtMs).CompareTo(_selectedFrom.Value.ToString("yyyy-MM-dd")) >= 0 &&
+                    UsageParser.DayKey(s.CreatedAtMs).CompareTo(_selectedTo.Value.ToString("yyyy-MM-dd")) <= 0)
                 : _summary.Sessions ?? Enumerable.Empty<UsageSessionStat>();
             foreach (UsageSessionStat s in src.Take(200))
             {
                 UsageSessionRow row = UsageSessionRow.From(s);
-                if (_sessionLabels.TryGetValue(s, out string label) && !string.IsNullOrEmpty(label))
-                    row.Title = label + " · " + row.Title;   // 聚合视图：标注来源实例
                 var self = row;
                 self.ExpandCommand = new RelayCommand(() => self.IsExpanded = !self.IsExpanded);
                 Sessions.Add(row);

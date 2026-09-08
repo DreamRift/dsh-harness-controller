@@ -42,6 +42,9 @@ namespace DshController.ViewModels
         private readonly IArchiveFacade _facade;
 
         public ObservableCollection<ArchivesRailRow> Rows { get; } = new ObservableCollection<ArchivesRailRow>();
+        public int ActiveCount { get; private set; }
+        public int RetiredCount { get; private set; }
+        public string CountsText => "活跃 " + ActiveCount + " · 退役 " + RetiredCount;
 
         /// <summary>当前选中行 Id（Refresh 后仍在则保持，消失回落总计）。</summary>
         public string SelectedId { get; private set; } = "";
@@ -66,6 +69,8 @@ namespace DshController.ViewModels
                 else active.Add(archive);
             }
             retired.Sort((x, y) => y.RetiredAt.Value.CompareTo(x.RetiredAt.Value));   // 新退役在前
+            ActiveCount = active.Count;
+            RetiredCount = retired.Count;
 
             var next = new List<ArchivesRailRow> { TotalsRow(active.Count + retired.Count, retired.Count) };
             foreach (InstanceArchive a in active) next.Add(InstanceRow(a));

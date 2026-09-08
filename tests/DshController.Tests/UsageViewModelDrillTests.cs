@@ -69,7 +69,7 @@ namespace DshController.Tests
             UsageDayBar today = vm.DailyBars.Single(b => b.Day == Today.ToString("yyyy-MM-dd"));
             Assert.Equal(200, today.Total);                         // 每实例当日 100，合并 200
             Assert.Single(vm.Models);                               // 同 provider/model 合并成一行
-            Assert.Equal("400", vm.Models[0].TotalText);            // projcache 总账 200 + 200
+            Assert.Equal("200", vm.Models[0].TotalText);            // 默认近 7 天：按天日志合并
             Assert.Equal(2, vm.Sessions.Count);
             Assert.True(vm.HasData);
         }

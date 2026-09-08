@@ -111,6 +111,24 @@ namespace DshController.Tests
             Assert.Equal(-1, s.CacheHitRate);
         }
 
+        [Fact]
+        public void 零Token会话不进入会话统计或明细()
+        {
+            UsageFacetData data = Sample("chat", -1, 100);
+            data.Sessions.Add(new UsageSessionStat
+            {
+                SessionId = "empty-session",
+                CreatedAtMs = MsFor(-1),
+                Totals = new TokenBuckets()
+            });
+
+            UsageSummary summary = UsageQuery.Summarize(new[] { data });
+
+            Assert.Single(summary.Sessions);
+            Assert.Equal(1, summary.SessionCount);
+            Assert.DoesNotContain(summary.Sessions, s => s.SessionId == "empty-session");
+        }
+
         [Theory]
         [InlineData(0, "0")]
         [InlineData(999, "999")]

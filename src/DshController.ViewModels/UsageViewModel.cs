@@ -39,11 +39,16 @@ namespace DshController.ViewModels
             Models = new ObservableCollection<UsageModelRow>();
             Sessions = new ObservableCollection<UsageSessionRow>();
             DailyBars = new ObservableCollection<UsageDayBar>();
+            Kpis = new ObservableCollection<UsageKpiRow>();
+            TrendPoints = new ObservableCollection<UsageTrendPoint>();
+            SetDashboardRange("7", reload: false);
         }
 
         public ObservableCollection<UsageModelRow> Models { get; }
         public ObservableCollection<UsageSessionRow> Sessions { get; }
         public ObservableCollection<UsageDayBar> DailyBars { get; }
+        public ObservableCollection<UsageKpiRow> Kpis { get; }
+        public ObservableCollection<UsageTrendPoint> TrendPoints { get; }
 
         [ObservableProperty] public partial bool IsBusy { get; set; }
         [ObservableProperty] public partial bool RefreshEnabled { get; set; } = true;
@@ -52,8 +57,8 @@ namespace DshController.ViewModels
         partial void OnIsBusyChanged(bool value) => RefreshEnabled = !value;
         [ObservableProperty] public partial string StatusText { get; set; } = "";
         [ObservableProperty] public partial string UpdatedText { get; set; } = "";
-        [ObservableProperty] public partial int RangeDays { get; set; }          // 0 = 全部
-        [ObservableProperty] public partial string RangeLabel { get; set; } = "全部时间";
+        [ObservableProperty] public partial int RangeDays { get; set; } = 7;     // 0 = 全部，-1 = 自定义
+        [ObservableProperty] public partial string RangeLabel { get; set; } = "近 7 天";
         [ObservableProperty] public partial bool HasData { get; set; }
         [ObservableProperty] public partial bool EmptyCanChangeRange { get; set; }
         [ObservableProperty] public partial string EmptyText { get; set; } =
@@ -68,6 +73,12 @@ namespace DshController.ViewModels
         [ObservableProperty] public partial string TopModelText { get; set; } = "—";
         [ObservableProperty] public partial string CompletenessText { get; set; } = "";
         [ObservableProperty] public partial string HeroSubText { get; set; } = "";
+        [ObservableProperty] public partial string UsageRangeKey { get; set; } = "7";
+        [ObservableProperty] public partial DateTimeOffset? UsageRangeStart { get; set; }
+        [ObservableProperty] public partial DateTimeOffset? UsageRangeEnd { get; set; }
+        [ObservableProperty] public partial string UsageRangeError { get; set; } = "";
+        [ObservableProperty] public partial string TrendMetric { get; set; } = "tokens";
+        [ObservableProperty] public partial string TrendTotalText { get; set; } = "—";
         /// <summary>按天柱图截断标注（W3：「全部」档超过 60 根不再静默截断）。</summary>
         [ObservableProperty] public partial string BarsNote { get; set; } = "";
         // hero 四桶堆叠条像素宽（卡宽固定，比例×330）
@@ -104,6 +115,8 @@ namespace DshController.ViewModels
             public double BarWUncached, BarWCacheRead, BarWCacheWrite, BarWOutput;
             public List<UsageModelRow> ModelRows = new List<UsageModelRow>();
             public List<UsageDayBar> Bars = new List<UsageDayBar>();
+            public List<UsageKpiRow> Kpis = new List<UsageKpiRow>();
+            public List<UsageTrendPoint> TrendPoints = new List<UsageTrendPoint>();
             public string BarsNote = "";
             public string StatusText = "";
         }
@@ -114,9 +127,10 @@ namespace DshController.ViewModels
         {
             int gen = ++_loadGen;
             int rangeDays = RangeDays;
+            DateTime? from = _rangeFrom, to = _rangeTo;
             double chartHeight = ChartHeight;
             List<(InstanceArchive Archive, UsageFacetData Usage)> pairs = CollectPairs(out DateTime? newest);
-            UsageFrame frame = await Task.Run(() => ComputeFrame(pairs, rangeDays, chartHeight));
+            UsageFrame frame = await Task.Run(() => ComputeFrame(pairs, from, to, rangeDays, chartHeight));
             if (gen != _loadGen) return;
             ApplyFrame(frame, newest);
         }
@@ -126,14 +140,14 @@ namespace DshController.ViewModels
         {
             _loadGen++;
             List<(InstanceArchive Archive, UsageFacetData Usage)> pairs = CollectPairs(out DateTime? newest);
-            ApplyFrame(ComputeFrame(pairs, RangeDays, ChartHeight), newest);
+            ApplyFrame(ComputeFrame(pairs, _rangeFrom, _rangeTo, RangeDays, ChartHeight), newest);
         }
 
         /// <summary>后台线程：全量会话遍历 + 汇总排序 + 行/柱构造（W6 的重活全在这）。
         /// 实例方法但只读参数与静态——不碰 Observable 状态，后台执行安全。</summary>
         private UsageFrame ComputeFrame(
             List<(InstanceArchive Archive, UsageFacetData Usage)> pairs,
-            int rangeDays, double chartHeight)
+            DateTime? from, DateTime? to, int rangeDays, double chartHeight)
         {
             var f = new UsageFrame();
 
@@ -149,9 +163,8 @@ namespace DshController.ViewModels
             }
             f.SessionLabels = labels;
 
-            DateTime? from = rangeDays > 0 ? DateTime.Now.Date.AddDays(-(rangeDays - 1)) : (DateTime?)null;
             UsageSummary summary = UsageQuery.Summarize(
-                pairs.Select(p => p.Usage).Where(u => u != null), from, null);
+                pairs.Select(p => p.Usage).Where(u => u != null), from, to);
             f.Summary = summary;
 
             f.HasData = pairs.Count > 0 && (summary.Totals.Total > 0 || summary.SessionCount > 0);
@@ -183,6 +196,11 @@ namespace DshController.ViewModels
             long grand = summary.Models.Sum(m => m.Totals.Total);
             foreach (UsageModelStat m in summary.Models.Take(30))
                 f.ModelRows.Add(UsageModelRow.From(m, grand));
+
+            f.Kpis = UsageDashboardBuilder.BuildKpis(summary);
+            DateTime trendFrom = from ?? UsageDashboardBuilder.WindowStart(summary, DateTime.Now.Date);
+            DateTime trendTo = to ?? DateTime.Now.Date;
+            f.TrendPoints = UsageDashboardBuilder.BuildTrend(summary, trendFrom, trendTo);
 
             f.Bars = BuildBars(summary, rangeDays, chartHeight, out string barsNote);
             f.BarsNote = barsNote;
@@ -224,6 +242,16 @@ namespace DshController.ViewModels
 
             DailyBars.Clear();
             foreach (UsageDayBar bar in f.Bars) DailyBars.Add(bar);
+
+            Kpis.Clear();
+            foreach (UsageKpiRow row in f.Kpis) Kpis.Add(row);
+            TrendPoints.Clear();
+            foreach (UsageTrendPoint point in f.TrendPoints)
+            {
+                point.SelectCommand = new RelayCommand(() => SelectTrendPoint(point));
+                TrendPoints.Add(point);
+            }
+            TrendTotalText = TrendMetric == "requests" ? RequestsText : TotalTokensText;
 
             ResetDrill();                       // 时间范围切换即清钻取（方案 §3.2 一致性）
 
@@ -301,9 +329,7 @@ namespace DshController.ViewModels
         [RelayCommand]
         private void SetRange(string days)
         {
-            RangeDays = int.TryParse(days, out int d) ? d : 0;
-            RangeLabel = RangeDays > 0 ? "最近 " + RangeDays + " 天" : "全部时间";
-            Reload();
+            SetDashboardRange(days, reload: true);
         }
 
         /// <summary>强制重采：全部未退役实例（退役档案没有实例可采，只重新渲染）。</summary>

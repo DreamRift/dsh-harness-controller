@@ -18,49 +18,49 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Grid Grid.Row="0" Margin="34,28,34,18" ColumnSpacing="10">
+        <Grid Grid.Row="0" Margin="34,28,34,20" ColumnSpacing="12">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="0" Spacing="5">
+            <StackPanel Grid.Column="0" Spacing="8">
                 <TextBlock Text="EXTENSIONS" Style="{StaticResource PageEyebrow}" />
-                <TextBlock Text="插件市场" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="插件市场" Style="{StaticResource HeadingLg}" />
             </StackPanel>
-            <TextBlock Grid.Column="1" x:Name="TxtFreshness" Style="{StaticResource FooterText}"
-                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="320"
+            <TextBlock Grid.Column="1" x:Name="TxtFreshness" Style="{StaticResource BodySm}"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="360"
                        ToolTipService.ToolTip="各来源加载状态与数据时间" />
-            <Button Grid.Column="2" x:Name="BtnSources" Style="{StaticResource BtnCompact}" Click="BtnSources_Click"
+            <Button Grid.Column="2" x:Name="BtnSources" Style="{StaticResource BtnSecondaryEnhanced}" Click="BtnSources_Click"
                     ToolTipService.ToolTip="选择启用的目录来源">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;" FontSize="12" />
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE8FD;" FontSize="13" />
                     <TextBlock x:Name="TxtSourcesLabel" Text="数据源" />
                 </StackPanel>
             </Button>
-            <Button Grid.Column="3" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnCompact}" Click="BtnRefreshCatalog_Click"
+            <Button Grid.Column="3" x:Name="BtnRefreshCatalog" Style="{StaticResource BtnSecondaryEnhanced}" Click="BtnRefreshCatalog_Click"
                     ToolTipService.ToolTip="重新拉取全部启用来源的目录">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="12" />
+                <StackPanel Orientation="Horizontal" Spacing="7">
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="13" />
                     <TextBlock Text="刷新" />
                 </StackPanel>
             </Button>
         </Grid>
 
         <!-- 两栏壳·宽度治理：TxtInstanceMeta 由行内第 5 列移入下缘小字行（960 档主区≈690 不再挤出窗口；控件与绑定不变） -->
-        <Border Grid.Row="1" Style="{StaticResource DshToolbarCard}" Margin="34,0,34,10">
-            <StackPanel Spacing="4">
-                <Grid ColumnSpacing="10">
+        <Border Grid.Row="1" Style="{StaticResource CardCompact}" Margin="34,0,34,16">
+            <StackPanel Spacing="8">
+                <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="130" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="安装到实例" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
-                    <ComboBox Grid.Column="1" x:Name="CmbInstance" Style="{StaticResource InputCombo}" HorizontalAlignment="Stretch"
+                    <TextBlock Grid.Column="0" Text="安装到实例" Style="{StaticResource FormLabel}" VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1" x:Name="CmbInstance" HorizontalAlignment="Stretch"
                               SelectionChanged="CmbInstance_Changed"
                               ToolTipService.ToolTip="Windows 与 WSL 实例都在此列表">
                         <ComboBox.ItemTemplate>
@@ -69,19 +69,19 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <TextBlock Grid.Column="2" Text="配置档案" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"
+                    <TextBlock Grid.Column="2" Text="配置档案" Style="{StaticResource FormLabel}" VerticalAlignment="Center"
                                ToolTipService.ToolTip="dsh 实例 HOME 下的 profiles/&lt;配置档案&gt;/ 目录，插件装进这个档案。web 是 dsh 官方默认档案，一般不用改。" />
-                    <TextBox Grid.Column="3" x:Name="TxtProfile" Style="{StaticResource InputBox}" Text="web" />
-                    <Button Grid.Column="4" x:Name="BtnOpenHome" Style="{StaticResource BtnCompact}" Click="BtnOpenHome_Click"
+                    <TextBox Grid.Column="3" x:Name="TxtProfile" Style="{StaticResource TextBoxEnhanced}" Text="web" />
+                    <Button Grid.Column="4" x:Name="BtnOpenHome" Style="{StaticResource BtnGhostEnhanced}" Click="BtnOpenHome_Click"
                             Content="打开 HOME" ToolTipService.ToolTip="打开所选实例的 DSH_HOME 目录" />
                 </Grid>
-                <TextBlock x:Name="TxtInstanceMeta" Style="{StaticResource FooterText}" HorizontalAlignment="Right"
-                           TextTrimming="CharacterEllipsis" Margin="2,0,2,0" />
+                <TextBlock x:Name="TxtInstanceMeta" Style="{StaticResource BodySm}" HorizontalAlignment="Right"
+                           TextTrimming="CharacterEllipsis" Margin="0" />
             </StackPanel>
         </Border>
 
-        <Border Grid.Row="2" Style="{StaticResource DshCardTight}" Margin="34,0,34,14">
-            <Grid ColumnSpacing="8">
+        <Border Grid.Row="2" Style="{StaticResource CardCompact}" Margin="34,0,34,20">
+            <Grid ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -89,20 +89,20 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBox Grid.Column="0" x:Name="TxtSearch" Style="{StaticResource InputBox}"
+                <TextBox Grid.Column="0" x:Name="TxtSearch" Style="{StaticResource TextBoxEnhanced}"
                          PlaceholderText="搜索名称、简介、包名或标签" TextChanged="TxtSearch_TextChanged" />
-                <ComboBox Grid.Column="1" x:Name="CmbCategory" Style="{StaticResource InputCombo}" MinWidth="130"
+                <ComboBox Grid.Column="1" x:Name="CmbCategory" MinWidth="140"
                           SelectionChanged="Filter_SelectionChanged" ToolTipService.ToolTip="按分类过滤">
                     <ComboBoxItem Content="全部分类" IsSelected="True" Tag="" />
                 </ComboBox>
-                <ComboBox Grid.Column="2" x:Name="CmbSort" Style="{StaticResource InputCombo}" MinWidth="104"
+                <ComboBox Grid.Column="2" x:Name="CmbSort" MinWidth="120"
                           SelectionChanged="Filter_SelectionChanged" ToolTipService.ToolTip="排序方式">
                     <ComboBoxItem Content="按热度" IsSelected="True" Tag="stars" />
                     <ComboBoxItem Content="最近更新" Tag="updated" />
                 </ComboBox>
-                <CheckBox Grid.Column="3" x:Name="ChkInstallable" Content="仅可安装" MinHeight="40"
+                <CheckBox Grid.Column="3" x:Name="ChkInstallable" Content="仅可安装" MinHeight="36"
                           Checked="Filter_Toggled" Unchecked="Filter_Toggled" />
-                <CheckBox Grid.Column="4" x:Name="ChkVerified" Content="仅人工复核" MinHeight="40"
+                <CheckBox Grid.Column="4" x:Name="ChkVerified" Content="仅人工复核" MinHeight="36"
                           Checked="Filter_Toggled" Unchecked="Filter_Toggled" />
             </Grid>
         </Border>
@@ -111,45 +111,52 @@
             <ListView x:Name="ListPlugins" SelectionMode="None" Padding="0,0,6,0">
                 <ListView.ItemTemplate>
                     <DataTemplate x:DataType="local:MarketItem">
-                        <Border Style="{StaticResource DshCardTight}" Margin="0,0,0,10">
-                            <Grid ColumnSpacing="18">
+                        <Border Style="{StaticResource CardPrimary}" Margin="0,0,0,12">
+                            <Grid ColumnSpacing="20">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" Spacing="6">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{x:Bind Title}" FontSize="14" FontWeight="SemiBold"
-                                                   Foreground="{ThemeResource LabelPrimaryBrush}" TextTrimming="CharacterEllipsis" />
-                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind VerifiedVis}">
-                                            <TextBlock Text="✓ 人工复核" Style="{StaticResource ChipText}" />
+                                <StackPanel Grid.Column="0" Spacing="10">
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <TextBlock Text="{x:Bind Title}" Style="{StaticResource HeadingSm}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Border Style="{StaticResource BadgeSuccess}" Visibility="{x:Bind VerifiedVis}">
+                                            <TextBlock Text="✓ 人工复核" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource StateRunBrush}" />
                                         </Border>
-                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind UnverifiedVis}">
-                                            <TextBlock Text="未审核" Style="{StaticResource ChipText}" />
+                                        <Border Style="{StaticResource BadgeWarning}" Visibility="{x:Bind UnverifiedVis}">
+                                            <TextBlock Text="未审核" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource StateStartingBrush}" />
                                         </Border>
-                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind InstalledVis}">
-                                            <TextBlock Text="已安装" Style="{StaticResource ChipText}" />
+                                        <Border Style="{StaticResource BadgePrimary}" Visibility="{x:Bind InstalledVis}">
+                                            <TextBlock Text="已安装" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource BrandPrimaryBrush}" />
                                         </Border>
-                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind MultiSourceVis}">
-                                            <TextBlock Text="{x:Bind SourceText}" Style="{StaticResource ChipText}" />
+                                        <Border Style="{StaticResource BadgePrimary}" Visibility="{x:Bind MultiSourceVis}">
+                                            <TextBlock Text="{x:Bind SourceText}" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource BrandPrimaryBrush}" />
                                         </Border>
-                                        <Border Style="{StaticResource Chip}" Visibility="{x:Bind BrowseVis}">
-                                            <TextBlock Text="仅浏览" Style="{StaticResource ChipText}" />
+                                        <Border Style="{StaticResource BadgeWarning}" Visibility="{x:Bind BrowseVis}">
+                                            <TextBlock Text="仅浏览" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource StateStartingBrush}" />
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock Text="{x:Bind MetaText}" Style="{StaticResource FooterText}" />
-                                    <TextBlock Text="{x:Bind DescText}" FontSize="13" Foreground="{ThemeResource LabelSecondaryBrush}"
+                                    <TextBlock Text="{x:Bind MetaText}" Style="{StaticResource BodySm}" />
+                                    <TextBlock Text="{x:Bind DescText}" Style="{StaticResource BodyMd}"
                                                TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind PkgText}" Style="{StaticResource MonoText}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{x:Bind CompatText}" Style="{StaticResource HelperText}" TextTrimming="CharacterEllipsis"
+                                    <TextBlock Text="{x:Bind PkgText}" FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                                               Foreground="{ThemeResource LabelTertiaryBrush}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{x:Bind CompatText}" Style="{StaticResource FormHint}" TextTrimming="CharacterEllipsis"
                                                Visibility="{x:Bind CompatVis}" />
                                 </StackPanel>
-                                <StackPanel Grid.Column="1" Spacing="8" VerticalAlignment="Top">
-                                    <Button Style="{StaticResource BtnPrimary}" Content="{x:Bind InstallLabel}"
+                                <StackPanel Grid.Column="1" Spacing="10" VerticalAlignment="Top">
+                                    <Button Style="{StaticResource BtnPrimaryEnhanced}" Content="{x:Bind InstallLabel}"
                                             IsEnabled="{x:Bind InstallEnabled}" Click="BtnInstall_Click" Tag="{x:Bind}"
-                                            Visibility="{x:Bind InstallVis}" ToolTipService.ToolTip="{x:Bind InstallTip}" />
-                                    <Button Style="{StaticResource BtnCompact}" Content="详情" Click="BtnDetail_Click" Tag="{x:Bind}"
-                                            ToolTipService.ToolTip="查看简介、来源和安装命令" />
+                                            Visibility="{x:Bind InstallVis}" ToolTipService.ToolTip="{x:Bind InstallTip}"
+                                            MinWidth="100" />
+                                    <Button Style="{StaticResource BtnSecondaryEnhanced}" Content="详情" Click="BtnDetail_Click" Tag="{x:Bind}"
+                                            ToolTipService.ToolTip="查看简介、来源和安装命令" MinWidth="100" />
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -158,23 +165,23 @@
             </ListView>
 
             <StackPanel x:Name="EmptyState" Visibility="Collapsed" VerticalAlignment="Center"
-                        HorizontalAlignment="Center" Spacing="10" MaxWidth="460">
-                <Border Width="52" Height="52" CornerRadius="16" Background="{ThemeResource BrandSoftBrush}"
+                        HorizontalAlignment="Center" Spacing="16" MaxWidth="480">
+                <Border Width="64" Height="64" CornerRadius="{StaticResource RadiusLg}" Background="{ThemeResource BrandSoftBrush}"
                         HorizontalAlignment="Center">
-                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="22"
+                    <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE719;" FontSize="28"
                               Foreground="{ThemeResource BrandPrimaryBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
-                <TextBlock x:Name="TxtEmpty" Text="" TextWrapping="Wrap" TextAlignment="Center"
-                           Foreground="{ThemeResource LabelSecondaryBrush}" HorizontalAlignment="Center" />
+                <TextBlock x:Name="TxtEmpty" Text="" Style="{StaticResource BodyMd}" TextWrapping="Wrap" TextAlignment="Center"
+                           HorizontalAlignment="Center" />
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="4" Margin="34,10,34,12" ColumnSpacing="8">
+        <Grid Grid.Row="4" Margin="34,16,34,16" ColumnSpacing="10">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <ProgressRing Grid.Column="0" x:Name="BusyRing" Width="18" Height="18" IsActive="False" VerticalAlignment="Center" />
+            <ProgressRing Grid.Column="0" x:Name="BusyRing" Width="20" Height="20" IsActive="False" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" x:Name="TxtStatus" Style="{StaticResource FooterText}" VerticalAlignment="Center"
                        TextTrimming="CharacterEllipsis" />
         </Grid>

@@ -126,7 +126,11 @@ namespace DshController
         private static string CapacityText(DiscoveredModel m)
         {
             var parts = new List<string>();
-            if (m.Multimodal == true) parts.Add("多模态");
+            var modalities = new List<string>();
+            if (m.SupportImage == true) modalities.Add("图片");
+            if (m.SupportVideo == true) modalities.Add("视频");
+            if (m.SupportAudio == true) modalities.Add("音频");
+            if (modalities.Count > 0) parts.Add(string.Join("/", modalities));
             if (m.ContextWindow.HasValue) parts.Add("上下文 " + ProviderPresetRules.FormatCapacity(m.ContextWindow.Value));
             if (m.MaxTokens.HasValue) parts.Add("最大输出 " + ProviderPresetRules.FormatCapacity(m.MaxTokens.Value));
             return string.Join(" · ", parts);

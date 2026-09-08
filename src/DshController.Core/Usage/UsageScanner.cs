@@ -25,6 +25,7 @@ namespace DshController.Core.Usage
     public sealed class UsageScanResult
     {
         public List<UsageModelStat> Models { get; set; } = new List<UsageModelStat>();
+        public List<UsageSessionScan> Sessions { get; set; } = new List<UsageSessionScan>();
         public int Files { get; set; }
         public bool Complete { get; set; }
         public string Error { get; set; } = "";
@@ -35,16 +36,16 @@ namespace DshController.Core.Usage
         /// <summary>会话样本缓存上限（一份样本约几十 KB，512 份足够覆盖常见规模）。</summary>
         public const int CacheCapacity = 512;
 
-        private sealed class CachedSamples
+        private sealed class CachedSession
         {
             public long Length;
             public long MtimeEpoch;
             public long LastUsedTicks;
-            public List<UsageSample> Samples;
+            public UsageSessionScan Session;
         }
 
-        private static readonly ConcurrentDictionary<string, CachedSamples> Cache =
-            new ConcurrentDictionary<string, CachedSamples>(StringComparer.OrdinalIgnoreCase);
+        private static readonly ConcurrentDictionary<string, CachedSession> Cache =
+            new ConcurrentDictionary<string, CachedSession>(StringComparer.OrdinalIgnoreCase);
 
         public static void ClearCache() => Cache.Clear();
 
@@ -72,23 +73,24 @@ namespace DshController.Core.Usage
                 return result;
             }
 
-            var perSession = new List<List<UsageSample>>();
+            var perSession = new List<UsageSessionScan>();
             await Task.Run(() =>
             {
                 foreach (string file in files)
                 {
                     ct.ThrowIfCancellationRequested();
-                    List<UsageSample> samples = LoadWindowsSession(file);
-                    if (samples != null) perSession.Add(samples);
+                    UsageSessionScan session = LoadWindowsSession(file);
+                    if (session != null) perSession.Add(session);
                 }
             }, ct).ConfigureAwait(false);
 
-            result.Models = UsageParser.AggregateModels(perSession);
+            result.Sessions = perSession;
+            result.Models = UsageParser.AggregateModels(perSession.Select(s => s.Samples));
             result.Complete = true;
             return result;
         }
 
-        private static List<UsageSample> LoadWindowsSession(string file)
+        private static UsageSessionScan LoadWindowsSession(string file)
         {
             try
             {
@@ -96,13 +98,13 @@ namespace DshController.Core.Usage
                 if (!fi.Exists) return null;
                 long mtime = new DateTimeOffset(fi.LastWriteTimeUtc).ToUnixTimeSeconds();
                 string key = "win:" + file;
-                List<UsageSample> hit = TryGetCached(key, fi.Length, mtime);
+                UsageSessionScan hit = TryGetCached(key, fi.Length, mtime);
                 if (hit != null) return hit;
 
                 string text = Encoding.UTF8.GetString(Decompress(File.ReadAllBytes(file)));
-                List<UsageSample> samples = UsageParser.ParseSessionSamples(text);
-                Put(key, fi.Length, mtime, samples);
-                return samples;
+                UsageSessionScan session = UsageParser.ParseSessionScan(text);
+                Put(key, fi.Length, mtime, session);
+                return session;
             }
             catch
             {
@@ -188,11 +190,11 @@ namespace DshController.Core.Usage
             }
 
             // 只取缓存未命中的文件；全部命中时第二次往返都省了
-            var perSession = new List<List<UsageSample>>();
+            var perSession = new List<UsageSessionScan>();
             var wanted = new List<string>();
             foreach (WslFileEntry e in entries)
             {
-                List<UsageSample> hit = TryGetCached(CacheKey(distro, e.Path), e.Size, e.Mtime);
+                UsageSessionScan hit = TryGetCached(CacheKey(distro, e.Path), e.Size, e.Mtime);
                 if (hit != null) perSession.Add(hit);
                 else wanted.Add(e.Path);
             }
@@ -203,10 +205,11 @@ namespace DshController.Core.Usage
                 List<string> batch = wanted.GetRange(i, Math.Min(Math.Max(1, batchSize), wanted.Count - i));
                 WslResult fetched = await WslTools
                     .RunInDistroAsync(distro, BuildFetchScript(batch), 300000).ConfigureAwait(false);
-                perSession.AddRange(ParseWslFrames(fetched.Output, distro));
+                perSession.AddRange(ParseWslScanFrames(fetched.Output, distro));
             }
 
-            result.Models = UsageParser.AggregateModels(perSession);
+            result.Sessions = perSession;
+            result.Models = UsageParser.AggregateModels(perSession.Select(s => s.Samples));
             result.Complete = true;
             return result;
         }
@@ -214,7 +217,13 @@ namespace DshController.Core.Usage
         /// <summary>解析 base64 帧（离线可测）。</summary>
         public static List<List<UsageSample>> ParseWslFrames(string output, string cacheNamespace)
         {
-            var result = new List<List<UsageSample>>();
+            return ParseWslScanFrames(output, cacheNamespace).Select(s => s.Samples).ToList();
+        }
+
+        /// <summary>解析 WSL 帧为 token 与时序的完整会话扫描结果。</summary>
+        public static List<UsageSessionScan> ParseWslScanFrames(string output, string cacheNamespace)
+        {
+            var result = new List<UsageSessionScan>();
             if (string.IsNullOrEmpty(output)) return result;
 
             int pos = 0;
@@ -251,21 +260,21 @@ namespace DshController.Core.Usage
                 if (b64.Length == 0) continue;
 
                 string key = CacheKey(cacheNamespace, path);
-                List<UsageSample> samples = TryGetCached(key, sz, mt);
-                if (samples == null)
+                UsageSessionScan session = TryGetCached(key, sz, mt);
+                if (session == null)
                 {
                     try
                     {
                         string text = Encoding.UTF8.GetString(Decompress(Convert.FromBase64String(b64.ToString())));
-                        samples = UsageParser.ParseSessionSamples(text);
-                        Put(key, sz, mt, samples);
+                        session = UsageParser.ParseSessionScan(text);
+                        Put(key, sz, mt, session);
                     }
                     catch
                     {
-                        samples = null;   // 理由: 单帧损坏（传输截断/文件损坏）跳过，其余会话照常统计
+                        session = null;   // 理由: 单帧损坏（传输截断/文件损坏）跳过，其余会话照常统计
                     }
                 }
-                if (samples != null) result.Add(samples);
+                if (session != null) result.Add(session);
             }
             return result;
         }
@@ -274,24 +283,24 @@ namespace DshController.Core.Usage
 
         private static string CacheKey(string ns, string path) => "wsl:" + ns + ":" + path;
 
-        private static List<UsageSample> TryGetCached(string key, long size, long mtime)
+        private static UsageSessionScan TryGetCached(string key, long size, long mtime)
         {
-            if (Cache.TryGetValue(key, out CachedSamples c) && c.Length == size && c.MtimeEpoch == mtime)
+            if (Cache.TryGetValue(key, out CachedSession c) && c.Length == size && c.MtimeEpoch == mtime)
             {
                 c.LastUsedTicks = DateTime.UtcNow.Ticks;
-                return c.Samples;
+                return c.Session;
             }
             return null;
         }
 
-        private static void Put(string key, long size, long mtime, List<UsageSample> samples)
+        private static void Put(string key, long size, long mtime, UsageSessionScan session)
         {
-            Cache[key] = new CachedSamples
+            Cache[key] = new CachedSession
             {
                 Length = size,
                 MtimeEpoch = mtime,
                 LastUsedTicks = DateTime.UtcNow.Ticks,
-                Samples = samples
+                Session = session
             };
             if (Cache.Count <= CacheCapacity) return;
 

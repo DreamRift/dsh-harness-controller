@@ -161,6 +161,11 @@ namespace DshController.Tests
             var vm = new ArchiveMetaViewModel(fake);
             vm.Show("a1");
 
+            // 默认近 7 天；扩大为自定义范围后才触发详情兼容柱图的 30 天截断标注。
+            vm.UsageRangeStart = DateTimeOffset.Now.Date.AddDays(-34);
+            vm.UsageRangeEnd = DateTimeOffset.Now.Date;
+            vm.ApplyCustomUsageRangeCommand.Execute(null);
+
             Assert.Equal(30, vm.DailyBars.Count);                    // 详情卡只画最近 30 根
             Assert.Contains("30", vm.UsageBarsNote);                 // W3：不再静默截断
             Assert.Contains("35", vm.UsageBarsNote);
@@ -300,6 +305,73 @@ namespace DshController.Tests
             Assert.Equal("", vm.SelectedDay);
             Assert.Single(vm.Sessions);                             // 回到全量
             Assert.DoesNotContain(vm.DailyBars, b => b.IsSelected);
+        }
+
+        [Fact]
+        public void 档案用量默认近七天并生成五卡趋势点()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a1", "甲", false, UsageSpanDays(10));
+            var vm = new ArchiveMetaViewModel(fake);
+            vm.Show("a1");
+
+            Assert.Equal("近 7 天", vm.UsageRangeLabel);
+            Assert.Equal(5, vm.Kpis.Count);
+            Assert.Equal(7, vm.TrendPoints.Count);
+            Assert.Equal("tokens", vm.TrendMetric);
+            Assert.Contains(vm.Kpis, k => k.Label == "平均首 Token" && k.Value == "—");
+        }
+
+        [Fact]
+        public void 档案用量将有效TTFT写入第五张KPI()
+        {
+            UsageFacetData data = Usage(1000);
+            string today = DateTime.Now.Date.ToString("yyyy-MM-dd");
+            data.Latency = new UsageLatencyStats { Samples = 2, TtftMs = 600 };
+            data.DailyLatency[today] = new UsageLatencyStats { Samples = 2, TtftMs = 600 };
+            var fake = new FakeArchiveFacade();
+            fake.Add("a1", "甲", false, data);
+            var vm = new ArchiveMetaViewModel(fake);
+            vm.Show("a1");
+
+            Assert.Contains(vm.Kpis, k => k.Label == "平均首 Token" && k.Value == "300 ms" &&
+                k.Detail.Contains("2 个有效步骤样本"));
+        }
+
+        [Fact]
+        public void 自定义范围非法时保留上次有效趋势()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a1", "甲", false, UsageSpanDays(10));
+            var vm = new ArchiveMetaViewModel(fake);
+            vm.Show("a1");
+            int prior = vm.TrendPoints.Count;
+
+            vm.UsageRangeStart = DateTimeOffset.Now.Date;
+            vm.UsageRangeEnd = DateTimeOffset.Now.Date.AddDays(-1);
+            vm.ApplyCustomUsageRangeCommand.Execute(null);
+
+            Assert.NotEmpty(vm.UsageRangeError);
+            Assert.Equal(prior, vm.TrendPoints.Count);
+        }
+
+        [Fact]
+        public void 超过九十天趋势按周聚合且可逆钻取()
+        {
+            var fake = new FakeArchiveFacade();
+            fake.Add("a1", "甲", false, UsageSpanDays(100));
+            var vm = new ArchiveMetaViewModel(fake);
+            vm.Show("a1");
+            vm.UsageRangeStart = DateTimeOffset.Now.Date.AddDays(-99);
+            vm.UsageRangeEnd = DateTimeOffset.Now.Date;
+            vm.ApplyCustomUsageRangeCommand.Execute(null);
+
+            Assert.InRange(vm.TrendPoints.Count, 14, 16);
+            UsageTrendPoint first = vm.TrendPoints[0];
+            first.SelectCommand.Execute(null);
+            Assert.True(vm.HasDay);
+            first.SelectCommand.Execute(null);
+            Assert.False(vm.HasDay);
         }
     }
 }

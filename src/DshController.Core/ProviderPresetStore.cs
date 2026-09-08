@@ -20,14 +20,16 @@ using DshController.Core.Storage;
 namespace DshController.Core
 {
     /// <summary>模型目录一行（形状对齐实例侧 providers.*.models[]；容量 null=继承默认；
-    /// Multimodal 三态：null=未知（同步省略 input）、false=纯文本（input:[text]）、true=图文）。</summary>
+    /// 模态支持三态：null=未知（同步省略该模态）、false=明确不支持、true=支持）。</summary>
     public sealed class PresetModel
     {
         public string Id { get; set; } = "";
         public string Name { get; set; } = "";
         public long? ContextWindow { get; set; }
         public long? MaxTokens { get; set; }
-        public bool? Multimodal { get; set; }
+        public bool? SupportImage { get; set; }
+        public bool? SupportVideo { get; set; }
+        public bool? SupportAudio { get; set; }
     }
 
     /// <summary>一条供应商预设（全局层形状；字段语义对齐 dsh 自定义提供方 profile）。</summary>
@@ -90,7 +92,7 @@ namespace DshController.Core
                 {
                     new PresetModel { Id = "deepseek-v4-flash", Name = "DeepSeek-V4-Flash", ContextWindow = 1000000, MaxTokens = 384000 },
                     new PresetModel { Id = "deepseek-v4-pro", Name = "DeepSeek-V4-Pro", ContextWindow = 1000000, MaxTokens = 384000 },
-                    new PresetModel { Id = "deepseek-v4-flash-vision-exp", Name = "DeepSeek-V4-Flash-Vision-Exp", ContextWindow = 1000000, MaxTokens = 384000, Multimodal = true }
+                    new PresetModel { Id = "deepseek-v4-flash-vision-exp", Name = "DeepSeek-V4-Flash-Vision-Exp", ContextWindow = 1000000, MaxTokens = 384000, SupportImage = true }
                 },
                 Enabled = true
             };

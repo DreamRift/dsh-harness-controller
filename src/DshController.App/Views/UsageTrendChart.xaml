@@ -1,0 +1,31 @@
+<UserControl
+    x:Class="DshController.Views.UsageTrendChart"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+    <Grid x:Name="Root" MinHeight="258" Background="Transparent" IsTabStop="True" KeyDown="Root_KeyDown"
+          AutomationProperties.Name="用量趋势图，可用左右方向键选择时间点">
+        <!-- 静态曲线与 hover 交互分层：移动鼠标只更新下层，不重画曲线。 -->
+        <Canvas x:Name="StaticCanvas" MinHeight="258" SizeChanged="StaticCanvas_SizeChanged" />
+        <Canvas x:Name="InteractionCanvas" MinHeight="258" Background="Transparent"
+                PointerMoved="InteractionCanvas_PointerMoved"
+                PointerExited="InteractionCanvas_PointerExited"
+                PointerPressed="InteractionCanvas_PointerPressed" />
+        <TextBlock x:Name="EmptyText" Text="所选时间范围暂无请求记录" Style="{StaticResource HelperText}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+        <Canvas x:Name="OverlayCanvas" IsHitTestVisible="False">
+            <Border x:Name="HoverCard" Width="190" Padding="12,10" CornerRadius="10"
+                    Background="{ThemeResource BgCardBrush}" BorderBrush="{ThemeResource BrandPrimaryBrush}"
+                    BorderThickness="1" Visibility="Collapsed" Canvas.ZIndex="5">
+                <StackPanel Spacing="4">
+                    <TextBlock x:Name="HoverTitle" FontWeight="SemiBold" Foreground="{ThemeResource LabelPrimaryBrush}" />
+                    <TextBlock x:Name="HoverTokens" Style="{StaticResource HelperText}" />
+                    <TextBlock x:Name="HoverRequests" Style="{StaticResource HelperText}" />
+                    <TextBlock x:Name="HoverTtft" Style="{StaticResource HelperText}" />
+                </StackPanel>
+            </Border>
+        </Canvas>
+    </Grid>
+</UserControl>
